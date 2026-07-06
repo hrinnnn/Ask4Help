@@ -106,7 +106,8 @@ bash requirements/install.sh embodied --model openpi --env maniskill_libero
 
 - If Docker is available and working, prefer the official RLinf Docker image and switch into the documented `openpi` environment before running experiments.
 - Do not patch dependency versions, copy package files, or bypass `uv sync` manually unless the official install path has failed and the failure has been recorded.
-- When an official install command is running, let it reach a stable download/install phase before interrupting it. If stopping is required, stop cleanly and record what stage was reached.
+- For long official installs or downloads, start the command in a durable background session or with `nohup`, record the PID and log path, confirm it is actively running, then report back instead of continuously watching it.
+- Do not stop an official install merely because it has reached a stable download/install phase. Stop it only if the user explicitly asks to stop, or if it is clearly failing or corrupting the environment.
 - Smoke tests should run only after the official environment checks pass:
 
 ```bash
