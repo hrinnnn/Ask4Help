@@ -94,3 +94,24 @@ git submodule update --init --recursive
   - LIBERO documentation for environment setup and task suites.
   - NVIDIA Docker / NVIDIA Container Toolkit docs for GPU container issues.
 - Record any non-obvious fixes or server-specific setup steps in this workspace so future servers can be recreated faster.
+
+## Official Setup Discipline
+
+- For RLinf/openpi/LIBERO environment setup, follow the official RLinf installation path first:
+
+```bash
+cd /root/Ask4Help/RLinf
+bash requirements/install.sh embodied --model openpi --env maniskill_libero
+```
+
+- If Docker is available and working, prefer the official RLinf Docker image and switch into the documented `openpi` environment before running experiments.
+- Do not patch dependency versions, copy package files, or bypass `uv sync` manually unless the official install path has failed and the failure has been recorded.
+- When an official install command is running, let it reach a stable download/install phase before interrupting it. If stopping is required, stop cleanly and record what stage was reached.
+- Smoke tests should run only after the official environment checks pass:
+
+```bash
+cd /root/Ask4Help/RLinf
+.venv/bin/python -c "import torch, ray, transformers, openpi, libero; print(torch.cuda.is_available(), transformers.__version__)"
+```
+
+- Treat ad hoc fixes as temporary diagnostics, not as the reproducible setup. Convert any necessary fix into a documented command or script before relying on it.
