@@ -1,0 +1,47 @@
+# Ask4Help Agent Notes
+
+## Source Control Workflow
+
+- Treat GitHub as the source of truth for this workspace.
+- Do code editing and documentation updates on the local machine first, then push to `https://github.com/hrinnnn/Ask4Help`.
+- Treat cloud servers as run environments by default. On a new server, clone or pull from GitHub instead of writing long-lived code directly there.
+- For a fresh server clone, use:
+
+```bash
+git clone --recurse-submodules https://github.com/hrinnnn/Ask4Help.git
+```
+
+- For updating an existing server checkout, use:
+
+```bash
+cd /root/Ask4Help
+git pull
+git submodule update --init --recursive
+```
+
+- Server-side GitHub write access is only needed when intentionally pushing changes made on the server. Prefer avoiding that for disposable Aliyun instances.
+- If server-side push is needed, use a repository-scoped deploy key with write access, and remove stale keys when the server is replaced.
+
+## Server Environment Workflow
+
+- Use the server mainly to install dependencies, run RL experiments, and validate GPU/runtime behavior.
+- Once CUDA, Docker, RLinf, openpi, LIBERO, model weights, and smoke tests are working, save an Aliyun custom image.
+- Keep code updates in GitHub even when using a saved server image; after booting from the image, pull the latest code.
+- Do not rely on a disposable server filesystem as the only copy of code, configs, or experiment notes.
+
+## RLinf / pi0.5 Setup Guidance
+
+- For pi0.5 RL, prefer the RLinf + openpi + LIBERO path first.
+- Use Flow-SDE for pi0.5 unless there is a specific reason to compare Flow-Noise.
+- Confirm that configs keep `openpi.noise_method: "flow_sde"` and `openpi.train_expert_only: True` when the goal is RL on the flow-based action expert.
+- Prefer Docker for reproducible server setup. If Docker or NVIDIA container runtime fails, debug that layer before changing RLinf code.
+
+## Documentation First
+
+- When blocked or uncertain, consult official documentation before guessing:
+  - RLinf docs for installation, Docker images, configs, and run scripts.
+  - RLinf repository configs under `RLinf/examples/embodiment/config/`.
+  - openpi documentation or repository notes for pi0/pi0.5 model behavior.
+  - LIBERO documentation for environment setup and task suites.
+  - NVIDIA Docker / NVIDIA Container Toolkit docs for GPU container issues.
+- Record any non-obvious fixes or server-specific setup steps in this workspace so future servers can be recreated faster.
