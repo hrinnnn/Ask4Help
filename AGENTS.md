@@ -29,6 +29,55 @@ git submodule update --init --recursive
 - Keep code updates in GitHub even when using a saved server image; after booting from the image, pull the latest code.
 - Do not rely on a disposable server filesystem as the only copy of code, configs, or experiment notes.
 
+## Persistence Strategy
+
+- Use GitHub for source code and lightweight reproducible configuration:
+  - workspace notes and docs
+  - custom YAML configs
+  - launch scripts
+  - small patches
+  - experiment manifests
+  - RLinf submodule pointers
+- Do not put large or frequently changing artifacts in GitHub:
+  - model weights
+  - LIBERO datasets
+  - checkpoints
+  - TensorBoard logs
+  - evaluation videos
+  - large generated rollouts
+- Use Aliyun custom images for the reusable system/runtime environment:
+  - Docker
+  - NVIDIA Container Toolkit
+  - CUDA-compatible runtime setup
+  - base apt packages
+  - conda/uv/venv tooling
+  - RLinf/openpi/LIBERO dependency environments
+  - smoke-tested runtime fixes
+- Avoid baking fast-changing experiment artifacts into images. Images should make a new server boot quickly into a usable environment, while GitHub and OSS provide current code and data.
+- Use OSS or a persistent cloud disk for large durable artifacts:
+  - Hugging Face / ModelScope model checkpoints
+  - LIBERO datasets
+  - RL training checkpoints
+  - logs
+  - evaluation videos
+  - result archives
+- Preferred server layout:
+
+```bash
+/root/Ask4Help              # GitHub workspace
+/data/ask4help/models       # model weights
+/data/ask4help/datasets     # datasets and simulator assets
+/data/ask4help/results      # logs, checkpoints, videos, eval outputs
+```
+
+- Preferred lifecycle:
+  1. Edit locally and push to GitHub.
+  2. On a server, clone or pull GitHub code.
+  3. Sync large inputs from OSS or mount a persistent data disk.
+  4. Run experiments and write outputs under `/data/ask4help/results`.
+  5. Sync results/checkpoints/videos back to OSS.
+  6. After the runtime is verified, save an Aliyun custom image for future instances.
+
 ## RLinf / pi0.5 Setup Guidance
 
 - For pi0.5 RL, prefer the RLinf + openpi + LIBERO path first.
