@@ -48,6 +48,7 @@ require_path() {
 activate_rlinf() {
   require_path "${RLINF_DIR}" "RLinf checkout"
   require_path "${RLINF_DIR}/.venv/bin/activate" "RLinf venv"
+  export PYTHONPATH="${PYTHONPATH:-}"
   # shellcheck disable=SC1091
   source "${RLINF_DIR}/.venv/bin/activate"
 }
@@ -62,4 +63,3 @@ export_rll_env() {
   export EMBODIED_PATH="${EMBODIED_PATH:-${RLINF_DIR}/examples/embodiment}"
   export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 }
-
