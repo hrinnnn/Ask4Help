@@ -12,6 +12,9 @@ require_path "${GRM_GOAL_BANK_DIR}/task_000/meta.json" "GRM goal bank"
 
 CONFIG_NAME="libero_spatial_ppo_openpi_pi05_grm_task0_real_smoke_runtime"
 CONFIG_PATH="${RLINF_DIR}/examples/embodiment/config/${CONFIG_NAME}.yaml"
+RUN_ID="$(timestamp)"
+LOG="${TASK0_SMOKE_LOG:-/root/rlinf_pi05_libero_grm_task0_real_smoke_${RUN_ID}.log}"
+LOGDIR="${TASK0_SMOKE_LOGDIR:-${RLINF_DIR}/logs/grm_task0_real_smoke_${RUN_ID}}"
 python "${SCRIPT_DIR}/write_runtime_config.py" \
   --output "${CONFIG_PATH}" \
   --experiment-name "libero_spatial_ppo_openpi_pi05_grm_task0_real_smoke" \
@@ -19,6 +22,7 @@ python "${SCRIPT_DIR}/write_runtime_config.py" \
   --goal-bank-dir "${GRM_GOAL_BANK_DIR}" \
   --grm-model-name "${GRM_MODEL_NAME}" \
   --grm-endpoint "${GRM_ENDPOINT}" \
+  --metrics-log-path "${LOGDIR}/grm_metrics.jsonl" \
   --train-gpu-rank "${TRAIN_GPU_RANK}" \
   --num-envs 1 \
   --max-epochs 1 \
@@ -27,11 +31,6 @@ python "${SCRIPT_DIR}/write_runtime_config.py" \
   --micro-batch-size 1 \
   --global-batch-size 1 \
   --task-id-filter 0
-
-RUN_ID="$(timestamp)"
-LOG="${TASK0_SMOKE_LOG:-/root/rlinf_pi05_libero_grm_task0_real_smoke_${RUN_ID}.log}"
-LOGDIR="${TASK0_SMOKE_LOGDIR:-${RLINF_DIR}/logs/grm_task0_real_smoke_${RUN_ID}}"
-
 cd "${RLINF_DIR}"
 python examples/embodiment/train_embodied_agent.py \
   --config-path "${RLINF_DIR}/examples/embodiment/config" \
@@ -44,4 +43,3 @@ cp -a "${LOG}" "${DEST}/"
 cp -a "${LOGDIR}" "${DEST}/"
 cp -a "${CONFIG_PATH}" "${DEST}/server_runtime_config/"
 echo "Saved smoke result to ${DEST}"
-

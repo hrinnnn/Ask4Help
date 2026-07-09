@@ -143,6 +143,7 @@ reward:
     model_name: {args.grm_model_name}
     grm_endpoint: {args.grm_endpoint}
     goal_bank_dir: {args.goal_bank_dir}
+    metrics_log_path: {args.metrics_log_path}
     modes:
     - incremental
     - forward
@@ -187,6 +188,7 @@ def main() -> None:
     parser.add_argument("--goal-bank-dir", required=True)
     parser.add_argument("--grm-model-name", required=True)
     parser.add_argument("--grm-endpoint", required=True)
+    parser.add_argument("--metrics-log-path", default="grm_metrics.jsonl")
     parser.add_argument("--train-gpu-rank", default="1")
     parser.add_argument("--num-envs", type=int, required=True)
     parser.add_argument("--rollout-epoch", type=int, default=1)
@@ -208,4 +210,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
