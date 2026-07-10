@@ -7,6 +7,7 @@ source "${SCRIPT_DIR}/common.sh"
 
 activate_rlinf
 mkdir -p "${LIBERO_DEMO_ROOT}"
+mkdir -p "${LIBERO_SPATIAL_DEMO_DIR}"
 
 count="$(find "${LIBERO_SPATIAL_DEMO_DIR}" -maxdepth 1 -name '*.hdf5' 2>/dev/null | wc -l | tr -d ' ')"
 if [[ "${count}" == "10" ]]; then
@@ -24,4 +25,3 @@ HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}" nohup python -u \
 echo $! > /tmp/ask4help_libero_spatial_download.pid
 echo "${LOG}" > /tmp/ask4help_libero_spatial_download.logpath
 echo "Started LIBERO spatial download pid=$(cat /tmp/ask4help_libero_spatial_download.pid) log=${LOG}"
-

@@ -7,6 +7,7 @@ source "${SCRIPT_DIR}/common.sh"
 
 activate_rlinf
 mkdir -p "${LIBERO_DEMO_ROOT}"
+mkdir -p "${LIBERO_GOAL_DEMO_DIR}"
 
 count="$(find "${LIBERO_GOAL_DEMO_DIR}" -maxdepth 1 -name '*.hdf5' 2>/dev/null | wc -l | tr -d ' ')"
 if [[ "${count}" == "10" ]]; then
