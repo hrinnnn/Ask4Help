@@ -30,4 +30,10 @@ python -m utils.2_posprocess_data \
   --replace-prob 0.75 \
   --seed 42
 
+sample_count="$(${RLINF_DIR}/.venv/bin/python -c 'import json, sys; print(len(json.load(open(sys.argv[1], encoding="utf-8"))))' "${TRAIN_DIR}/train_jsons/finetune_data_final.json")"
+if [[ "${sample_count}" -le 0 ]]; then
+  echo "One-shot preparation produced zero training samples." >&2
+  exit 1
+fi
+
 echo "Prepared one-shot adaptation data: ${TRAIN_DIR}/train_jsons/finetune_data_final.json"
