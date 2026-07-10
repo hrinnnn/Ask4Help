@@ -6,6 +6,55 @@ from pathlib import Path
 
 
 def write_config(args: argparse.Namespace) -> None:
+    component_roles = "actor,env,rollout,reward" if args.use_reward_model else "actor,env,rollout"
+    reward_config = (
+        f"""reward:
+  use_reward_model: true
+  group_name: RewardGroup
+  reward_mode: history_buffer
+  history_reward_assign: false
+  env_reward_weight: 1.0
+  reward_weight: {args.reward_weight}
+  model:
+    model_type: dopamine_grm
+    model_name: {args.grm_model_name}
+    grm_endpoint: {args.grm_endpoint}
+    goal_bank_dir: {args.goal_bank_dir}
+    metrics_log_path: {args.metrics_log_path}
+    modes:
+    - incremental
+    - forward
+    - backward
+    fusion: mean_valid
+    gamma: 0.99
+    grm_interval_chunks: {args.grm_interval_chunks}
+    invalid_reward: 0.0
+    phi_clip:
+    - 0.0
+    - 1.0
+    request_timeout: 240
+    max_tokens: 32
+    temperature: 0.0
+    num_envs: {args.num_envs}
+    history_buffers:
+      grm_window:
+        history_size: 1
+        min_history_size: 1
+        input_interval: 1
+        history_keys:
+        - main_images
+        - wrist_images
+        - reference_start_main_images
+        - reference_start_wrist_images
+        - task_descriptions
+        - task_ids
+        input_on_done: true
+"""
+        if args.use_reward_model
+        else """reward:
+  use_reward_model: false
+"""
+    )
     text = f"""defaults:
 - env/libero_spatial@env.train
 - env/libero_spatial@env.eval
@@ -24,7 +73,7 @@ hydra:
 cluster:
   num_nodes: 1
   component_placement:
-    actor,env,rollout,reward: '{args.train_gpu_rank}'
+    {component_roles}: '{args.train_gpu_rank}'
 
 runner:
   task_type: embodied
@@ -131,47 +180,7 @@ actor:
       reduce_dtype: ${{actor.model.precision}}
       buffer_dtype: ${{actor.model.precision}}
 
-reward:
-  use_reward_model: true
-  group_name: RewardGroup
-  reward_mode: history_buffer
-  history_reward_assign: false
-  env_reward_weight: 1.0
-  reward_weight: {args.reward_weight}
-  model:
-    model_type: dopamine_grm
-    model_name: {args.grm_model_name}
-    grm_endpoint: {args.grm_endpoint}
-    goal_bank_dir: {args.goal_bank_dir}
-    metrics_log_path: {args.metrics_log_path}
-    modes:
-    - incremental
-    - forward
-    - backward
-    fusion: mean_valid
-    gamma: 0.99
-    grm_interval_chunks: {args.grm_interval_chunks}
-    invalid_reward: 0.0
-    phi_clip:
-    - 0.0
-    - 1.0
-    request_timeout: 240
-    max_tokens: 32
-    temperature: 0.0
-    num_envs: {args.num_envs}
-    history_buffers:
-      grm_window:
-        history_size: 1
-        min_history_size: 1
-        input_interval: 1
-        history_keys:
-        - main_images
-        - wrist_images
-        - reference_start_main_images
-        - reference_start_wrist_images
-        - task_descriptions
-        - task_ids
-        input_on_done: true
+{reward_config}
 
 critic:
   use_critic_model: false
@@ -199,12 +208,18 @@ def main() -> None:
     parser.add_argument("--global-batch-size", type=int, required=True)
     parser.add_argument("--reward-weight", type=float, default=0.1)
     parser.add_argument("--grm-interval-chunks", type=int, default=1)
+    parser.add_argument(
+        "--disable-reward-model",
+        action="store_true",
+        help="Generate the official sparse-LIBERO reward baseline configuration.",
+    )
     parser.add_argument("--task-id-filter", default="")
     args = parser.parse_args()
     if args.task_id_filter:
         args.task_filter_yaml = f"    task_id_filter: [{args.task_id_filter}]\n"
     else:
         args.task_filter_yaml = ""
+    args.use_reward_model = not args.disable_reward_model
     write_config(args)
 
 
