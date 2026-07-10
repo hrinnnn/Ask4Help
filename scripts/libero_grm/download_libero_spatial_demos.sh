@@ -7,9 +7,11 @@ source "${SCRIPT_DIR}/common.sh"
 
 activate_rlinf
 mkdir -p "${LIBERO_DEMO_ROOT}"
-mkdir -p "${LIBERO_SPATIAL_DEMO_DIR}"
+if [[ -d "${LIBERO_SPATIAL_DEMO_DIR}" ]] && [[ -z "$(find "${LIBERO_SPATIAL_DEMO_DIR}" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+  rmdir "${LIBERO_SPATIAL_DEMO_DIR}"
+fi
 
-count="$(find "${LIBERO_SPATIAL_DEMO_DIR}" -maxdepth 1 -name '*.hdf5' 2>/dev/null | wc -l | tr -d ' ')"
+count="$(find "${LIBERO_SPATIAL_DEMO_DIR}" -maxdepth 1 -name '*.hdf5' 2>/dev/null | wc -l | tr -d ' ' || true)"
 if [[ "${count}" == "10" ]]; then
   echo "LIBERO spatial demos already complete at ${LIBERO_SPATIAL_DEMO_DIR}."
   exit 0
