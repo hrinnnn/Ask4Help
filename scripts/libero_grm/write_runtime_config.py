@@ -26,8 +26,12 @@ def write_config(args: argparse.Namespace) -> None:
     - forward
     - backward
     fusion: mean_valid
-    gamma: 0.99
+    gamma: ${{algorithm.gamma}}
     grm_interval_chunks: {args.grm_interval_chunks}
+    consistency_check: {str(not args.disable_consistency_check).lower()}
+    consistency_alpha: {args.consistency_alpha}
+    consistency_epsilon: {args.consistency_epsilon}
+    terminal_potential: {args.terminal_potential}
     invalid_reward: 0.0
     phi_clip:
     - 0.0
@@ -56,8 +60,8 @@ def write_config(args: argparse.Namespace) -> None:
 """
     )
     text = f"""defaults:
-- env/libero_spatial@env.train
-- env/libero_spatial@env.eval
+- env/{args.task_suite}@env.train
+- env/{args.task_suite}@env.eval
 - model/pi0_5@actor.model
 - training_backend/fsdp@actor.fsdp_config
 - weight_syncer/patch_syncer@weight_syncer
@@ -206,8 +210,13 @@ def main() -> None:
     parser.add_argument("--max-episode-steps", type=int, required=True)
     parser.add_argument("--micro-batch-size", type=int, required=True)
     parser.add_argument("--global-batch-size", type=int, required=True)
-    parser.add_argument("--reward-weight", type=float, default=0.1)
-    parser.add_argument("--grm-interval-chunks", type=int, default=1)
+    parser.add_argument("--task-suite", default="libero_spatial")
+    parser.add_argument("--reward-weight", type=float, default=1.0)
+    parser.add_argument("--grm-interval-chunks", type=int, default=2)
+    parser.add_argument("--disable-consistency-check", action="store_true")
+    parser.add_argument("--consistency-alpha", type=float, default=1.0)
+    parser.add_argument("--consistency-epsilon", type=float, default=1e-6)
+    parser.add_argument("--terminal-potential", type=float, default=0.0)
     parser.add_argument(
         "--disable-reward-model",
         action="store_true",

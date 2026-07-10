@@ -9,8 +9,20 @@ require_path "${GRM_MODEL_PATH}" "Robo-Dopamine GRM model"
 require_path "${ROBO_DOPAMINE_CONDA}" "conda activation script"
 
 if curl -fsS "http://127.0.0.1:${GRM_PORT}/v1/models" >/dev/null 2>&1; then
-  echo "GRM endpoint already responds on port ${GRM_PORT}."
-  exit 0
+  if [[ "${GRM_FORCE_RESTART:-0}" != "1" ]]; then
+    echo "GRM endpoint already responds on port ${GRM_PORT}."
+    exit 0
+  fi
+  if [[ -f /tmp/ask4help_grm_endpoint.pid ]]; then
+    old_pid="$(cat /tmp/ask4help_grm_endpoint.pid)"
+    kill "${old_pid}" 2>/dev/null || true
+    for _ in $(seq 1 30); do
+      if ! kill -0 "${old_pid}" 2>/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+  fi
 fi
 
 LOG="${GRM_LOG:-/root/grm_vllm_endpoint_$(timestamp)_gpu${GRM_GPU}.log}"
@@ -32,4 +44,3 @@ CUDA_VISIBLE_DEVICES="${GRM_GPU}" nohup python -m vllm.entrypoints.openai.api_se
 echo $! > /tmp/ask4help_grm_endpoint.pid
 echo "${LOG}" > /tmp/ask4help_grm_endpoint.logpath
 echo "Started GRM endpoint pid=$(cat /tmp/ask4help_grm_endpoint.pid) log=${LOG}"
-
