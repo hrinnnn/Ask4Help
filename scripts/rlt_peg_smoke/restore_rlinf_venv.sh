@@ -33,4 +33,10 @@ restored_venv=$(find "${staging_dir}" -type d -name .venv -print -quit)
 }
 
 mv "${restored_venv}" "${DESTINATION}"
+if [[ ! -x "${DESTINATION}/bin/python" ]]; then
+  incompatible_destination="${DESTINATION}.incompatible-$(date +%Y%m%d_%H%M%S)"
+  mv "${DESTINATION}" "${incompatible_destination}"
+  echo "Restored environment has no executable Python. Moved it to ${incompatible_destination}" >&2
+  exit 2
+fi
 echo "Restored ${DESTINATION} from ${ARCHIVE}"
