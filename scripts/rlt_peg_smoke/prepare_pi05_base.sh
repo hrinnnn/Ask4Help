@@ -6,6 +6,7 @@ PYTHON=${PYTHON:-"${RLINF_ROOT}/.venv/bin/python"}
 DOWNLOAD_ROOT=${DOWNLOAD_ROOT:-/root/ask4help_model_downloads/openpi}
 OUTPUT_DIR=${OUTPUT_DIR:-/root/ask4help_model_downloads/pi05_base_torch}
 PERSIST_DIR=${PERSIST_DIR:-/mnt/data/ask4help/models/pi05_base_torch}
+OPENPI_CONVERT_CONFIG=${OPENPI_CONVERT_CONFIG:-pi05_droid}
 
 [[ -x "${PYTHON}" ]] || {
   echo "RLinf Python does not exist: ${PYTHON}" >&2
@@ -30,7 +31,7 @@ JAX_CHECKPOINT="${DOWNLOAD_ROOT}/openpi-assets/checkpoints/pi05_base"
 if [[ ! -f "${OUTPUT_DIR}/model.safetensors" ]]; then
   "${PYTHON}" "${RLINF_ROOT}/rlinf/utils/ckpt_convertor/convert_openpi_jax_to_python.py" \
     --checkpoint-dir "${JAX_CHECKPOINT}" \
-    --config-name pi05_rlt_maniskill_joint \
+    --config-name "${OPENPI_CONVERT_CONFIG}" \
     --output-path "${OUTPUT_DIR}" \
     --precision bfloat16
 fi
