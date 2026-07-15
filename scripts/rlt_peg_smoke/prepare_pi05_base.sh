@@ -38,7 +38,11 @@ fi
 
 if [[ -n "${PERSIST_DIR}" ]]; then
   mkdir -p "${PERSIST_DIR}"
-  rsync -a --delete "${OUTPUT_DIR}/" "${PERSIST_DIR}/"
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --delete "${OUTPUT_DIR}/" "${PERSIST_DIR}/"
+  else
+    cp -a "${OUTPUT_DIR}/." "${PERSIST_DIR}/"
+  fi
   echo "Persisted converted pi05_base to ${PERSIST_DIR}"
 fi
 
