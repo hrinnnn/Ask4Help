@@ -8,7 +8,7 @@ PI05_BASE=${PI05_BASE:?Set PI05_BASE to the official OpenPI pi0.5 base weights}
 NORM_STATS_PATH=${NORM_STATS_PATH:?Set NORM_STATS_PATH to the dataset norm_stats.json}
 REPO_ID=${REPO_ID:?Set REPO_ID to the local LeRobot dataset repo id}
 OUTPUT_DIR=${OUTPUT_DIR:?Set OUTPUT_DIR to the Stage 1 output directory}
-TRAIN_DATA_OVERRIDE='[{"dataset_path":"'"${DATASET_PATH}"'","weight":1.0}]'
+TRAIN_DATA_OVERRIDE="[{dataset_path:${DATASET_PATH},weight:1.0}]"
 
 cd "${RLINF_ROOT}"
 export EMBODIED_PATH="${RLINF_ROOT}/examples/sft"
