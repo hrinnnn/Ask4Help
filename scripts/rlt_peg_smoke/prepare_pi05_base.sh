@@ -28,7 +28,7 @@ JAX_CHECKPOINT="${DOWNLOAD_ROOT}/openpi-assets/checkpoints/pi05_base"
 }
 
 if [[ ! -f "${OUTPUT_DIR}/model.safetensors" ]]; then
-  "${PYTHON}" rlinf/utils/ckpt_convertor/convert_openpi_jax_to_python.py \
+  "${PYTHON}" "${RLINF_ROOT}/rlinf/utils/ckpt_convertor/convert_openpi_jax_to_python.py" \
     --checkpoint-dir "${JAX_CHECKPOINT}" \
     --config-name pi05_rlt_maniskill_joint \
     --output-path "${OUTPUT_DIR}" \
