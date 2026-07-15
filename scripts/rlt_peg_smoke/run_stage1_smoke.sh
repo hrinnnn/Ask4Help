@@ -14,7 +14,7 @@ export EMBODIED_PATH="${RLINF_ROOT}/examples/sft"
 export PYTHONPATH="${RLINF_ROOT}:${PYTHONPATH:-}"
 
 "${PYTHON}" examples/sft/train_vla_sft.py \
-  --config-path examples/sft/config \
+  --config-path "${RLINF_ROOT}/examples/sft/config" \
   --config-name maniskill_rlt_stage1_sft_openpi_pi05 \
   runner.logger.log_path="${OUTPUT_DIR}" \
   runner.max_steps=2 \

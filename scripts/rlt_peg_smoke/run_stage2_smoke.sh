@@ -13,7 +13,7 @@ export EMBODIED_PATH="${RLINF_ROOT}/examples/embodiment"
 export PYTHONPATH="${RLINF_ROOT}:${PYTHONPATH:-}"
 
 "${PYTHON}" examples/embodiment/train_embodied_agent.py \
-  --config-path examples/embodiment/config \
+  --config-path "${RLINF_ROOT}/examples/embodiment/config" \
   --config-name maniskill_rlt_stage2_ac_mlp \
   runner.logger.log_path="${OUTPUT_DIR}" \
   runner.max_epochs=1 \
