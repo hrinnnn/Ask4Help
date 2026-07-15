@@ -39,3 +39,4 @@ export PYTHONPATH="${RLINF_ROOT}:${PYTHONPATH:-}"
   rollout.rlt_feature_model.model_path="${STAGE1_ACTOR}" \
   rollout.rlt_feature_model.openpi_data.repo_id="${REPO_ID}" \
   "+rollout.rlt_feature_model.openpi_data.norm_stats_path=${NORM_STATS_PATH}"
+  "rollout.expert_model.model_path=${STAGE1_ACTOR}"
