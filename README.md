@@ -3,6 +3,7 @@
 This workspace tracks VLA RL code and experiments.
 
 - RLinf: https://github.com/RLinf/RLinf
+- RLT + pi0.5 + ManiSkill Peg reproduction: [docs/rlinf_rlt_pi05_maniskill_peg_reproduction.md](docs/rlinf_rlt_pi05_maniskill_peg_reproduction.md)
 
 ## pi0.5 LIBERO GRM Reproduction
 
