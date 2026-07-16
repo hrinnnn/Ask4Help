@@ -126,11 +126,47 @@ Checkpoint and TensorBoard output:
 Both final checkpoints occupy about 19 GB and include a distributed checkpoint
 plus full weights.
 
+### Real Robo-Dopamine, One Episode
+
+The `robo-dopamine` Python environment was restored from the existing OSS
+snapshot. Its verified runtime was:
+
+```text
+torch 2.8.0+cu128
+transformers 4.57.0
+vLLM 0.11.0
+CUDA available: true
+```
+
+The real preview checkpoint started through the OpenAI-compatible vLLM server
+and served the Qwen3-VL architecture successfully. A short one-episode smoke
+used the start and terminal frames, issuing three real eight-image requests for
+incremental, forward, and backward modes. All three outputs parsed as valid and
+the successful terminal transition produced `Phi_next=1`.
+
+```text
+real endpoint requests: 3
+dataset rows:           51
+valid transitions:       1
+```
+
+After the endpoint was stopped, the same annotation was replayed against an
+unreachable port and reconstructed all 51 rows from the cache. Results and the
+vLLM log are persisted at:
+
+```text
+/mnt/data/ask4help/results/awbc_peg_smoke/real_annotation_1ep
+```
+
+This shortened smoke used a 50-frame stride to test the real model quickly.
+Formal annotation still uses the specified 5-frame stride.
+
 ## Still Required For Scientific Results
 
 - Select the shared warm-start checkpoint by measured success closest to 25%.
 - Collect 32 real warm-start policy episodes, retaining failures.
-- Annotate expert and policy trajectories with the real GRM endpoint.
+- Annotate the complete expert and policy datasets with the real GRM endpoint
+  at the formal 5-frame stride.
 - Run matched 500-step Uniform, ARM exact, and selected robust AWBC experiments.
 - Evaluate all methods with 50 fixed seeds, then 3 training seeds and 100
   evaluation episodes per method.
