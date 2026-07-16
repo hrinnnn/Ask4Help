@@ -1,5 +1,9 @@
 # pi0.5 Flow-SDE PPO + DiffDAgger
 
+The Chinese implementation record, including changed files, design decisions,
+test results, and remaining validation work, is in
+[`pi05_flow_sde_diffdagger_implementation_record.md`](pi05_flow_sde_diffdagger_implementation_record.md).
+
 This branch connects DiffDAgger-style uncertainty intervention to RLinf's
 pi0.5 Flow-SDE PPO path in ManiSkill. It does not download model checkpoints.
 
