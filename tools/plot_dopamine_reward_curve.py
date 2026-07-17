@@ -99,6 +99,11 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         for record in queried
         if (value := _finite_number(record.get("shaping_reward"))) is not None
     ]
+    delta_phi_values = [
+        value
+        for record in queried
+        if (value := _finite_number(record.get("delta_phi"))) is not None
+    ]
 
     def stats(values: list[float]) -> dict[str, float | None]:
         if not values:
@@ -117,6 +122,7 @@ def summarize(records: list[dict[str, Any]]) -> dict[str, Any]:
         "environment_count": len({int(record.get("env_idx", 0)) for record in records}),
         "phi_next": stats(phi_values),
         "shaping_reward": stats(rewards),
+        "delta_phi": stats(delta_phi_values),
     }
 
 
@@ -147,7 +153,11 @@ def _plot_panel(axis, series, *, window: int, label: str, color: str) -> None:
 
 
 def plot_reward_curve(
-    records: list[dict[str, Any]], output: str | Path, *, window: int
+    records: list[dict[str, Any]],
+    output: str | Path,
+    *,
+    window: int,
+    reward_key: str = "auto",
 ) -> Path:
     import matplotlib
 
@@ -155,9 +165,17 @@ def plot_reward_curve(
     import matplotlib.pyplot as plt
 
     phi_series = metric_series(records, "phi_next")
-    reward_series = metric_series(records, "shaping_reward")
+    if reward_key == "auto":
+        reward_key = (
+            "shaping_reward"
+            if metric_series(records, "shaping_reward")
+            else "delta_phi"
+        )
+    if reward_key not in {"shaping_reward", "delta_phi"}:
+        raise ValueError("reward_key must be auto, shaping_reward, or delta_phi")
+    reward_series = metric_series(records, reward_key)
     if not phi_series and not reward_series:
-        raise ValueError("metric log contains neither phi_next nor shaping_reward")
+        raise ValueError(f"metric log contains neither phi_next nor {reward_key}")
 
     output_path = Path(output).expanduser()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,10 +187,16 @@ def plot_reward_curve(
     axes[0].set_ylim(-0.05, 1.05)
 
     _plot_panel(
-        axes[1], reward_series, window=window, label="shaping reward", color="#C84B31"
+        axes[1],
+        reward_series,
+        window=window,
+        label=reward_key.replace("_", " "),
+        color="#C84B31",
     )
     axes[1].axhline(0.0, color="#202020", linewidth=0.8)
-    axes[1].set_ylabel("PBRS shaping reward")
+    axes[1].set_ylabel(
+        "PBRS shaping reward" if reward_key == "shaping_reward" else "Progress delta Phi"
+    )
     axes[1].set_xlabel("GRM query index per environment")
     figure.suptitle(f"Robo-Dopamine progress and reward (moving average={window})")
     figure.tight_layout()
@@ -194,10 +218,18 @@ def main() -> None:
     parser.add_argument("--input", required=True, help="Path to grm_metrics.jsonl")
     parser.add_argument("--output", required=True, help="Output PNG path")
     parser.add_argument("--window", type=int, default=5, help="Moving-average window")
+    parser.add_argument(
+        "--reward-key",
+        choices=("auto", "shaping_reward", "delta_phi"),
+        default="auto",
+        help="Second-panel metric; auto falls back to delta_phi for AWBC sidecars",
+    )
     args = parser.parse_args()
 
     records = load_metric_records(args.input)
-    output = plot_reward_curve(records, args.output, window=args.window)
+    output = plot_reward_curve(
+        records, args.output, window=args.window, reward_key=args.reward_key
+    )
     print(json.dumps({"output": str(output), **summarize(records)}, indent=2))
 
 

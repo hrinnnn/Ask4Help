@@ -57,3 +57,14 @@ def test_invalid_json_reports_line_number(tmp_path):
 
     with pytest.raises(ValueError, match="line 2"):
         load_metric_records(path)
+
+
+def test_awbc_sidecar_delta_phi_is_available_for_plotting():
+    records = [
+        {"env_idx": 0, "phi_next": 0.3, "delta_phi": 0.3, "valid": True},
+        {"env_idx": 0, "phi_next": 0.2, "delta_phi": -0.1, "valid": True},
+    ]
+
+    assert metric_series(records, "shaping_reward") == {}
+    assert metric_series(records, "delta_phi") == {0: [0.3, -0.1]}
+    assert summarize(records)["delta_phi"]["mean"] == pytest.approx(0.1)
