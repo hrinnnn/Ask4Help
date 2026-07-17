@@ -74,6 +74,7 @@ def collect_observation(seed: int) -> dict:
 
 def compose_model_config(model_path: Path, norm_stats_path: Path):
     from hydra import compose, initialize_config_dir
+    from omegaconf import open_dict
 
     rlinf_root = Path(os.environ["RLINF_ROOT"]).resolve()
     config_dir = rlinf_root / "examples" / "embodiment" / "config"
@@ -83,8 +84,11 @@ def compose_model_config(model_path: Path, norm_stats_path: Path):
     with initialize_config_dir(version_base=None, config_dir=str(config_dir)):
         cfg = compose(config_name="maniskill_awbc_collect_openpi_pi05")
     model_cfg = copy.deepcopy(cfg.rollout.model)
-    model_cfg.model_path = str(model_path)
-    model_cfg.openpi_data.norm_stats_path = str(norm_stats_path)
+    with open_dict(model_cfg):
+        model_cfg.model_path = str(model_path)
+        model_cfg.openpi_data.norm_stats_path = str(norm_stats_path)
+        model_cfg.is_lora = False
+        model_cfg.load_to_device = True
     return model_cfg
 
 
