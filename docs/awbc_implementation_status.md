@@ -264,6 +264,46 @@ phi_next:                1.0
 
 该快速 smoke 使用 50 帧间隔；正式标注仍使用 5 帧间隔。
 
+### 6. 真实 Peg 完整 Episode 曲线
+
+在同一条 Peg expert episode 上按正式的 5 帧间隔重新运行真实 GRM：
+
+```text
+episode frames:          51
+GRM anchor transitions:  10
+three-mode requests:     30
+positive delta_phi:       7
+negative delta_phi:       3
+```
+
+逐段 progress 为：
+
+```text
+frame  0 ->  5: +0.0805
+frame  5 -> 10: +0.1952
+frame 10 -> 15: -0.0168
+frame 15 -> 20: -0.0049
+frame 20 -> 25: +0.0173
+frame 25 -> 30: +0.1136
+frame 30 -> 35: +0.1858
+frame 35 -> 40: +0.1073
+frame 40 -> 45: -0.0748
+frame 45 -> 50: +0.3968
+```
+
+最后一个转移包含环境 success 将终点覆盖为 `Phi=1`，因此不能解释为纯 GRM
+预测。前 9 个转移使用三模式 consistency-aware 融合结果。
+
+曲线、sidecar、摘要、cache、annotation log 和 vLLM log 均保存在：
+
+```text
+/mnt/data/ask4help/results/awbc_peg_smoke/real_episode0_stride5
+```
+
+这条轨迹是已有 expert demonstration，不是当前 policy 在线采集的 episode。它验证
+了完整单 episode 的曲线导出能力；正式 online AWBC 仍需在 policy rollout 上重复
+相同流程。
+
 ## 与正式实验的差距
 
 当前尚未完成以下科学实验步骤：
