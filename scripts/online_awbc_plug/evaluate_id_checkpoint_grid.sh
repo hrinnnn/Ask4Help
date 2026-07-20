@@ -12,8 +12,9 @@ NORM_STATS=${NORM_STATS:?Set NORM_STATS}
 OUTPUT_ROOT=${OUTPUT_ROOT:?Set OUTPUT_ROOT}
 POLICY_MEMBER=${POLICY_MEMBER:?Set POLICY_MEMBER to 0 or 1}
 GPU_ID=${GPU_ID:?Set GPU_ID to 0 or 1}
-STEPS=${STEPS:-"50 100 150 200 250"}
+STEPS=${STEPS:-"250"}
 EPISODES=${EPISODES:-20}
+COMPUTE_VFD=${COMPUTE_VFD:-false}
 
 if [ "${POLICY_MEMBER}" = "0" ]; then
   FIRST_ROOT=${CHECKPOINT_ROOT_0}
@@ -37,6 +38,6 @@ for step in ${STEPS}; do
     NORM_STATS="${NORM_STATS}" \
     OUTPUT_DIR="${output}" \
     DATASET="${dataset}" \
-    SPLIT=id SEED=10000 EPISODES="${EPISODES}" \
+    SPLIT=id SEED=10000 EPISODES="${EPISODES}" COMPUTE_VFD="${COMPUTE_VFD}" \
     bash "${ASK4HELP_ROOT}/scripts/online_awbc_plug/evaluate_checkpoint.sh"
 done

@@ -106,6 +106,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--num-action-samples", type=int, default=5)
     parser.add_argument(
+        "--compute-vfd",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Compute the paired-model VFD score at each chunk. Disable for pure policy evaluation.",
+    )
+    parser.add_argument(
         "--sim-backend",
         default="physx_cpu",
         choices=("physx_cpu", "gpu"),
@@ -269,6 +275,7 @@ def _run_episode(
     controller: FixedThresholdChunkController | None,
     chunk_size: int,
     num_action_samples: int,
+    compute_vfd: bool,
     episode_index: int,
     dataset_offset: int,
     task: str,
@@ -314,22 +321,28 @@ def _run_episode(
             oracle_plan = oracle.plan(env)
             action_sequence = oracle_plan.actions
         else:
-            assert member_0 is not None and member_1 is not None
+            assert member_0 is not None
             env_obs = _wrap_obs(raw_obs, info, task=task)
             with torch.no_grad():
                 policy_actions, _ = member_0.predict_action_batch(
                     env_obs=env_obs, mode="eval", compute_values=False
                 )
-                generator = torch.Generator(device="cuda").manual_seed(seed + start_frame)
-                _candidates, score = member_0.compute_vfd_uncertainty(
-                    env_obs,
-                    member_1,
-                    num_action_samples=num_action_samples,
-                    generator=generator,
-                )
-            vfd = float(score.reshape(-1)[0].detach().cpu())
-            vfd_scores.append(vfd)
-            source = "expert" if controller is not None and controller.decide([vfd]).expert_mask.item() else "policy"
+                if compute_vfd:
+                    assert member_1 is not None
+                    generator = torch.Generator(device="cuda").manual_seed(seed + start_frame)
+                    _candidates, score = member_0.compute_vfd_uncertainty(
+                        env_obs,
+                        member_1,
+                        num_action_samples=num_action_samples,
+                        generator=generator,
+                    )
+            if compute_vfd:
+                vfd = float(score.reshape(-1)[0].detach().cpu())
+                vfd_scores.append(vfd)
+                source = "expert" if controller is not None and controller.decide([vfd]).expert_mask.item() else "policy"
+            else:
+                vfd = float("nan")
+                source = "policy"
             if source == "expert":
                 oracle_plan = oracle.plan(env)
                 action_sequence = oracle_plan.actions
@@ -391,13 +404,16 @@ def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.mode != "oracle":
-        for path in (args.member_0, args.member_1, args.norm_stats):
+        required_paths = (args.member_0, args.norm_stats)
+        if args.compute_vfd:
+            required_paths += (args.member_1,)
+        for path in required_paths:
             if path is None or not path.exists():
                 raise FileNotFoundError(path)
         if not torch.cuda.is_available():
             raise RuntimeError("pi0.5 VFD online collection requires CUDA")
         member_0 = _load_model(args.member_0, args.norm_stats, args.pi05_base)
-        member_1 = _load_model(args.member_1, args.norm_stats, args.pi05_base)
+        member_1 = _load_model(args.member_1, args.norm_stats, args.pi05_base) if args.compute_vfd else None
     else:
         member_0 = member_1 = None
 
@@ -429,6 +445,7 @@ def main() -> None:
                 controller=controller,
                 chunk_size=args.chunk_size,
                 num_action_samples=args.num_action_samples,
+                compute_vfd=args.compute_vfd,
                 episode_index=saved,
                 dataset_offset=len(all_frames),
                 task=args.task,
@@ -438,6 +455,13 @@ def main() -> None:
             if args.task == "plug":
                 row.update(scenario_metadata)
             episode_rows.append(row)
+            completed_successes = sum(bool(episode["success"]) for episode in episode_rows)
+            print(
+                f"[rollout] attempt={attempts} seed={seed} success={int(success)} "
+                f"chunks={len(chunks)} cumulative_success={completed_successes}/{len(episode_rows)} "
+                f"success_rate={completed_successes / len(episode_rows):.3f}",
+                flush=True,
+            )
             if args.mode == "calibrate":
                 if success:
                     calibration_scores.extend(scores[index] for index in uniformly_spaced_chunk_indices(len(scores), samples_per_episode=args.samples_per_episode))
@@ -479,6 +503,8 @@ def main() -> None:
 
     if saved < target:
         raise RuntimeError(f"completed {saved}/{target} targets after {attempts} attempts")
+    success_count = sum(bool(episode["success"]) for episode in episode_rows)
+    success_rate = success_count / len(episode_rows) if episode_rows else 0.0
     (args.output_dir / "episodes.json").write_text(json.dumps(episode_rows, indent=2) + "\n")
     if args.mode == "calibrate":
         calibrated = FixedVFDThreshold.calibrate(calibration_scores, quantile=args.quantile)
@@ -496,6 +522,9 @@ def main() -> None:
             {
                 "mode": args.mode,
                 "episodes": saved,
+                "successes": success_count,
+                "success_rate": success_rate,
+                "compute_vfd": args.compute_vfd,
                 "dataset": str(_resolve_output_path(args.repo_id)),
                 "progress_manifest": str(args.output_dir / "progress.jsonl"),
                 "chunks": len(all_chunks),
