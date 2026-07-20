@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect PegInsertionSide online AWBC trajectories with a fixed VFD gate.
+"""Collect ManiSkill Peg/Plug online AWBC trajectories with a fixed VFD gate.
 
 The runner deliberately uses one environment.  A ManiSkill motion-planning
 oracle can then plan from the exact current simulator state after a VFD query,
@@ -36,6 +36,7 @@ from rlinf.algorithms.online_awbc import (  # noqa: E402
     uniformly_spaced_chunk_indices,
 )
 from rlinf.data.maniskill_peg_progress import peg_privileged_phi  # noqa: E402
+from rlinf.data.maniskill_plug_progress import PlugProgressState  # noqa: E402
 from rlinf.data.online_awbc import (  # noqa: E402
     OnlineAWBCChunk,
     OnlineAWBCFrame,
@@ -53,6 +54,18 @@ from rlinf.envs.maniskill.peg_insertion_side_variants import (  # noqa: E402
 from rlinf.envs.maniskill.peg_privileged_oracle import (  # noqa: E402
     PegPrivilegedChunkOracle,
 )
+from rlinf.envs.maniskill.plug_charger_variants import (  # noqa: E402
+    PLUG_CHARGER_ID_ENV_ID,
+    PLUG_CHARGER_OOD_ENV_ID,
+    PLUG_CHARGER_TASK,
+    default_plug_instruction,
+    register_controlled_plug_charger_variants,
+    reset_metadata as plug_reset_metadata,
+    wrap_plug_charger_openpi_joint_obs,
+)
+from rlinf.envs.maniskill.plug_privileged_oracle import (  # noqa: E402
+    PlugChargerPrivilegedChunkOracle,
+)
 from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     _build_frames,
     _create_dataset,
@@ -68,6 +81,8 @@ from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=("oracle", "calibrate", "online"), required=True)
+    parser.add_argument("--task", choices=("peg", "plug"), default="peg")
+    parser.add_argument("--split", choices=("id", "ood"), default="id")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--repo-id", default="")
     parser.add_argument("--member-0", type=Path)
@@ -119,14 +134,27 @@ def _load_model(model_path: Path, norm_stats_path: Path):
     return model.to("cuda").eval().requires_grad_(False)
 
 
-def _build_env(max_episode_steps: int, *, sim_backend: str = "physx_cpu"):
+def _build_env(
+    max_episode_steps: int,
+    *,
+    task: str,
+    split: str,
+    sim_backend: str = "physx_cpu",
+):
     import gymnasium as gym
     import mani_skill.envs  # noqa: F401
 
-    register_rlinf_peg_insertion_side_variants()
+    if task == "peg":
+        register_rlinf_peg_insertion_side_variants()
+        env_id = PEG_INSERTION_SIDE_WIDE_OBSERVER_WIDE_WRIST_ENV_ID
+        robot_uids = PANDA_WIDE_WRISTCAM_UID
+    else:
+        register_controlled_plug_charger_variants()
+        env_id = PLUG_CHARGER_ID_ENV_ID if split == "id" else PLUG_CHARGER_OOD_ENV_ID
+        robot_uids = "panda_wristcam"
     return gym.make(
-        PEG_INSERTION_SIDE_WIDE_OBSERVER_WIDE_WRIST_ENV_ID,
-        robot_uids=PANDA_WIDE_WRISTCAM_UID,
+        env_id,
+        robot_uids=robot_uids,
         num_envs=1,
         obs_mode="rgb",
         control_mode="pd_joint_delta_pos",
@@ -139,7 +167,12 @@ def _build_env(max_episode_steps: int, *, sim_backend: str = "physx_cpu"):
     )
 
 
-def _wrap_obs(raw_obs: dict[str, Any], info: dict[str, Any]) -> dict[str, Any]:
+def _wrap_obs(raw_obs: dict[str, Any], info: dict[str, Any], *, task: str) -> dict[str, Any]:
+    if task == "plug":
+        return wrap_plug_charger_openpi_joint_obs(
+            copy.deepcopy(raw_obs),
+            task_descriptions=default_plug_instruction(num_envs=1),
+        )
     copied = copy.deepcopy(raw_obs)
     return wrap_rlt_openpi_joint_obs(
         copied,
@@ -170,7 +203,7 @@ def _bool(value: Any) -> bool:
     return bool(np.asarray(value, dtype=bool).reshape(-1).any())
 
 
-def _augment_info(env: Any, info: dict[str, Any], event_state: dict[str, torch.Tensor]) -> dict[str, Any]:
+def _augment_peg_info(env: Any, info: dict[str, Any], event_state: dict[str, torch.Tensor]) -> dict[str, Any]:
     augmented = maybe_augment_peg_insertion_info(
         env=env.unwrapped,
         infos=dict(info),
@@ -180,6 +213,10 @@ def _augment_info(env: Any, info: dict[str, Any], event_state: dict[str, torch.T
     )
     env.unwrapped._online_partial_insert = _bool(augmented.get("partial_insert_once"))
     return augmented
+
+
+def _task_label(task: str) -> str:
+    return "insert the peg in the hole" if task == "peg" else PLUG_CHARGER_TASK
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -199,21 +236,41 @@ def _run_episode(
     num_action_samples: int,
     episode_index: int,
     dataset_offset: int,
-) -> tuple[list[dict[str, Any]], list[OnlineAWBCFrame], list[OnlineAWBCChunk], list[float], bool]:
+    task: str,
+    split: str,
+) -> tuple[
+    list[dict[str, Any]],
+    list[OnlineAWBCFrame],
+    list[OnlineAWBCChunk],
+    list[float],
+    bool,
+    dict[str, Any],
+]:
     raw_obs, info = env.reset(seed=seed)
-    event_state = init_peg_insertion_event_state(num_envs=1, device=raw_obs["agent"]["qpos"].device)
-    info = _augment_info(env, info, event_state)
+    scenario_metadata = plug_reset_metadata(env) if task == "plug" else {"task": "peg"}
+    event_state = (
+        init_peg_insertion_event_state(num_envs=1, device=raw_obs["agent"]["qpos"].device)
+        if task == "peg"
+        else PlugProgressState()
+    )
+    if task == "peg":
+        info = _augment_peg_info(env, info, event_state)
+    phi_of = (lambda: peg_privileged_phi(info)) if task == "peg" else (lambda: event_state.update(env, info))
     records = [_extract_record(raw_obs)]
     actions: list[np.ndarray] = []
     frames: list[OnlineAWBCFrame] = []
     chunks: list[OnlineAWBCChunk] = []
     vfd_scores: list[float] = []
-    oracle = PegPrivilegedChunkOracle(chunk_size=chunk_size)
+    oracle = (
+        PegPrivilegedChunkOracle(chunk_size=chunk_size)
+        if task == "peg"
+        else PlugChargerPrivilegedChunkOracle(chunk_size=chunk_size)
+    )
     main_camera = _select_camera(records[0].obs, "", MAIN_CAMERA_CANDIDATES, "main")
     wrist_camera = _select_camera(records[0].obs, "", WRIST_CAMERA_CANDIDATES, "wrist")
     terminated = truncated = False
     while not (terminated or truncated):
-        phi = peg_privileged_phi(info)
+        phi = phi_of()
         start_frame = len(actions)
         oracle_plan = None
         if mode == "oracle":
@@ -223,7 +280,7 @@ def _run_episode(
             action_sequence = oracle_plan.actions
         else:
             assert member_0 is not None and member_1 is not None
-            env_obs = _wrap_obs(raw_obs, info)
+            env_obs = _wrap_obs(raw_obs, info, task=task)
             with torch.no_grad():
                 policy_actions, _ = member_0.predict_action_batch(
                     env_obs=env_obs, mode="eval", compute_values=False
@@ -258,14 +315,16 @@ def _run_episode(
             )
             env_action = torch.as_tensor(action, device=raw_obs["agent"]["qpos"].device).unsqueeze(0)
             raw_obs, _reward, terminated, truncated, info = env.step(env_action)
-            info = _augment_info(env, info, event_state)
+            if task == "peg":
+                info = _augment_peg_info(env, info, event_state)
             actions.append(np.asarray(action, dtype=np.float32))
             records.append(_extract_record(raw_obs))
             if _bool(info.get("success", False)) or _bool(terminated) or _bool(truncated):
                 break
 
         next_frame = len(actions)
-        success = _bool(info.get("success", False)) or peg_privileged_phi(info) == 1.0
+        phi_next = phi_of()
+        success = _bool(info.get("success", False)) or phi_next == 1.0
         chunks.append(
             OnlineAWBCChunk(
                 dataset_index=dataset_offset + start_frame,
@@ -274,7 +333,7 @@ def _run_episode(
                 next_frame_index=next_frame,
                 source=source,
                 phi=phi,
-                phi_next=peg_privileged_phi(info),
+                phi_next=phi_next,
                 vfd_score=vfd,
                 threshold=float(controller.threshold.threshold) if controller else float("nan"),
                 success=success,
@@ -284,11 +343,12 @@ def _run_episode(
             terminated = True
 
     return (
-        _build_frames(records=records, actions=actions, task="insert the peg in the hole", main_camera=main_camera, wrist_camera=wrist_camera),
+        _build_frames(records=records, actions=actions, task=_task_label(task), main_camera=main_camera, wrist_camera=wrist_camera),
         frames,
         chunks,
         vfd_scores,
-        bool(_bool(info.get("success", False)) or peg_privileged_phi(info) == 1.0),
+        bool(_bool(info.get("success", False)) or phi_of() == 1.0),
+        scenario_metadata,
     )
 
 
@@ -314,7 +374,7 @@ def main() -> None:
         threshold = FixedVFDThreshold(**threshold_data)
     controller = None if threshold is None else FixedThresholdChunkController(threshold)
     target = args.successes if args.mode == "calibrate" else args.episodes
-    env = _build_env(args.max_episode_steps, sim_backend=args.sim_backend)
+    env = _build_env(args.max_episode_steps, task=args.task, split=args.split, sim_backend=args.sim_backend)
     dataset = None
     all_frames: list[OnlineAWBCFrame] = []
     all_chunks: list[OnlineAWBCChunk] = []
@@ -325,7 +385,7 @@ def main() -> None:
         while saved < target and attempts < args.max_attempts:
             seed = args.seed + attempts
             attempts += 1
-            frames, metadata, chunks, scores, success = _run_episode(
+            frames, metadata, chunks, scores, success, scenario_metadata = _run_episode(
                 env=env,
                 seed=seed,
                 mode=args.mode,
@@ -336,8 +396,13 @@ def main() -> None:
                 num_action_samples=args.num_action_samples,
                 episode_index=saved,
                 dataset_offset=len(all_frames),
+                task=args.task,
+                split=args.split,
             )
-            episode_rows.append({"seed": seed, "success": success, "chunks": len(chunks)})
+            row = {"seed": seed, "success": success, "chunks": len(chunks), "task": args.task, "split": args.split}
+            if args.task == "plug":
+                row.update(scenario_metadata)
+            episode_rows.append(row)
             if args.mode == "calibrate":
                 if success:
                     calibration_scores.extend(scores[index] for index in uniformly_spaced_chunk_indices(len(scores), samples_per_episode=args.samples_per_episode))
