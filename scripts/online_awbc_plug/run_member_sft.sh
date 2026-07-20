@@ -24,7 +24,7 @@ export EMBODIED_PATH="${RLINF_ROOT}/examples/sft"
 export PYTHONPATH="${RLINF_ROOT}:${PYTHONPATH:-}"
 mkdir -p "${OUTPUT_DIR}"
 
-"${PYTHON}" examples/sft/train_vla_sft.py \
+"${PYTHON}" "${RLINF_ROOT}/examples/sft/train_vla_sft.py" \
   --config-path "${RLINF_ROOT}/examples/sft/config" \
   --config-name maniskill_plug_awbc_sft_openpi_pi05 \
   runner.logger.log_path="${OUTPUT_DIR}" \
