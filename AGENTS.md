@@ -78,6 +78,57 @@ git submodule update --init --recursive
   5. Sync results/checkpoints/videos back to OSS.
   6. After the runtime is verified, save an Aliyun custom image for future instances.
 
+### Environment Persistence Is Mandatory
+
+- An instance-local environment is **not** preserved by the OSS mount. In
+  particular, `/root`, apt packages, `/opt`, conda environments, Python/uv
+  virtual environments, simulator installations, and cached compiled wheels
+  disappear when an instance is replaced unless they are saved separately.
+- Do not call an environment setup complete merely because an import or smoke
+  test passed. Before asking the user to switch cards, recreate an instance, or
+  stop the server, complete the persistence checklist below.
+- After a reproducible environment is verified, save an Aliyun custom image.
+  Record the image name/ID, base image, CUDA/driver information, the server
+  date, the Git commits used for the smoke test, and the smoke command/result
+  in a tracked document under `docs/`.
+- Also create an OSS environment archive and manifest. The archive is a
+  fallback when an image cannot be created or cannot be selected:
+  - archive the project virtual environment or conda environment together with
+    its restore command;
+  - include `pip freeze`/`uv.lock` or `conda env export`, `nvidia-smi`, Python,
+    CUDA, Torch, ManiSkill, RLinf, and OpenPI versions;
+  - store it under `/mnt/data/ask4help/environments/<environment-name>/`;
+  - record archive size, checksum, source Git commits, and the exact restore
+    command in `manifest.json` and a tracked markdown document;
+  - verify a fresh instance can restore the archive before treating it as a
+    recovery path.
+- Never archive only code, models, or datasets and call the runtime persisted.
+  Code belongs in GitHub and large artifacts belong in OSS, but both are
+  insufficient to recreate an unarchived Python/simulator runtime.
+
+### Monitoring Long Downloads And Installs
+
+- For any long model download, dataset download, environment installation, or
+  environment archive upload, run it in a durable background process. Record
+  its PID, start time, command, log path, output path, and expected completion
+  artifact in a small manifest under `/mnt/data/ask4help/results/`.
+- After confirming real progress, create a heartbeat monitor every 20 minutes
+  by default. Each check must report: PID/process tree, elapsed time, relevant
+  directory sizes, free disk space, GPU use when relevant, and the latest
+  actionable log stage or error.
+- OSSFS can reject `tail` on an actively written mounted log with `Invalid
+  argument`. Treat that as an OSSFS read limitation, not an installation
+  failure; inspect the process tree, local cache/venv growth, and completion
+  files instead. Prefer writing live install logs to local disk and syncing a
+  completed copy to OSS when possible.
+- On successful installation, immediately run the documented import/GPU smoke
+  test, then perform the environment persistence checklist above before
+  launching expensive training.
+- If an install fails because a minimal base image lacks Python, pip, uv, curl,
+  or wget, install only those documented bootstrap prerequisites, record the
+  reason, and rerun the official installer. Do not replace the official setup
+  with a hand-patched dependency environment.
+
 ## RLinf / pi0.5 Setup Guidance
 
 - For pi0.5 RL, prefer the RLinf + openpi + LIBERO path first.
