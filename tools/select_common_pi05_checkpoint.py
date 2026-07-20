@@ -34,7 +34,7 @@ def select_common_step(member_0: dict[int, float], member_1: dict[int, float]) -
         for record in records
         if record["member_0_success_rate"] >= 0.25 and record["member_1_success_rate"] >= 0.25
     ]
-    selected = (preferred or viable or records[-1])[0]
+    selected = preferred[0] if preferred else viable[0] if viable else records[-1]
     return {"selected_step": selected["step"], "selected": selected, "all": records}
 
 
