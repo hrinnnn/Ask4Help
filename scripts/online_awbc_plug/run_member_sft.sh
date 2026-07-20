@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run members serially.  RLinf's Cluster first connects to any existing Ray
-# cluster, so an old two-GPU Ray head can silently turn a single-GPU command
-# into a two-rank FSDP job.  Stopping Ray and constraining CUDA before launch
-# makes world_size=1 an explicit precondition.
+# Run members serially.  RLinf enumerates host hardware independently of
+# CUDA_VISIBLE_DEVICES, so use its documented explicit component placement
+# rather than masking CUDA and accidentally allowing an ``all`` placement.
 ASK4HELP_ROOT=${ASK4HELP_ROOT:-/root/Ask4Help}
 RLINF_ROOT=${RLINF_ROOT:-"${ASK4HELP_ROOT}/RLinf"}
 PYTHON=${PYTHON:-"${RLINF_ROOT}/.venv/bin/python"}
@@ -20,6 +19,7 @@ rm -rf "/tmp/ask4help_ray_member_${SEED}"
 export CUDA_VISIBLE_DEVICES="${GPU_ID}"
 export RAY_TMPDIR="/tmp/ask4help_ray_member_${SEED}"
 export RAY_ADDRESS=""
+export ASK4HELP_RLINF_PLACEMENT="${GPU_ID}-${GPU_ID}"
 export EMBODIED_PATH="${RLINF_ROOT}/examples/sft"
 export PYTHONPATH="${RLINF_ROOT}:${PYTHONPATH:-}"
 mkdir -p "${OUTPUT_DIR}"
