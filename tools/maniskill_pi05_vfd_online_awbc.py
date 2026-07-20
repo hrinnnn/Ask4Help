@@ -104,6 +104,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--chunk-size", type=int, default=10)
     parser.add_argument("--max-episode-steps", type=int, default=100)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--seed-manifest",
+        type=Path,
+        help="JSON or JSONL manifest whose rows contain replay-validated episode seeds.",
+    )
     parser.add_argument("--num-action-samples", type=int, default=5)
     parser.add_argument(
         "--compute-vfd",
@@ -119,6 +124,28 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--save-videos", action=argparse.BooleanOptionalAction, default=True)
     return parser.parse_args()
+
+
+def load_seed_manifest(path: Path) -> list[int]:
+    """Load unique, replay-validated evaluation seeds from JSON or JSONL."""
+    if not path.is_file():
+        raise FileNotFoundError(path)
+    text = path.read_text(encoding="utf-8").strip()
+    if not text:
+        raise ValueError(f"Seed manifest is empty: {path}")
+    try:
+        parsed = json.loads(text)
+        rows = parsed.get("episodes", parsed) if isinstance(parsed, dict) else parsed
+    except json.JSONDecodeError:
+        rows = [json.loads(line) for line in text.splitlines() if line.strip()]
+    if not isinstance(rows, list):
+        raise ValueError(f"Seed manifest must contain a list of rows: {path}")
+    seeds = [int(row["seed"]) for row in rows if isinstance(row, dict) and "seed" in row]
+    if not seeds:
+        raise ValueError(f"Seed manifest contains no seed rows: {path}")
+    if len(set(seeds)) != len(seeds):
+        raise ValueError(f"Seed manifest contains duplicate seeds: {path}")
+    return seeds
 
 
 def _compose_model_config(model_path: Path, norm_stats_path: Path):
@@ -425,6 +452,11 @@ def main() -> None:
         threshold = FixedVFDThreshold(**threshold_data)
     controller = None if threshold is None else FixedThresholdChunkController(threshold)
     target = args.successes if args.mode == "calibrate" else args.episodes
+    seed_manifest = load_seed_manifest(args.seed_manifest) if args.seed_manifest else None
+    if seed_manifest is not None and target > len(seed_manifest):
+        raise ValueError(
+            f"Requested {target} episodes but seed manifest only provides {len(seed_manifest)} replay-validated seeds"
+        )
     env = _build_env(args.max_episode_steps, task=args.task, split=args.split, sim_backend=args.sim_backend)
     dataset = None
     all_frames: list[OnlineAWBCFrame] = []
@@ -433,8 +465,9 @@ def main() -> None:
     episode_rows: list[dict[str, Any]] = []
     saved = attempts = 0
     try:
-        while saved < target and attempts < args.max_attempts:
-            seed = args.seed + attempts
+        max_attempts = min(args.max_attempts, len(seed_manifest)) if seed_manifest is not None else args.max_attempts
+        while saved < target and attempts < max_attempts:
+            seed = seed_manifest[attempts] if seed_manifest is not None else args.seed + attempts
             attempts += 1
             frames, metadata, chunks, scores, success, scenario_metadata = _run_episode(
                 env=env,

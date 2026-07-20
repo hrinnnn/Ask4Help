@@ -40,3 +40,20 @@ def test_parse_args_supports_pure_policy_evaluation(monkeypatch, tmp_path):
         ],
     )
     assert _module().parse_args().compute_vfd is False
+
+
+def test_load_seed_manifest_supports_oracle_jsonl_rows(tmp_path):
+    manifest = tmp_path / "episodes.jsonl"
+    manifest.write_text('{"episode_index": 0, "seed": 10001}\n{"episode_index": 1, "seed": 10005}\n')
+    assert _module().load_seed_manifest(manifest) == [10001, 10005]
+
+
+def test_load_seed_manifest_rejects_duplicate_seeds(tmp_path):
+    manifest = tmp_path / "duplicate.json"
+    manifest.write_text('[{"seed": 10001}, {"seed": 10001}]')
+    try:
+        _module().load_seed_manifest(manifest)
+    except ValueError as error:
+        assert "duplicate" in str(error)
+    else:
+        raise AssertionError("duplicate seed manifest should fail")

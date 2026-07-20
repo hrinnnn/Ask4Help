@@ -16,6 +16,7 @@ SPLIT=${SPLIT:-id}
 SEED=${SEED:-10000}
 EPISODES=${EPISODES:-20}
 COMPUTE_VFD=${COMPUTE_VFD:-true}
+SEED_MANIFEST=${SEED_MANIFEST:-}
 
 mkdir -p "${OUTPUT_DIR}"
 POLICY_ONLY_THRESHOLD="${OUTPUT_DIR}/policy_only_threshold.json"
@@ -24,6 +25,9 @@ export PYTHONPATH="${RLINF_ROOT}:${ASK4HELP_ROOT}:${PYTHONPATH:-}"
 extra_args=()
 if [ "${COMPUTE_VFD}" = "false" ]; then
   extra_args+=(--no-compute-vfd)
+fi
+if [ -n "${SEED_MANIFEST}" ]; then
+  extra_args+=(--seed-manifest "${SEED_MANIFEST}")
 fi
 "${PYTHON}" "${ASK4HELP_ROOT}/tools/maniskill_pi05_vfd_online_awbc.py" \
   --mode online --task plug --split "${SPLIT}" \

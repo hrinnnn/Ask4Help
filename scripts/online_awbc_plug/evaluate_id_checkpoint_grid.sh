@@ -15,6 +15,7 @@ GPU_ID=${GPU_ID:?Set GPU_ID to 0 or 1}
 STEPS=${STEPS:-"250"}
 EPISODES=${EPISODES:-20}
 COMPUTE_VFD=${COMPUTE_VFD:-false}
+SEED_MANIFEST=${SEED_MANIFEST:-}
 
 if [ "${POLICY_MEMBER}" = "0" ]; then
   FIRST_ROOT=${CHECKPOINT_ROOT_0}
@@ -38,6 +39,6 @@ for step in ${STEPS}; do
     NORM_STATS="${NORM_STATS}" \
     OUTPUT_DIR="${output}" \
     DATASET="${dataset}" \
-    SPLIT=id SEED=10000 EPISODES="${EPISODES}" COMPUTE_VFD="${COMPUTE_VFD}" \
+    SPLIT=id SEED=10000 EPISODES="${EPISODES}" COMPUTE_VFD="${COMPUTE_VFD}" SEED_MANIFEST="${SEED_MANIFEST}" \
     bash "${ASK4HELP_ROOT}/scripts/online_awbc_plug/evaluate_checkpoint.sh"
 done
