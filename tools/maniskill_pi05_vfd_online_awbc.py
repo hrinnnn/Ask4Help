@@ -83,6 +83,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-episode-steps", type=int, default=100)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--num-action-samples", type=int, default=5)
+    parser.add_argument(
+        "--sim-backend",
+        default="physx_cpu",
+        choices=("physx_cpu", "gpu"),
+        help="Use CPU physics for compatibility with ManiSkill's official planner; rendering remains on CUDA.",
+    )
     parser.add_argument("--save-videos", action=argparse.BooleanOptionalAction, default=True)
     return parser.parse_args()
 
@@ -113,7 +119,7 @@ def _load_model(model_path: Path, norm_stats_path: Path):
     return model.to("cuda").eval().requires_grad_(False)
 
 
-def _build_env(max_episode_steps: int):
+def _build_env(max_episode_steps: int, *, sim_backend: str = "physx_cpu"):
     import gymnasium as gym
     import mani_skill.envs  # noqa: F401
 
@@ -124,7 +130,7 @@ def _build_env(max_episode_steps: int):
         num_envs=1,
         obs_mode="rgb",
         control_mode="pd_joint_delta_pos",
-        sim_backend="gpu",
+        sim_backend=sim_backend,
         reward_mode="sparse",
         sim_config={"sim_freq": 100, "control_freq": 10},
         sensor_configs={"width": 384, "height": 384},
@@ -308,7 +314,7 @@ def main() -> None:
         threshold = FixedVFDThreshold(**threshold_data)
     controller = None if threshold is None else FixedThresholdChunkController(threshold)
     target = args.successes if args.mode == "calibrate" else args.episodes
-    env = _build_env(args.max_episode_steps)
+    env = _build_env(args.max_episode_steps, sim_backend=args.sim_backend)
     dataset = None
     all_frames: list[OnlineAWBCFrame] = []
     all_chunks: list[OnlineAWBCChunk] = []

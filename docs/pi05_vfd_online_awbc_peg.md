@@ -8,6 +8,7 @@
 - VFD ensemble：同一 `pi05_base` 和同一初始数据，分别用 seed `1000`、`1001` 各 SFT 2,000 steps。
 - 阈值：20 条 ID policy-success rollout；每条均匀抽 5 个 action chunk，共 100 个 VFD score；取全局 `q=0.95` 分位数，写入 `fixed_vfd_threshold.json`。
 - 一个 chunk：10 个低层环境 action；每个 chunk 前计算一次 `C=5` 的 one-way VFD。
+- ManiSkill：使用 `physx_cpu` 物理和 CUDA 图像渲染。当前 ManiSkill 官方 Panda motion planner 在本环境的 GPU-physics 变体无法稳定规划；CPU 物理是已有 expert collector 已验证的官方兼容路径，并不把图像或 pi0.5 推理移到 CPU。
 - Online：每轮 2 条 rollout，累计 10 轮；每轮两个模型各进行 50 steps ARM exact AWBC 更新。
 - Uniform BC：从相同初始 reference checkpoint、使用完全相同累计数据，运行 500 steps 作为 matched control。
 
