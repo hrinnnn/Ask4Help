@@ -112,8 +112,14 @@ git submodule update --init --recursive
   environment archive upload, run it in a durable background process. Record
   its PID, start time, command, log path, output path, and expected completion
   artifact in a small manifest under `/mnt/data/ask4help/results/`.
-- After confirming real progress, create a heartbeat monitor every 20 minutes
-  by default. Each check must report: PID/process tree, elapsed time, relevant
+- Choose the heartbeat interval from the task's expected duration, stage, and
+  failure risk; do not use a fixed interval. Healthy, stable long downloads,
+  installs, and archive uploads normally use 20-30 minute checks. Short jobs,
+  smoke tests, short training runs, stage transitions, and tasks approaching a
+  completion gate normally use 3-10 minute checks. Check sooner immediately
+  after launch or configuration changes, and whenever a failure signal appears.
+- After confirming real progress, create a heartbeat monitor at the chosen
+  interval. Each check must report: PID/process tree, elapsed time, relevant
   directory sizes, free disk space, GPU use when relevant, and the latest
   actionable log stage or error.
 - OSSFS can reject `tail` on an actively written mounted log with `Invalid
