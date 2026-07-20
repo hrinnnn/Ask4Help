@@ -72,9 +72,11 @@ from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     _extract_record,
     _resolve_output_path,
     _select_camera,
-    _write_episode_video,
     MAIN_CAMERA_CANDIDATES,
     WRIST_CAMERA_CANDIDATES,
+)
+from toolkits.lerobot.collect_maniskill_plug_lerobot_joint import (  # noqa: E402
+    write_episode_video_durably,
 )
 
 
@@ -429,7 +431,7 @@ def main() -> None:
             all_frames.extend(metadata)
             all_chunks.extend(chunks)
             if args.save_videos:
-                _write_episode_video(
+                write_episode_video_durably(
                     frames,
                     video_dir=args.output_dir / "videos",
                     episode_index=saved,
