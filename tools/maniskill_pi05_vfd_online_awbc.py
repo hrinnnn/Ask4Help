@@ -209,10 +209,12 @@ def _run_episode(
     while not (terminated or truncated):
         phi = peg_privileged_phi(info)
         start_frame = len(actions)
+        oracle_plan = None
         if mode == "oracle":
             source = "expert"
             vfd = 0.0
-            action_sequence = oracle.plan(env).actions
+            oracle_plan = oracle.plan(env)
+            action_sequence = oracle_plan.actions
         else:
             assert member_0 is not None and member_1 is not None
             env_obs = _wrap_obs(raw_obs, info)
@@ -230,9 +232,15 @@ def _run_episode(
             vfd = float(score.reshape(-1)[0].detach().cpu())
             vfd_scores.append(vfd)
             source = "expert" if controller is not None and controller.decide([vfd]).expert_mask.item() else "policy"
-            action_sequence = oracle.plan(env).actions if source == "expert" else _action_chunk(policy_actions, chunk_size)
+            if source == "expert":
+                oracle_plan = oracle.plan(env)
+                action_sequence = oracle_plan.actions
+            else:
+                action_sequence = _action_chunk(policy_actions, chunk_size)
 
-        for action in action_sequence:
+        for step_index, action in enumerate(action_sequence):
+            if oracle_plan is not None:
+                action = oracle_plan.action_at(raw_obs["agent"]["qpos"], step_index)
             frames.append(
                 OnlineAWBCFrame(
                     dataset_index=dataset_offset + len(actions),
