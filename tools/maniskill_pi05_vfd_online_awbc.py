@@ -89,6 +89,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-id", default="")
     parser.add_argument("--member-0", type=Path)
     parser.add_argument("--member-1", type=Path)
+    parser.add_argument(
+        "--pi05-base",
+        type=Path,
+        help="Base OpenPI PyTorch directory used to instantiate SFT full_weights.pt checkpoints.",
+    )
     parser.add_argument("--norm-stats", type=Path)
     parser.add_argument("--threshold-path", type=Path)
     parser.add_argument("--episodes", type=int, default=2)
@@ -127,12 +132,40 @@ def _compose_model_config(model_path: Path, norm_stats_path: Path):
     return model_cfg
 
 
-def _load_model(model_path: Path, norm_stats_path: Path):
+def resolve_sft_full_weights(path: Path) -> Path | None:
+    """Resolve the portable full state dict emitted by RLinf SFT checkpoints."""
+    if path.is_file():
+        return path
+    candidates = (
+        path / "actor" / "model_state_dict" / "full_weights.pt",
+        path / "model_state_dict" / "full_weights.pt",
+        path / "full_weights.pt",
+    )
+    return next((candidate for candidate in candidates if candidate.is_file()), None)
+
+
+def _load_model(model_path: Path, norm_stats_path: Path, pi05_base: Path | None):
     from rlinf.models import get_model
 
-    model = get_model(_compose_model_config(model_path, norm_stats_path))
+    fine_tuned_weights = resolve_sft_full_weights(model_path)
+    initial_path = pi05_base if fine_tuned_weights is not None else model_path
+    if initial_path is None or not initial_path.is_dir():
+        raise FileNotFoundError(
+            "A --pi05-base directory is required when loading an RLinf SFT full_weights.pt checkpoint"
+        )
+    model = get_model(_compose_model_config(initial_path, norm_stats_path))
     if model is None:
-        raise RuntimeError(f"Could not load pi0.5 model from {model_path}")
+        raise RuntimeError(f"Could not load pi0.5 model from {initial_path}")
+    if fine_tuned_weights is not None:
+        state_dict = torch.load(fine_tuned_weights, map_location="cpu", mmap=True, weights_only=True)
+        incompatible = model.load_state_dict(state_dict, strict=False)
+        allowed_unexpected = {"paligemma_with_expert.paligemma.model.language_model.embed_tokens.weight"}
+        unexpected = set(incompatible.unexpected_keys) - allowed_unexpected
+        if incompatible.missing_keys or unexpected:
+            raise RuntimeError(
+                "SFT checkpoint is incompatible with the selected pi0.5 base: "
+                f"missing={incompatible.missing_keys}, unexpected={sorted(unexpected)}"
+            )
     return model.to("cuda").eval().requires_grad_(False)
 
 
@@ -363,8 +396,8 @@ def main() -> None:
                 raise FileNotFoundError(path)
         if not torch.cuda.is_available():
             raise RuntimeError("pi0.5 VFD online collection requires CUDA")
-        member_0 = _load_model(args.member_0, args.norm_stats)
-        member_1 = _load_model(args.member_1, args.norm_stats)
+        member_0 = _load_model(args.member_0, args.norm_stats, args.pi05_base)
+        member_1 = _load_model(args.member_1, args.norm_stats, args.pi05_base)
     else:
         member_0 = member_1 = None
 

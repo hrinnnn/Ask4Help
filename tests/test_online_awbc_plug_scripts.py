@@ -25,3 +25,11 @@ def test_member_sft_can_use_an_external_two_gpu_ray_head_without_stopping_it():
     assert 'EXTERNAL_RAY=${EXTERNAL_RAY:-0}' in script
     assert 'if [ "${EXTERNAL_RAY}" = "1" ]; then' in script
     assert 'unset CUDA_VISIBLE_DEVICES' in script
+
+
+def test_rollout_scripts_require_and_forward_the_pi05_base_directory():
+    root = Path(__file__).parents[1] / "scripts" / "online_awbc_plug"
+    for name in ("evaluate_checkpoint.sh", "calibrate_fixed_threshold.sh", "collect_ood_round.sh"):
+        script = (root / name).read_text(encoding="utf-8")
+        assert 'PI05_BASE=${PI05_BASE:?Set PI05_BASE}' in script
+        assert '--pi05-base "${PI05_BASE}"' in script
