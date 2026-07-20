@@ -14,6 +14,9 @@ ID_DATASET=${ID_DATASET:?Set ID_DATASET}
 NORM_STATS=${NORM_STATS:?Set NORM_STATS}
 PI05_BASE=${PI05_BASE:?Set PI05_BASE}
 OUTPUT_DIR=${OUTPUT_DIR:?Set OUTPUT_DIR}
+INIT_MODEL_PATH=${INIT_MODEL_PATH:-"${PI05_BASE}"}
+MAX_STEPS=${MAX_STEPS:-250}
+SAVE_INTERVAL=${SAVE_INTERVAL:-50}
 
 if [ "${EXTERNAL_RAY}" = "1" ]; then
   # Two independent driver processes can safely share a manually started
@@ -38,11 +41,11 @@ mkdir -p "${OUTPUT_DIR}"
   --config-path "${RLINF_ROOT}/examples/sft/config" \
   --config-name maniskill_plug_awbc_sft_openpi_pi05 \
   runner.logger.log_path="${OUTPUT_DIR}" \
-  runner.max_steps=250 \
-  runner.save_interval=50 \
-  actor.optim.total_training_steps=250 \
+  runner.max_steps="${MAX_STEPS}" \
+  runner.save_interval="${SAVE_INTERVAL}" \
+  actor.optim.total_training_steps="${MAX_STEPS}" \
   actor.seed="${SEED}" \
   "data.train_data_paths=[{dataset_path:${ID_DATASET},weight:1.0}]" \
-  actor.model.model_path="${PI05_BASE}" \
+  actor.model.model_path="${INIT_MODEL_PATH}" \
   actor.model.openpi_data.norm_stats_path="${NORM_STATS}" \
   awbc.enabled=false
