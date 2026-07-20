@@ -9,15 +9,25 @@ RLINF_ROOT=${RLINF_ROOT:-"${ASK4HELP_ROOT}/RLinf"}
 PYTHON=${PYTHON:-"${RLINF_ROOT}/.venv/bin/python"}
 GPU_ID=${GPU_ID:?Set GPU_ID to 0 or 1}
 SEED=${SEED:?Set SEED to 1000 or 1001}
+EXTERNAL_RAY=${EXTERNAL_RAY:-0}
 ID_DATASET=${ID_DATASET:?Set ID_DATASET}
 NORM_STATS=${NORM_STATS:?Set NORM_STATS}
 PI05_BASE=${PI05_BASE:?Set PI05_BASE}
 OUTPUT_DIR=${OUTPUT_DIR:?Set OUTPUT_DIR}
 
-"${RLINF_ROOT}/.venv/bin/ray" stop --force || true
-rm -rf "/tmp/ask4help_ray_member_${SEED}"
-export CUDA_VISIBLE_DEVICES="${GPU_ID}"
-export RAY_TMPDIR="/tmp/ask4help_ray_member_${SEED}"
+if [ "${EXTERNAL_RAY}" = "1" ]; then
+  # Two independent driver processes can safely share a manually started
+  # two-GPU Ray head.  Their explicit RLinf placements select GPU 0 or 1.
+  # Do not mask CUDA here: Ray must advertise both resources to schedule both
+  # actors concurrently.
+  unset CUDA_VISIBLE_DEVICES
+  unset RAY_TMPDIR
+else
+  "${RLINF_ROOT}/.venv/bin/ray" stop --force || true
+  rm -rf "/tmp/ask4help_ray_member_${SEED}"
+  export CUDA_VISIBLE_DEVICES="${GPU_ID}"
+  export RAY_TMPDIR="/tmp/ask4help_ray_member_${SEED}"
+fi
 export RAY_ADDRESS=""
 export ASK4HELP_RLINF_PLACEMENT="${GPU_ID}-${GPU_ID}"
 export EMBODIED_PATH="${RLINF_ROOT}/examples/sft"
