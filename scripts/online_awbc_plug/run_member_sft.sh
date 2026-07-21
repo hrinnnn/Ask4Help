@@ -44,7 +44,9 @@ if [ -n "${RESUME_DIR}" ]; then
     echo "RESUME_DIR must contain an actor checkpoint directory: ${RESUME_DIR}" >&2
     exit 2
   fi
-  resume_args+=(runner.resume_dir="${RESUME_DIR}")
+  # `resume_dir` is intentionally optional in the base Hydra config, so the
+  # command-line override must add it instead of replacing an existing key.
+  resume_args+=(+runner.resume_dir="${RESUME_DIR}")
 fi
 
 "${PYTHON}" "${RLINF_ROOT}/examples/sft/train_vla_sft.py" \
