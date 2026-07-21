@@ -17,6 +17,17 @@ relative yaw, split, seed, and source.
 
 ## Implementation status
 
+- **2026-07-21 visual-data integrity fix.** The first 128-demo collection at
+  `plug_charger_id_128` is invalid for VLA training: its simulator state and
+  action streams moved, but its retained RGB observation buffers were static.
+  Do not use that dataset or the two SFT checkpoints trained from it. RLinf
+  commit `111d1500` snapshots camera tensors at every environment step and
+  rejects a trajectory whose complete camera sequence has no visible motion.
+  The repaired one-episode acceptance artifact is
+  `datasets/lerobot/local/plug_charger_id_visual_gate_20260721_0500`; both
+  LeRobot images and its MP4 contain 76 distinct frames. Future collections
+  must first pass this one-episode check and use a new, timestamped OSS output
+  directory rather than overwriting a previous experiment path.
 - Peg SFT monitor and both 2,000-step Peg jobs were stopped on 2026-07-20;
   their partial logs were preserved under
   `/mnt/data/ask4help/results/online_awbc_peg/aborted_peg_sft_*` and are not
