@@ -37,6 +37,35 @@ def _video_frames(path: Path) -> int:
     return count
 
 
+def _validate_parquet(path: Path, *, episode_index: int, expected_actions: int) -> dict[str, float]:
+    import pyarrow.parquet as pq
+
+    table = pq.read_table(path, columns=["state", "actions", "frame_index", "episode_index"])
+    states = np.asarray(table["state"].to_pylist(), dtype=np.float32)
+    actions = np.asarray(table["actions"].to_pylist(), dtype=np.float32)
+    frame_indices = np.asarray(table["frame_index"].to_pylist(), dtype=np.int64)
+    episode_indices = np.asarray(table["episode_index"].to_pylist(), dtype=np.int64)
+    if len(actions) != expected_actions:
+        raise RuntimeError(
+            f"{path} has {len(actions)} action rows, manifest expects {expected_actions}"
+        )
+    if states.shape != (expected_actions, 9) or actions.shape != (expected_actions, 8):
+        raise RuntimeError(f"unexpected state/action shape in {path}: {states.shape}, {actions.shape}")
+    if not np.array_equal(frame_indices, np.arange(expected_actions)):
+        raise RuntimeError(f"non-contiguous frame_index in {path}")
+    if not np.all(episode_indices == episode_index):
+        raise RuntimeError(f"wrong episode_index in {path}")
+    state_motion = float(np.abs(states - states[0]).max())
+    action_motion = float(np.abs(actions - actions[0]).max())
+    if state_motion <= 1e-5 or action_motion <= 1e-5:
+        raise RuntimeError(
+            f"constant state/action trajectory in {path}: state={state_motion}, action={action_motion}"
+        )
+    if not np.isfinite(states).all() or not np.isfinite(actions).all():
+        raise RuntimeError(f"non-finite state/action values in {path}")
+    return {"state_peak_delta": state_motion, "action_peak_delta": action_motion}
+
+
 def main() -> None:
     args = parse_args()
     rows = [json.loads(line) for line in args.manifest.read_text().splitlines() if line.strip()]
@@ -63,6 +92,14 @@ def main() -> None:
         if max(float(motion.get("image", 0)), float(motion.get("wrist_image", 0))) < 1.0:
             raise RuntimeError(f"episode has static RGB according to manifest: {row}")
     frame_counts = [_video_frames(path) for path in videos]
+    parquet_stats = [
+        _validate_parquet(
+            path,
+            episode_index=index,
+            expected_actions=int(rows[index]["num_actions"]),
+        )
+        for index, path in enumerate(parquet)
+    ]
     report = {
         "valid": True,
         "episodes": args.episodes,
@@ -75,6 +112,8 @@ def main() -> None:
         "distance_max": max(float(row["relative_distance"]) for row in rows),
         "angle_offset_deg_min": min(np.rad2deg(float(row["relative_angle_offset"])) for row in rows),
         "angle_offset_deg_max": max(np.rad2deg(float(row["relative_angle_offset"])) for row in rows),
+        "state_peak_delta_min": min(item["state_peak_delta"] for item in parquet_stats),
+        "action_peak_delta_min": min(item["action_peak_delta"] for item in parquet_stats),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n")
@@ -83,4 +122,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
