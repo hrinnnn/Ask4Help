@@ -19,9 +19,26 @@ test ! -e "${RESULT_ROOT}/member_0"
 test ! -e "${RESULT_ROOT}/member_1"
 mkdir -p "${RESULT_ROOT}" /root/ask4help_stackcube_sft
 
+export PYTHONPATH="${RLINF_ROOT}:${ASK4HELP_ROOT}:${PYTHONPATH:-}"
 "${RLINF_ROOT}/.venv/bin/ray" stop --force || true
 "${RLINF_ROOT}/.venv/bin/ray" start --head --num-cpus=32 --num-gpus=2 \
   --disable-usage-stats > /root/ask4help_stackcube_sft/ray_start.log 2>&1
+
+"${RLINF_ROOT}/.venv/bin/python" - <<'PY'
+import ray
+
+
+@ray.remote(num_cpus=0)
+def import_rlinf():
+    import rlinf
+
+    return rlinf.__file__
+
+
+ray.init(address="auto")
+print(f"Ray worker RLinf import: {ray.get(import_rlinf.remote())}")
+ray.shutdown()
+PY
 
 launch_member() {
   local member=$1
@@ -67,4 +84,3 @@ EOF
 
 printf 'member0 pid=%s log=%s\n' "$(cat /tmp/ask4help_stackcube_member_0.pid)" /root/ask4help_stackcube_sft/member_0.log
 printf 'member1 pid=%s log=%s\n' "$(cat /tmp/ask4help_stackcube_member_1.pid)" /root/ask4help_stackcube_sft/member_1.log
-
