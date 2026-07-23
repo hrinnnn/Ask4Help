@@ -26,7 +26,7 @@ CUDA_VISIBLE_DEVICES=${GRM_GPU:-1} nohup "${GRM_PYTHON}" \
   --enable-lora --max-loras 1 --lora-modules "${GRM_ADAPTER_NAME}=${GRM_ADAPTER_DIR}" \
   --default-mm-loras "{\"image\":\"${GRM_ADAPTER_DIR}\"}" \
   --host 127.0.0.1 --port 8000 --trust-remote-code \
-  --limit-mm-per-prompt '{"image":8}' --max-model-len 8192 \
+  --limit-mm-per-prompt '{"image":8}' --max-model-len 8192 --skip-mm-profiling \
   --gpu-memory-utilization "${GRM_GPU_MEMORY_UTILIZATION:-0.45}" \
   >"${LOG}" 2>&1 &
 echo $! >"${RESULT_ROOT}/grm_endpoint.pid"
