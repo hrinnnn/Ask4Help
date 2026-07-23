@@ -379,8 +379,13 @@ class StackCubeOnlineWorker:
             raise ValueError("the first smoke intentionally collects exactly two trajectories")
         # A failed trigger gate is still valuable online evidence. Keep each
         # collection attempt immutable instead of overwriting its raw archive.
-        raw_dir = self.output_dir / "raw_online_archive" / f"collection_{int(time.time())}"
-        repo_id = f"stackcube_online_awbc_{self.round_id}"
+        collection_id = f"collection_{time.time_ns()}"
+        raw_dir = self.output_dir / "raw_online_archive" / collection_id
+        # LeRobot materializes local datasets below its repo id.  The worker may
+        # be restarted for the same logical round, so the collection id must be
+        # unique as well; reusing round_id would collide with an earlier raw
+        # archive and prevents a restart from collecting anything.
+        repo_id = f"stackcube_online_awbc_{self.round_id}_{collection_id}"
         env = _build_env(100, task="stack", split="ood")
         dataset = None
         all_frames: list[OnlineAWBCFrame] = []
