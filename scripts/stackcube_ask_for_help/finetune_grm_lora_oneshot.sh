@@ -12,7 +12,11 @@ test -d "${GRM_MODEL}"
 mkdir -p "${ADAPTER_DIR}"
 
 "${PYTHON}" "${ASK4HELP_ROOT}/tools/patch_robo_dopamine_lora_targets.py" --repo "${ROBO_DOPAMINE_DIR}" --manifest "${ADAPTER_DIR}/official_trainer_patch.json"
-ln -sfn "${TRAIN_ROOT}" "${ROBO_DOPAMINE_DIR}/dataset/train_data"
+# The upstream example config resolves `./dataset/...` from `train/`, not from
+# the repository root. Keep the generated pair data outside the checkout and
+# expose it at that exact upstream-relative location.
+mkdir -p "${ROBO_DOPAMINE_DIR}/train/dataset"
+ln -sfn "${TRAIN_ROOT}" "${ROBO_DOPAMINE_DIR}/train/dataset/train_data"
 cd "${ROBO_DOPAMINE_DIR}/train"
 CUDA_VISIBLE_DEVICES=${GRM_GPU:-1} "${GRM_PYTHON}" qwenvl/train/train_qwen.py \
   --model_name_or_path "${GRM_MODEL}" --dataset_use example_grm_finetune --output_dir "${ADAPTER_DIR}" --cache_dir "${ROBO_DOPAMINE_DIR}/.cache" \
