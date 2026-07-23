@@ -296,7 +296,12 @@ class StackCubeOnlineWorker:
                         if done:
                             break
                 if _bool(info.get("success", False)):
-                    scores.extend(episode_scores[index] for index in uniformly_spaced_chunk_indices(len(episode_scores), samples_per_episode))
+                    scores.extend(
+                        episode_scores[index]
+                        for index in uniformly_spaced_chunk_indices(
+                            len(episode_scores), samples_per_episode=samples_per_episode
+                        )
+                    )
                     accepted.append(seed)
                     if len(accepted) == successes:
                         break
