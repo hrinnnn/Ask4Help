@@ -7,11 +7,14 @@ RAW_ROOT="${RESULT_ROOT}/robodopamine_adaptation/raw_data"
 TRAIN_ROOT="${RESULT_ROOT}/robodopamine_adaptation/train_data"
 EPISODE_INDEX=${ONESHOT_EPISODE_INDEX:-0}
 EPISODE_SEED=${ONESHOT_EPISODE_SEED:-0}
-PRIVILEGED_EVENTS=${ONESHOT_PRIVILEGED_EVENTS:?Set ONESHOT_PRIVILEGED_EVENTS to the successful ID privileged event sidecar.}
+PRIVILEGED_EVENTS=${ONESHOT_PRIVILEGED_EVENTS:-"${RESULT_ROOT}/robodopamine_adaptation/oneshot_privileged_events.jsonl"}
 
 test -f "${ROBO_DOPAMINE_DIR}/dataset/utils/0_preprocess_data.py"
-test -f "${PRIVILEGED_EVENTS}"
 mkdir -p "${RAW_ROOT}"
+if [[ ! -f "${PRIVILEGED_EVENTS}" ]]; then
+  "${PYTHON}" "${ASK4HELP_ROOT}/tools/replay_stackcube_privileged_events.py" \
+    --dataset "${EXPERT_DATASET}" --episode-index "${EPISODE_INDEX}" --seed "${EPISODE_SEED}" --output "${PRIVILEGED_EVENTS}"
+fi
 "${PYTHON}" "${ASK4HELP_ROOT}/tools/export_stackcube_grm_oneshot.py" \
   --dataset "${EXPERT_DATASET}" --privileged-events "${PRIVILEGED_EVENTS}" \
   --episode-index "${EPISODE_INDEX}" --seed "${EPISODE_SEED}" --output-dir "${RAW_ROOT}"
