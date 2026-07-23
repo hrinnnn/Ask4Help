@@ -17,7 +17,7 @@ printf '{"successful_episodes":[]}\n' >"${OUT}/successful_episodes.json"
   --grm-endpoint "${GRM_ENDPOINT}" --model-name "${GRM_MODEL_NAME}" \
   --output "${MANIFEST}" --source policy \
   --source-manifest "${RESULT_ROOT}/ood_assisted/progress.jsonl" \
-  --stride-steps 5 --lookahead-steps 10 \
+  --stride-steps 10 --lookahead-steps 10 --request-workers 3 \
   --successful-episodes "${OUT}/successful_episodes.json"
 "${PYTHON}" "${ASK4HELP_ROOT}/tools/validate_flux_awbc_manifest.py" \
   --manifest "${MANIFEST}" --output "${OUT}/flux_weight_summary.json"

@@ -156,6 +156,12 @@ def main() -> None:
     parser.add_argument("--assume-all-success", action="store_true")
     parser.add_argument("--max-episodes", type=int)
     parser.add_argument("--request-timeout", type=float, default=120.0)
+    parser.add_argument(
+        "--request-workers",
+        type=int,
+        default=3,
+        help="Concurrent incremental/forward/backward requests to the persistent vLLM endpoint.",
+    )
     args = parser.parse_args()
 
     from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
@@ -190,6 +196,7 @@ def main() -> None:
             "grm_interval_chunks": 1,
             "consistency_check": True,
             "request_timeout": args.request_timeout,
+            "request_workers": args.request_workers,
         }
     )
     estimator = _CapturingDopamineGRM(config)
