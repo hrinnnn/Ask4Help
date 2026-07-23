@@ -364,16 +364,19 @@ class StackCubeOnlineWorker:
     def collect(self, *, seeds: list[int], trajectories: int = 2) -> dict[str, Any]:
         if trajectories != 2:
             raise ValueError("the first smoke intentionally collects exactly two trajectories")
-        raw_dir = self.output_dir / "raw_online_archive"
+        # A failed trigger gate is still valuable online evidence. Keep each
+        # collection attempt immutable instead of overwriting its raw archive.
+        raw_dir = self.output_dir / "raw_online_archive" / f"collection_{int(time.time())}"
         repo_id = f"stackcube_online_awbc_{self.round_id}"
         env = _build_env(100, task="stack", split="ood")
         dataset = None
         all_frames: list[OnlineAWBCFrame] = []
         all_chunks: list[OnlineAWBCChunk] = []
         episodes: list[dict[str, Any]] = []
+        assisted_episode_indices: list[int] = []
         try:
             for attempt, seed in enumerate(seeds):
-                if len(episodes) == trajectories:
+                if len(assisted_episode_indices) == trajectories:
                     break
                 video_frames, frames, chunks, episode = self._collect_episode(env, seed=seed, episode_index=len(episodes), offset=len(all_frames))
                 if dataset is None:
@@ -385,14 +388,12 @@ class StackCubeOnlineWorker:
                 all_frames.extend(frames)
                 all_chunks.extend(chunks)
                 episodes.append(episode)
+                if any(chunk.source == "expert" for chunk in chunks):
+                    assisted_episode_indices.append(len(episodes) - 1)
         finally:
             if dataset is not None and getattr(dataset, "image_writer", None) is not None:
                 dataset.image_writer.wait_until_done()
             env.close()
-        if len(episodes) != trajectories:
-            raise RuntimeError(f"collected {len(episodes)}/{trajectories} online trajectories")
-        if not any(chunk.source == "expert" for chunk in all_chunks):
-            raise RuntimeError("no real VFD-triggered expert chunk was observed")
         source_dataset = Path.home() / ".cache" / "huggingface" / "lerobot" / repo_id
         if not source_dataset.is_dir():
             raise FileNotFoundError(f"LeRobot did not create online dataset: {source_dataset}")
@@ -412,9 +413,12 @@ class StackCubeOnlineWorker:
         )
         self.raw_online_dataset = durable_dataset
         self.online_store = _AnchorStore(durable_dataset)
-        self._last_collection = {"episodes": episodes, "chunks": [chunk.diagnostic_dict() for chunk in all_chunks]}
+        self._last_collection = {"episodes": episodes, "chunks": [chunk.diagnostic_dict() for chunk in all_chunks], "assisted_episode_indices": assisted_episode_indices}
         self._write_status("collected")
-        return {"dataset": str(durable_dataset), "episodes": episodes, "expert_chunks": sum(chunk.source == "expert" for chunk in all_chunks)}
+        result = {"dataset": str(durable_dataset), "episodes": episodes, "expert_chunks": sum(chunk.source == "expert" for chunk in all_chunks), "assisted_episode_indices": assisted_episode_indices}
+        if len(assisted_episode_indices) != trajectories:
+            raise RuntimeError(f"collected {len(assisted_episode_indices)}/{trajectories} assisted trajectories after {len(episodes)} OOD attempts; raw archive={durable_dataset}")
+        return result
 
     def admit_quality_buffer(
         self,
