@@ -18,7 +18,9 @@ mkdir -p "${ADAPTER_DIR}"
 mkdir -p "${ROBO_DOPAMINE_DIR}/train/dataset"
 ln -sfn "${TRAIN_ROOT}" "${ROBO_DOPAMINE_DIR}/train/dataset/train_data"
 cd "${ROBO_DOPAMINE_DIR}/train"
-CUDA_VISIBLE_DEVICES=${GRM_GPU:-1} "${GRM_PYTHON}" qwenvl/train/train_qwen.py \
+# This self-contained one-shot smoke records its training log under ADAPTER_DIR;
+# it must not require an interactive W&B login on a disposable server.
+WANDB_MODE=${WANDB_MODE:-disabled} CUDA_VISIBLE_DEVICES=${GRM_GPU:-1} "${GRM_PYTHON}" qwenvl/train/train_qwen.py \
   --model_name_or_path "${GRM_MODEL}" --dataset_use example_grm_finetune --output_dir "${ADAPTER_DIR}" --cache_dir "${ROBO_DOPAMINE_DIR}/.cache" \
   --bf16 --per_device_train_batch_size 1 --gradient_accumulation_steps 4 --learning_rate 1e-5 --optim adamw_torch \
   --model_max_length 32768 --data_flatten False --data_packing False --max_pixels 76800 --min_pixels 12544 --base_interval 2 \
