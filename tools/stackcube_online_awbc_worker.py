@@ -225,7 +225,11 @@ class StackCubeOnlineWorker:
 
     def _per_sample_flow_loss(self, member: ResidentMember, batch: dict[str, Any]) -> torch.Tensor:
         prepared = member.model.prepare_lerobot_sft_batch(batch)
-        loss = member.model.forward(prepared["observation"], prepared["actions"])
+        # OpenPi0ForRLActionPrediction.forward is an RL dispatcher. Call its
+        # PI0Pytorch parent directly to retain the unreduced flow-loss tensor.
+        loss = super(type(member.model), member.model).forward(
+            prepared["observation"], prepared["actions"]
+        )
         loss = loss[:, : member.model.config.action_chunk, : member.model.config.action_env_dim]
         return loss.reshape(loss.shape[0], -1).mean(dim=1)
 
