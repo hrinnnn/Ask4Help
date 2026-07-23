@@ -43,3 +43,27 @@ All runtime artifacts are written under:
 The directory contains calibration scores and threshold, assisted rollout
 videos and controller timeline, Robo-Dopamine cache/sidecar and weight summary,
 both AWBC checkpoints and logs, and both reload-forward summaries.
+
+## Verified Run
+
+The step-7000 smoke completed successfully on 2026-07-23:
+
+- VFD calibration used 25 scores from five successful ID trajectories and
+  produced a fixed threshold of `5.038795089721678`.
+- Two OOD trajectories produced 40 decision chunks: 37 policy chunks and
+  three expert chunks. The second trajectory included a real
+  `policy -> expert -> policy` transition.
+- Robo-Dopamine produced 36 valid ten-step progress records. Thirty records
+  received positive Flux-style AWBC weights.
+- Both members completed two AWBC steps, wrote `global_step_2`, reloaded it,
+  and produced finite action tensors with shape `[1, 10, 8]`.
+
+The two assisted OOD trajectories did not complete the StackCube task. This is
+expected to remain visible in the result summary: the run validates the
+ask-for-help and update path, not post-update policy quality. The authoritative
+machine-readable report is:
+
+```text
+/mnt/data/ask4help/results/stackcube_ask_for_help/
+  vfd_robodopamine_awbc_smoke_step7000/smoke_summary.json
+```

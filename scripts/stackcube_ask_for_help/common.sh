@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ASK4HELP_ROOT=${ASK4HELP_ROOT:-/root/Ask4Help}
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+ASK4HELP_ROOT=${ASK4HELP_ROOT:-$(cd "${SCRIPT_DIR}/../.." && pwd)}
 RLINF_ROOT=${RLINF_ROOT:-"${ASK4HELP_ROOT}/RLinf"}
 PYTHON=${PYTHON:-"${RLINF_ROOT}/.venv/bin/python"}
 RESULT_ROOT=${RESULT_ROOT:-/mnt/data/ask4help/results/stackcube_ask_for_help/vfd_robodopamine_awbc_smoke_step7000}
