@@ -264,7 +264,15 @@ class StackCubeOnlineWorker:
         self._write_status("preflight_passed")
         return results
 
-    def calibrate(self, *, seeds: list[int], successes: int = 5, samples_per_episode: int = 5, quantile: float = 0.95) -> dict[str, Any]:
+    def calibrate(
+        self,
+        *,
+        seeds: list[int],
+        successes: int = 5,
+        samples_per_episode: int | None = None,
+        min_scores: int = 100,
+        quantile: float = 0.95,
+    ) -> dict[str, Any]:
         if successes <= 0:
             raise ValueError("successes must be positive")
         env = _build_env(100, task="stack", split="id")
@@ -296,19 +304,24 @@ class StackCubeOnlineWorker:
                         if done:
                             break
                 if _bool(info.get("success", False)):
-                    scores.extend(
-                        episode_scores[index]
-                        for index in uniformly_spaced_chunk_indices(
-                            len(episode_scores), samples_per_episode=samples_per_episode
+                    if samples_per_episode is None:
+                        scores.extend(episode_scores)
+                    else:
+                        scores.extend(
+                            episode_scores[index]
+                            for index in uniformly_spaced_chunk_indices(
+                                len(episode_scores), samples_per_episode=samples_per_episode
+                            )
                         )
-                    )
                     accepted.append(seed)
-                    if len(accepted) == successes:
+                    if len(accepted) >= successes and len(scores) >= min_scores:
                         break
         finally:
             env.close()
-        if len(accepted) != successes:
-            raise RuntimeError(f"VFD calibration found {len(accepted)}/{successes} successful ID trajectories")
+        if len(accepted) < successes or len(scores) < min_scores:
+            raise RuntimeError(
+                f"VFD calibration found {len(accepted)} successful ID trajectories and {len(scores)}/{min_scores} scores"
+            )
         self.threshold = FixedVFDThreshold.calibrate(scores, quantile=quantile)
         payload = {**self.threshold.__dict__, "seeds": accepted, "scores": scores, "sha256": hashlib.sha256(json.dumps(scores).encode()).hexdigest()}
         _json_dump(self.output_dir / "calibration" / "fixed_vfd_threshold.json", payload)
