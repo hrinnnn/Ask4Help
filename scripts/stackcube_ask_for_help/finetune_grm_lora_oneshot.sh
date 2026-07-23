@@ -4,7 +4,7 @@ source "$(dirname "$0")/common.sh"
 
 ROBO_DOPAMINE_DIR=${ROBO_DOPAMINE_DIR:-"${ASK4HELP_ROOT}/external/Robo-Dopamine"}
 GRM_PYTHON=${GRM_PYTHON:-/opt/conda/envs/robo-dopamine/bin/python}
-TRAIN_ROOT="${RESULT_ROOT}/robodopamine_adaptation/train_data"
+TRAIN_ROOT="${RESULT_ROOT}/robodopamine_adaptation/train_data_local_video_v2"
 ADAPTER_DIR="${RESULT_ROOT}/robodopamine_adaptation/stackcube-grm-lora"
 test -x "${GRM_PYTHON}"
 test -s "${TRAIN_ROOT}/train_jsons/finetune_data_final.json"

@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 from pathlib import Path
+import tempfile
 from typing import Any
 
 import numpy as np
@@ -82,6 +84,12 @@ def main() -> None:
     parser.add_argument("--episode-index", type=int, required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument(
+        "--local-staging-dir",
+        type=Path,
+        default=Path("/tmp"),
+        help="Local filesystem used to finalize mp4 trailers before OSSFS copy.",
+    )
     parser.add_argument("--task", default="stack the red cube on the green cube")
     args = parser.parse_args()
 
@@ -95,9 +103,16 @@ def main() -> None:
     output.mkdir(parents=True, exist_ok=False)
     main = np.stack([_rgb(dataset[position]["image"]) for position in positions])
     wrist = np.stack([_rgb(dataset[position].get("wrist_image", dataset[position]["image"])) for position in positions])
-    iio.imwrite(output / "cam_high.mp4", main, fps=10)
-    iio.imwrite(output / "cam_left_wrist.mp4", wrist, fps=10)
-    iio.imwrite(output / "cam_right_wrist.mp4", wrist, fps=10)
+    args.local_staging_dir.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="stackcube_grm_", dir=args.local_staging_dir) as temporary:
+        staging = Path(temporary)
+        for name, frames in (("cam_high.mp4", main), ("cam_left_wrist.mp4", wrist), ("cam_right_wrist.mp4", wrist)):
+            local_video = staging / name
+            iio.imwrite(local_video, frames, fps=10)
+            decoded = list(iio.imiter(local_video))
+            if len(decoded) != len(frames):
+                raise RuntimeError(f"video verification failed for {name}: {len(decoded)} != {len(frames)} frames")
+            shutil.copy2(local_video, output / name)
     events = _load_events(args.privileged_events, episode_id=args.episode_index)
     keyframes = _keyframes(events, len(positions))
     (output / "annotated_keyframes.json").write_text(json.dumps(keyframes, indent=2) + "\n", encoding="utf-8")
