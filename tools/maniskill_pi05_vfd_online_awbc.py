@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect ManiSkill Peg/Plug online AWBC trajectories with a fixed VFD gate.
+"""Collect ManiSkill Peg/Plug/StackCube trajectories with a fixed VFD gate.
 
 The runner deliberately uses one environment.  A ManiSkill motion-planning
 oracle can then plan from the exact current simulator state after a VFD query,
@@ -33,10 +33,14 @@ RLINF_ROOT = _bootstrap_rlinf()
 from rlinf.algorithms.online_awbc import (  # noqa: E402
     FixedThresholdChunkController,
     FixedVFDThreshold,
+    first_vfd_action_candidate,
     uniformly_spaced_chunk_indices,
 )
 from rlinf.data.maniskill_peg_progress import peg_privileged_phi  # noqa: E402
 from rlinf.data.maniskill_plug_progress import PlugProgressState  # noqa: E402
+from rlinf.data.maniskill_stack_cube_progress import (  # noqa: E402
+    StackCubeProgressState,
+)
 from rlinf.data.online_awbc import (  # noqa: E402
     OnlineAWBCChunk,
     OnlineAWBCFrame,
@@ -66,6 +70,16 @@ from rlinf.envs.maniskill.plug_charger_variants import (  # noqa: E402
 from rlinf.envs.maniskill.plug_privileged_oracle import (  # noqa: E402
     PlugChargerPrivilegedChunkOracle,
 )
+from rlinf.envs.maniskill.stack_cube_privileged_oracle import (  # noqa: E402
+    StackCubePrivilegedChunkOracle,
+)
+from rlinf.envs.maniskill.stack_cube_variants import (  # noqa: E402
+    STACK_CUBE_ID_ENV_ID,
+    STACK_CUBE_OOD_ENV_ID,
+    STACK_CUBE_TASK,
+    register_controlled_stack_cube_variants,
+    reset_metadata as stack_reset_metadata,
+)
 from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     _build_frames,
     _create_dataset,
@@ -83,7 +97,7 @@ from toolkits.lerobot.collect_maniskill_plug_lerobot_joint import (  # noqa: E40
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=("oracle", "calibrate", "online"), required=True)
-    parser.add_argument("--task", choices=("peg", "plug"), default="peg")
+    parser.add_argument("--task", choices=("peg", "plug", "stack"), default="peg")
     parser.add_argument("--split", choices=("id", "ood"), default="id")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--repo-id", default="")
@@ -123,6 +137,11 @@ def parse_args() -> argparse.Namespace:
         help="Use CPU physics for compatibility with ManiSkill's official planner; rendering remains on CUDA.",
     )
     parser.add_argument("--save-videos", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--require-expert-trigger",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     return parser.parse_args()
 
 
@@ -216,9 +235,13 @@ def _build_env(
         register_rlinf_peg_insertion_side_variants()
         env_id = PEG_INSERTION_SIDE_WIDE_OBSERVER_WIDE_WRIST_ENV_ID
         robot_uids = PANDA_WIDE_WRISTCAM_UID
-    else:
+    elif task == "plug":
         register_controlled_plug_charger_variants()
         env_id = PLUG_CHARGER_ID_ENV_ID if split == "id" else PLUG_CHARGER_OOD_ENV_ID
+        robot_uids = "panda_wristcam"
+    else:
+        register_controlled_stack_cube_variants()
+        env_id = STACK_CUBE_ID_ENV_ID if split == "id" else STACK_CUBE_OOD_ENV_ID
         robot_uids = "panda_wristcam"
     return gym.make(
         env_id,
@@ -241,15 +264,26 @@ def _wrap_obs(raw_obs: dict[str, Any], info: dict[str, Any], *, task: str) -> di
             copy.deepcopy(raw_obs),
             task_descriptions=default_plug_instruction(num_envs=1),
         )
-    copied = copy.deepcopy(raw_obs)
-    return wrap_rlt_openpi_joint_obs(
-        copied,
-        infos=info,
-        task_descriptions=default_peg_instruction(num_envs=1),
-        num_envs=1,
-        device=raw_obs["agent"]["qpos"].device,
-        is_peg_insertion_side=True,
-    )
+    if task == "peg":
+        copied = copy.deepcopy(raw_obs)
+        return wrap_rlt_openpi_joint_obs(
+            copied,
+            infos=info,
+            task_descriptions=default_peg_instruction(num_envs=1),
+            num_envs=1,
+            device=raw_obs["agent"]["qpos"].device,
+            is_peg_insertion_side=True,
+        )
+    return {
+        "main_images": raw_obs["sensor_data"]["base_camera"]["rgb"],
+        "wrist_images": raw_obs["sensor_data"]["hand_camera"]["rgb"],
+        "extra_view_images": None,
+        "states": raw_obs["agent"]["qpos"],
+        "task_descriptions": [STACK_CUBE_TASK],
+        "task_ids": torch.zeros(
+            1, dtype=torch.long, device=raw_obs["agent"]["qpos"].device
+        ),
+    }
 
 
 def _action_chunk(actions: torch.Tensor, chunk_size: int) -> np.ndarray:
@@ -284,7 +318,9 @@ def _augment_peg_info(env: Any, info: dict[str, Any], event_state: dict[str, tor
 
 
 def _task_label(task: str) -> str:
-    return "insert the peg in the hole" if task == "peg" else PLUG_CHARGER_TASK
+    if task == "peg":
+        return "insert the peg in the hole"
+    return PLUG_CHARGER_TASK if task == "plug" else STACK_CUBE_TASK
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
@@ -316,25 +352,37 @@ def _run_episode(
     dict[str, Any],
 ]:
     raw_obs, info = env.reset(seed=seed)
-    scenario_metadata = plug_reset_metadata(env) if task == "plug" else {"task": "peg"}
+    if task == "plug":
+        scenario_metadata = plug_reset_metadata(env)
+    elif task == "stack":
+        scenario_metadata = stack_reset_metadata(env, split=split)
+    else:
+        scenario_metadata = {"task": "peg"}
     event_state = (
         init_peg_insertion_event_state(num_envs=1, device=raw_obs["agent"]["qpos"].device)
         if task == "peg"
         else PlugProgressState()
+        if task == "plug"
+        else StackCubeProgressState()
     )
     if task == "peg":
         info = _augment_peg_info(env, info, event_state)
-    phi_of = (lambda: peg_privileged_phi(info)) if task == "peg" else (lambda: event_state.update(env, info))
+    phi_of = (
+        (lambda: peg_privileged_phi(info))
+        if task == "peg"
+        else (lambda: event_state.update(env, info))
+    )
     records = [_extract_record(raw_obs)]
     actions: list[np.ndarray] = []
     frames: list[OnlineAWBCFrame] = []
     chunks: list[OnlineAWBCChunk] = []
     vfd_scores: list[float] = []
-    oracle = (
-        PegPrivilegedChunkOracle(chunk_size=chunk_size)
-        if task == "peg"
-        else PlugChargerPrivilegedChunkOracle(chunk_size=chunk_size)
-    )
+    if task == "peg":
+        oracle = PegPrivilegedChunkOracle(chunk_size=chunk_size)
+    elif task == "plug":
+        oracle = PlugChargerPrivilegedChunkOracle(chunk_size=chunk_size)
+    else:
+        oracle = StackCubePrivilegedChunkOracle(chunk_size=chunk_size)
     main_camera = _select_camera(records[0].obs, "", MAIN_CAMERA_CANDIDATES, "main")
     wrist_camera = _select_camera(records[0].obs, "", WRIST_CAMERA_CANDIDATES, "wrist")
     terminated = truncated = False
@@ -351,17 +399,19 @@ def _run_episode(
             assert member_0 is not None
             env_obs = _wrap_obs(raw_obs, info, task=task)
             with torch.no_grad():
-                policy_actions, _ = member_0.predict_action_batch(
-                    env_obs=env_obs, mode="eval", compute_values=False
-                )
                 if compute_vfd:
                     assert member_1 is not None
                     generator = torch.Generator(device="cuda").manual_seed(seed + start_frame)
-                    _candidates, score = member_0.compute_vfd_uncertainty(
+                    candidates, score = member_0.compute_vfd_uncertainty(
                         env_obs,
                         member_1,
                         num_action_samples=num_action_samples,
                         generator=generator,
+                    )
+                    policy_actions = first_vfd_action_candidate(candidates)
+                else:
+                    policy_actions, _ = member_0.predict_action_batch(
+                        env_obs=env_obs, mode="eval", compute_values=False
                     )
             if compute_vfd:
                 vfd = float(score.reshape(-1)[0].detach().cpu())
@@ -485,7 +535,7 @@ def main() -> None:
                 split=args.split,
             )
             row = {"seed": seed, "success": success, "chunks": len(chunks), "task": args.task, "split": args.split}
-            if args.task == "plug":
+            if args.task in {"plug", "stack"}:
                 row.update(scenario_metadata)
             episode_rows.append(row)
             completed_successes = sum(bool(episode["success"]) for episode in episode_rows)
@@ -548,6 +598,9 @@ def main() -> None:
         return
 
     manifest = build_online_awbc_manifest(all_frames, all_chunks)
+    expert_chunks = sum(chunk.source == "expert" for chunk in all_chunks)
+    if args.mode == "online" and args.require_expert_trigger and expert_chunks == 0:
+        raise RuntimeError("online rollout completed without a real expert trigger")
     _write_jsonl(args.output_dir / "online_chunks.jsonl", [chunk.diagnostic_dict() for chunk in all_chunks])
     _write_jsonl(args.output_dir / "progress.jsonl", manifest)
     (args.output_dir / "summary.json").write_text(
@@ -561,7 +614,7 @@ def main() -> None:
                 "dataset": str(_resolve_output_path(args.repo_id)),
                 "progress_manifest": str(args.output_dir / "progress.jsonl"),
                 "chunks": len(all_chunks),
-                "expert_chunks": sum(chunk.source == "expert" for chunk in all_chunks),
+                "expert_chunks": expert_chunks,
                 "policy_chunks": sum(chunk.source == "policy" for chunk in all_chunks),
                 "timestamp": time.time(),
             },

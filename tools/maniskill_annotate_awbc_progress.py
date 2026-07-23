@@ -93,6 +93,25 @@ def _reset_estimator(estimator: _CapturingDopamineGRM) -> None:
     estimator.previous_grm_obs = [None] * estimator.num_envs
 
 
+def _load_source_manifest(path: str | None) -> dict[int, str]:
+    if not path:
+        return {}
+    source_by_index: dict[int, str] = {}
+    with Path(path).expanduser().open(encoding="utf-8") as file:
+        for line in file:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            index = int(row["dataset_index"])
+            source = str(row["source"])
+            if source not in {"policy", "expert"}:
+                raise ValueError(f"invalid source for dataset_index={index}: {source}")
+            if index in source_by_index:
+                raise ValueError(f"duplicate source dataset_index={index}")
+            source_by_index[index] = source
+    return source_by_index
+
+
 def _observation(item, start_item, *, done: bool, success: bool) -> dict:
     main = item["image"].unsqueeze(0)
     wrist = item.get("wrist_image", item["image"]).unsqueeze(0)
@@ -123,7 +142,16 @@ def main() -> None:
     parser.add_argument("--output", required=True)
     parser.add_argument("--cache-path")
     parser.add_argument("--source", choices=("expert", "policy"), required=True)
+    parser.add_argument(
+        "--source-manifest",
+        help="Optional JSONL with per-dataset-index policy/expert source labels.",
+    )
     parser.add_argument("--stride-steps", type=int, default=5)
+    parser.add_argument(
+        "--lookahead-steps",
+        type=int,
+        help="Progress horizon for AWBC targets; defaults to stride-steps.",
+    )
     parser.add_argument("--successful-episodes")
     parser.add_argument("--assume-all-success", action="store_true")
     parser.add_argument("--max-episodes", type=int)
@@ -243,7 +271,19 @@ def main() -> None:
         stride_steps=args.stride_steps,
         source=args.source,
         successful_episodes=successful_episodes,
+        lookahead_steps=args.lookahead_steps,
     )
+    source_by_index = _load_source_manifest(args.source_manifest)
+    if source_by_index:
+        expected = {int(row["dataset_index"]) for row in rows}
+        if set(source_by_index) != expected:
+            missing = sorted(expected - set(source_by_index))
+            extra = sorted(set(source_by_index) - expected)
+            raise ValueError(
+                f"source manifest index mismatch: missing={missing[:8]} extra={extra[:8]}"
+            )
+        for row in rows:
+            row["source"] = source_by_index[int(row["dataset_index"])]
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as file:
         for row in rows:
@@ -256,6 +296,7 @@ def main() -> None:
         "cache": str(cache_path),
         "source": args.source,
         "stride_steps": args.stride_steps,
+        "lookahead_steps": args.lookahead_steps or args.stride_steps,
         "episodes": len(episodes),
         "rows": len(rows),
         "valid_rows": valid_rows,
