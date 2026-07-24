@@ -657,7 +657,10 @@ class StackCubeOnlineWorker:
                     break
                 video_frames, frames, chunks, episode = self._collect_episode(env, seed=seed, episode_index=len(episodes), offset=len(all_frames))
                 if dataset is None:
-                    dataset = _create_dataset(repo_id=repo_id, image_shape=tuple(video_frames[0]["image"].shape), wrist_image_shape=tuple(video_frames[0]["wrist_image"].shape), fps=10, image_writer_threads=4, image_writer_processes=4)
+                    # Forked image-writer processes inherit CUDA contexts from the
+                    # resident policy process. Keep encoding thread-only so a
+                    # completed rollout cannot retain model VRAM.
+                    dataset = _create_dataset(repo_id=repo_id, image_shape=tuple(video_frames[0]["image"].shape), wrist_image_shape=tuple(video_frames[0]["wrist_image"].shape), fps=10, image_writer_threads=4, image_writer_processes=0)
                 for frame in video_frames:
                     dataset.add_frame(frame)
                 dataset.save_episode()
