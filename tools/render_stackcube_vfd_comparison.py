@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
+import shutil
+import tempfile
 from typing import Any
 
 import cv2
@@ -91,7 +94,13 @@ def main() -> None:
     id_capture, ood_capture = cv2.VideoCapture(str(id_video)), cv2.VideoCapture(str(ood_video))
     frames = max(int(id_capture.get(cv2.CAP_PROP_FRAME_COUNT)), int(ood_capture.get(cv2.CAP_PROP_FRAME_COUNT)))
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    writer = cv2.VideoWriter(str(args.output), cv2.VideoWriter_fourcc(*"mp4v"), FPS, (PANEL_WIDTH * 2, PANEL_HEIGHT + PLOT_HEIGHT))
+    # OSSFS does not reliably support the random seeks used by an MP4 writer.
+    # Render locally, validate the finished container, then copy it to OSS in
+    # one sequential operation.
+    descriptor, local_name = tempfile.mkstemp(prefix="stackcube_vfd_", suffix=".mp4")
+    os.close(descriptor)
+    Path(local_name).unlink(missing_ok=True)
+    writer = cv2.VideoWriter(local_name, cv2.VideoWriter_fourcc(*"mp4v"), FPS, (PANEL_WIDTH * 2, PANEL_HEIGHT + PLOT_HEIGHT))
     if not writer.isOpened():
         raise RuntimeError("OpenCV could not open the MP4 output")
     last_id = last_ood = None
@@ -112,6 +121,16 @@ def main() -> None:
         writer.release()
         id_capture.release()
         ood_capture.release()
+    check = cv2.VideoCapture(local_name)
+    valid = int(check.get(cv2.CAP_PROP_FRAME_COUNT)) > 0 and check.read()[0]
+    check.release()
+    if not valid:
+        Path(local_name).unlink(missing_ok=True)
+        raise RuntimeError("locally rendered VFD MP4 could not be decoded")
+    try:
+        shutil.copyfile(local_name, args.output)
+    finally:
+        Path(local_name).unlink(missing_ok=True)
     print(json.dumps({"output": str(args.output), "id_seed": id_episode["seed"], "ood_seed": ood_episode["seed"], "threshold": threshold}, indent=2))
 
 
