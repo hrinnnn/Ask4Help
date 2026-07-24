@@ -66,6 +66,8 @@ def _draw_panel(
     threshold: float,
     title: str,
 ) -> None:
+    import matplotlib.pyplot as plt
+
     for _, trace in id_traces:
         ax.plot(
             np.arange(len(trace)),
