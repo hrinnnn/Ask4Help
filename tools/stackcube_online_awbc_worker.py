@@ -30,7 +30,7 @@ sys.path[:0] = [str(ROOT), str(RLINF_ROOT)]
 
 from rlinf.algorithms.online_awbc import (  # noqa: E402
     FixedVFDThreshold,
-    HysteresisChunkController,
+    LatchingChunkController,
     first_vfd_action_candidate,
     uniformly_spaced_chunk_indices,
 )
@@ -182,8 +182,7 @@ class StackCubeOnlineWorker:
         self.vfd_metric = "two_way_vfd"
         self.vfd_num_action_samples = 64
         self.vfd_sample_microbatch = 8
-        self.controller_return_ratio = 0.9
-        self.controller_release_streak = 2
+        self.controller_mode = "expert_latch_until_episode_end"
         self.quality_chunks: tuple[OnlineChunk, ...] = ()
         self.raw_online_dataset: Path | None = None
         self._last_collection: dict[str, Any] | None = None
@@ -231,8 +230,7 @@ class StackCubeOnlineWorker:
                 "metric": self.vfd_metric,
                 "num_action_samples": self.vfd_num_action_samples,
                 "sample_microbatch": self.vfd_sample_microbatch,
-                "controller_return_ratio": self.controller_return_ratio,
-                "controller_release_streak": self.controller_release_streak,
+                "controller_mode": self.controller_mode,
             },
             "gpu0": self._gpu_stats(),
             "timestamp": time.time(),
@@ -269,6 +267,27 @@ class StackCubeOnlineWorker:
         _json_dump(self.output_dir / "calibration" / "active_two_way_vfd_threshold.json", payload)
         self._write_status("threshold_configured")
         return payload
+
+    def configure_vfd(
+        self,
+        *,
+        num_action_samples: int,
+        sample_microbatch: int | None = None,
+    ) -> dict[str, Any]:
+        if num_action_samples < 1:
+            raise ValueError("num_action_samples must be positive")
+        microbatch = num_action_samples if sample_microbatch is None else sample_microbatch
+        if microbatch < 1:
+            raise ValueError("sample_microbatch must be positive")
+        self.vfd_num_action_samples = int(num_action_samples)
+        self.vfd_sample_microbatch = int(min(microbatch, num_action_samples))
+        self._write_status("vfd_configured")
+        return {
+            "metric": self.vfd_metric,
+            "num_action_samples": self.vfd_num_action_samples,
+            "sample_microbatch": self.vfd_sample_microbatch,
+            "controller_mode": self.controller_mode,
+        }
 
     def _per_sample_flow_loss(self, member: ResidentMember, batch: dict[str, Any]) -> torch.Tensor:
         prepared = member.model.prepare_lerobot_sft_batch(batch)
@@ -567,11 +586,7 @@ class StackCubeOnlineWorker:
         raw_obs, info = env.reset(seed=seed)
         progress = StackCubeProgressState()
         oracle = StackCubePrivilegedChunkOracle(chunk_size=HORIZON)
-        controller = HysteresisChunkController(
-            self.threshold,
-            return_ratio=self.controller_return_ratio,
-            policy_release_streak=self.controller_release_streak,
-        )
+        controller = LatchingChunkController(self.threshold)
         records = [_extract_record(raw_obs)]
         actions: list[np.ndarray] = []
         frames: list[OnlineAWBCFrame] = []
@@ -813,6 +828,8 @@ class StackCubeOnlineWorker:
             return self.preflight()
         if command == "set_fixed_threshold":
             return self.set_fixed_threshold(**request.get("args", {}))
+        if command == "configure_vfd":
+            return self.configure_vfd(**request.get("args", {}))
         if command == "calibrate":
             return self.calibrate(**request.get("args", {}))
         if command == "audit_vfd":
