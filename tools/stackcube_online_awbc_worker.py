@@ -376,6 +376,152 @@ class StackCubeOnlineWorker:
         self._write_status("calibrated")
         return payload
 
+    def _two_way_vfd(
+        self,
+        obs: dict[str, Any],
+        *,
+        seed: int,
+        num_action_samples: int,
+        sample_microbatch: int,
+    ) -> tuple[torch.Tensor, float, float]:
+        """Compute the official symmetric VFD with memory-bounded candidate batches.
+
+        Each directional call implements uq_vla's ``vfd_oneway``.  Averaging
+        the two independent directions is its two-way ``vfd`` metric.  We use
+        a single generator per direction across microbatches, so the sampled
+        Gaussian priors have the same distribution as one C-sample call.
+        """
+        if num_action_samples < 1 or sample_microbatch < 1:
+            raise ValueError("VFD sample counts must be positive")
+        generator_a = torch.Generator(device=self.device).manual_seed(seed)
+        generator_b = torch.Generator(device=self.device).manual_seed(seed ^ 0x5A17)
+        one_way_total = 0.0
+        reverse_total = 0.0
+        action: torch.Tensor | None = None
+        remaining = int(num_action_samples)
+        while remaining:
+            count = min(sample_microbatch, remaining)
+            candidates_a, one_way = self.members["member0"].model.compute_vfd_uncertainty(
+                obs,
+                self.members["member1"].model,
+                num_action_samples=count,
+                generator=generator_a,
+            )
+            _, reverse = self.members["member1"].model.compute_vfd_uncertainty(
+                obs,
+                self.members["member0"].model,
+                num_action_samples=count,
+                generator=generator_b,
+            )
+            if action is None:
+                action = first_vfd_action_candidate(candidates_a)
+            one_way_total += float(one_way.reshape(-1)[0].cpu()) * count
+            reverse_total += float(reverse.reshape(-1)[0].cpu()) * count
+            remaining -= count
+        assert action is not None
+        one_way_score = one_way_total / num_action_samples
+        reverse_score = reverse_total / num_action_samples
+        return action, one_way_score, 0.5 * (one_way_score + reverse_score)
+
+    def audit_vfd(
+        self,
+        *,
+        seeds: list[int],
+        split: str,
+        successful_episodes: int | None = None,
+        num_action_samples: int = 64,
+        sample_microbatch: int = 8,
+    ) -> dict[str, Any]:
+        """Run a pure-policy ID/OOD VFD audit without expert intervention.
+
+        This is deliberately separate from ``collect``: it never changes the
+        online replay buffer, threshold, model parameters, or controller.
+        """
+        if split not in {"id", "ood"}:
+            raise ValueError("audit split must be 'id' or 'ood'")
+        if successful_episodes is not None and successful_episodes < 1:
+            raise ValueError("successful_episodes must be positive when set")
+
+        audit_id = f"audit_{split}_{time.time_ns()}"
+        output_dir = self.output_dir / "vfd_reaudit" / audit_id
+        env = _build_env(100, task="stack", split=split)
+        episodes: list[dict[str, Any]] = []
+        successes = 0
+        try:
+            for seed in seeds:
+                raw_obs, info = env.reset(seed=seed)
+                records = [_extract_record(raw_obs)]
+                actions: list[np.ndarray] = []
+                timeline: list[dict[str, Any]] = []
+                terminated = truncated = False
+                while not (terminated or truncated) and len(actions) < 100:
+                    start = len(actions)
+                    obs = _wrap_obs(raw_obs, info, task="stack")
+                    with torch.inference_mode():
+                        candidate, one_way, two_way = self._two_way_vfd(
+                            obs,
+                            seed=seed + start,
+                            num_action_samples=num_action_samples,
+                            sample_microbatch=sample_microbatch,
+                        )
+                    for action in _action_chunk(candidate, HORIZON):
+                        raw_obs, _reward, terminated, truncated, info = env.step(
+                            torch.as_tensor(action, device=env.unwrapped.device).unsqueeze(0)
+                        )
+                        actions.append(np.asarray(action, dtype=np.float32))
+                        records.append(_extract_record(raw_obs))
+                        if _bool(terminated) or _bool(truncated) or _bool(info.get("success", False)):
+                            break
+                    if len(actions) - start == HORIZON:
+                        timeline.append(
+                            {
+                                "chunk_index": len(timeline),
+                                "frame_index": start,
+                                "next_frame_index": len(actions),
+                                "oneway_vfd": one_way,
+                                "twoway_vfd": two_way,
+                                "controller": "policy",
+                            }
+                        )
+                success = _bool(info.get("success", False))
+                video_frames = _build_frames(
+                    records=records,
+                    actions=actions,
+                    task=_task_label("stack"),
+                    main_camera=_select_camera(records[0].obs, "", MAIN_CAMERA_CANDIDATES, "main"),
+                    wrist_camera=_select_camera(records[0].obs, "", WRIST_CAMERA_CANDIDATES, "wrist"),
+                )
+                video = write_episode_video_durably(
+                    video_frames,
+                    video_dir=output_dir / "videos",
+                    episode_index=len(episodes),
+                    seed=seed,
+                    fps=10,
+                )
+                episodes.append({"seed": seed, "success": success, "timeline": timeline, "video": str(video)})
+                successes += int(success)
+                if successful_episodes is not None and successes >= successful_episodes:
+                    break
+        finally:
+            env.close()
+
+        if successful_episodes is not None and successes < successful_episodes:
+            raise RuntimeError(f"audit collected only {successes}/{successful_episodes} successful {split} rollouts")
+        summary = {
+            "audit_id": audit_id,
+            "split": split,
+            "num_action_samples": num_action_samples,
+            "sample_microbatch": sample_microbatch,
+            "episodes": len(episodes),
+            "successful_episodes": successes,
+            "oneway_chunk_count": sum(len(item["timeline"]) for item in episodes),
+            "twoway_chunk_count": sum(len(item["timeline"]) for item in episodes),
+        }
+        _json_dump(output_dir / "episodes.json", episodes)
+        _json_dump(output_dir / "summary.json", summary)
+        self._write_status("vfd_audit")
+        return {**summary, "output_dir": str(output_dir)}
+
     def _collect_episode(self, env: Any, *, seed: int, episode_index: int, offset: int) -> tuple[list[dict[str, Any]], list[OnlineAWBCFrame], list[OnlineAWBCChunk], dict[str, Any]]:
         if self.threshold is None:
             raise RuntimeError("collect requires a calibrated VFD threshold")
@@ -617,6 +763,8 @@ class StackCubeOnlineWorker:
             return self.preflight()
         if command == "calibrate":
             return self.calibrate(**request.get("args", {}))
+        if command == "audit_vfd":
+            return self.audit_vfd(**request.get("args", {}))
         if command == "collect":
             return self.collect(**request.get("args", {}))
         if command == "admit_quality_buffer":
