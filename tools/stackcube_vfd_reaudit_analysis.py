@@ -150,12 +150,61 @@ def plot_audit(
     return {"quantile": quantile, "metrics": metrics, "figure": str(output)}
 
 
+def plot_id_only(
+    id_episodes: list[dict[str, Any]],
+    *,
+    quantile: float,
+    output: Path,
+) -> None:
+    """Render all successful calibration traces without OOD overlays."""
+    import matplotlib.pyplot as plt
+
+    figure, axes = plt.subplots(1, 2, figsize=(15, 5.7), sharey=False)
+    labels = (
+        "One-way VFD: member0 to member1",
+        "Two-way VFD: mean(A to B, B to A)",
+    )
+    for axis, metric, title in zip(axes, METRICS, labels, strict=True):
+        id_success = traces(id_episodes, metric, successful_only=True)
+        threshold = fiper_constant_threshold(id_success, quantile)
+        for seed, trace in id_success:
+            axis.plot(
+                np.arange(len(trace)),
+                trace,
+                marker="o",
+                markersize=3.5,
+                linewidth=1.4,
+                alpha=0.78,
+                label=f"ID {seed}",
+            )
+        axis.axhline(
+            threshold,
+            color="#c2410c",
+            linestyle="--",
+            linewidth=1.5,
+            label=f"FIPER q=.95 = {threshold:.3f}",
+        )
+        axis.set_title(title)
+        axis.set_xlabel("10-step decision chunk")
+        axis.set_ylabel("VFD uncertainty")
+        axis.legend(loc="upper left", fontsize=7.5, frameon=False, ncol=2)
+    figure.suptitle(
+        "StackCube step-7000: successful ID calibration trajectories (C=64)",
+        fontsize=14,
+        fontweight="bold",
+    )
+    figure.tight_layout()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output, dpi=180, bbox_inches="tight")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--id-episodes", type=Path, required=True)
     parser.add_argument("--ood-episodes", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--summary", type=Path, required=True)
+    parser.add_argument("--id-only-output", type=Path)
     parser.add_argument("--quantile", type=float, default=0.95)
     args = parser.parse_args()
     report = plot_audit(
@@ -168,6 +217,12 @@ def main() -> None:
     args.summary.write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    if args.id_only_output:
+        plot_id_only(
+            read_json(args.id_episodes),
+            quantile=args.quantile,
+            output=args.id_only_output,
+        )
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
