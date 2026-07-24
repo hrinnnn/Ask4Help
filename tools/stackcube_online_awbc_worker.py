@@ -196,6 +196,14 @@ class StackCubeOnlineWorker:
             "member0": ResidentMember("member0", member0, torch.optim.AdamW(member0.parameters(), lr=1e-5), seed0),
             "member1": ResidentMember("member1", member1, torch.optim.AdamW(member1.parameters(), lr=1e-5), seed1),
         }
+        # A residency preflight deliberately exercises a real optimizer step,
+        # but that probe must not turn the policy used for calibration into an
+        # unrecorded post-update policy. Keep CPU snapshots only for restoring
+        # the just-probed parameters; normal online updates remain in-place.
+        self._preflight_states = {
+            name: {key: value.detach().cpu().clone() for key, value in member.model.state_dict().items()}
+            for name, member in self.members.items()
+        }
         self._write_status("initialized")
 
     def _gpu_stats(self) -> dict[str, int]:
@@ -252,6 +260,11 @@ class StackCubeOnlineWorker:
                 self._per_sample_flow_loss(member, batch).mean().backward()
                 member.optimizer.step()
                 member.optimizer.zero_grad(set_to_none=True)
+                # The optimizer step is a capacity check, not part of online
+                # learning. Restore the original resident parameters and
+                # discard the temporary optimizer state before proceeding.
+                member.model.load_state_dict(self._preflight_states[name])
+                member.optimizer.state.clear()
                 member.model.eval()
                 results[f"{name}_backward"] = self._gpu_stats()
         except torch.OutOfMemoryError as error:
@@ -278,32 +291,66 @@ class StackCubeOnlineWorker:
         env = _build_env(100, task="stack", split="id")
         scores: list[float] = []
         accepted: list[int] = []
+        traces: list[dict[str, Any]] = []
         try:
             for seed in seeds:
                 raw_obs, info = env.reset(seed=seed)
                 progress = StackCubeProgressState()
                 episode_scores: list[float] = []
+                timeline: list[dict[str, Any]] = []
+                records = [_extract_record(raw_obs)]
+                actions: list[np.ndarray] = []
                 done = False
                 step = 0
                 while not done and step < 100:
+                    start = len(actions)
                     obs = _wrap_obs(raw_obs, info, task="stack")
                     generator = torch.Generator(device=self.device).manual_seed(seed + step)
                     with torch.inference_mode():
                         candidates, vfd = self.members["member0"].model.compute_vfd_uncertainty(
                             obs, self.members["member1"].model, num_action_samples=5, generator=generator
                         )
-                    episode_scores.append(float(vfd.reshape(-1)[0].cpu()))
-                    actions = _action_chunk(first_vfd_action_candidate(candidates), HORIZON)
-                    for action in actions:
+                    score = float(vfd.reshape(-1)[0].cpu())
+                    chunk_actions = _action_chunk(first_vfd_action_candidate(candidates), HORIZON)
+                    for action in chunk_actions:
                         raw_obs, _reward, terminated, truncated, info = env.step(
                             torch.as_tensor(action, device=env.unwrapped.device).unsqueeze(0)
                         )
+                        actions.append(np.asarray(action, dtype=np.float32))
                         step += 1
                         progress.update(env, info)
+                        records.append(_extract_record(raw_obs))
                         done = _bool(terminated) or _bool(truncated) or _bool(info.get("success", False))
                         if done:
                             break
+                    executed = step - start
+                    if executed == HORIZON:
+                        episode_scores.append(score)
+                        timeline.append(
+                            {
+                                "chunk_index": len(timeline),
+                                "frame_index": start,
+                                "next_frame_index": step,
+                                "vfd": score,
+                                "controller": "policy",
+                            }
+                        )
                 if _bool(info.get("success", False)):
+                    video_frames = _build_frames(
+                        records=records,
+                        actions=actions,
+                        task=_task_label("stack"),
+                        main_camera=_select_camera(records[0].obs, "", MAIN_CAMERA_CANDIDATES, "main"),
+                        wrist_camera=_select_camera(records[0].obs, "", WRIST_CAMERA_CANDIDATES, "wrist"),
+                    )
+                    video_path = write_episode_video_durably(
+                        video_frames,
+                        video_dir=self.output_dir / "calibration" / "id_vfd_videos",
+                        episode_index=len(traces),
+                        seed=seed,
+                        fps=10,
+                    )
+                    traces.append({"seed": seed, "success": True, "timeline": timeline, "video": str(video_path)})
                     if samples_per_episode is None:
                         scores.extend(episode_scores)
                     else:
@@ -325,6 +372,7 @@ class StackCubeOnlineWorker:
         self.threshold = FixedVFDThreshold.calibrate(scores, quantile=quantile)
         payload = {**self.threshold.__dict__, "seeds": accepted, "scores": scores, "sha256": hashlib.sha256(json.dumps(scores).encode()).hexdigest()}
         _json_dump(self.output_dir / "calibration" / "fixed_vfd_threshold.json", payload)
+        _json_dump(self.output_dir / "calibration" / "id_vfd_trajectories.json", traces)
         self._write_status("calibrated")
         return payload
 
