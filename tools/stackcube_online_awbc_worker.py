@@ -29,8 +29,8 @@ RLINF_ROOT = ROOT / "RLinf"
 sys.path[:0] = [str(ROOT), str(RLINF_ROOT)]
 
 from rlinf.algorithms.online_awbc import (  # noqa: E402
-    FixedThresholdChunkController,
     FixedVFDThreshold,
+    HysteresisChunkController,
     first_vfd_action_candidate,
     uniformly_spaced_chunk_indices,
 )
@@ -179,6 +179,11 @@ class StackCubeOnlineWorker:
             raise ValueError("first resident smoke fixes microbatch_size=1 for exact accounting")
         self.round_id = "round_0001"
         self.threshold: FixedVFDThreshold | None = None
+        self.vfd_metric = "two_way_vfd"
+        self.vfd_num_action_samples = 64
+        self.vfd_sample_microbatch = 8
+        self.controller_return_ratio = 0.9
+        self.controller_release_streak = 2
         self.quality_chunks: tuple[OnlineChunk, ...] = ()
         self.raw_online_dataset: Path | None = None
         self._last_collection: dict[str, Any] | None = None
@@ -222,6 +227,13 @@ class StackCubeOnlineWorker:
             "quality_online_count": len(self.quality_chunks),
             "raw_online_dataset": None if self.raw_online_dataset is None else str(self.raw_online_dataset),
             "threshold": None if self.threshold is None else self.threshold.__dict__,
+            "vfd": {
+                "metric": self.vfd_metric,
+                "num_action_samples": self.vfd_num_action_samples,
+                "sample_microbatch": self.vfd_sample_microbatch,
+                "controller_return_ratio": self.controller_return_ratio,
+                "controller_release_streak": self.controller_release_streak,
+            },
             "gpu0": self._gpu_stats(),
             "timestamp": time.time(),
         }
@@ -230,6 +242,33 @@ class StackCubeOnlineWorker:
 
     def status(self) -> dict[str, Any]:
         return self._write_status("status")
+
+    def set_fixed_threshold(
+        self,
+        *,
+        threshold: float,
+        quantile: float,
+        calibration_count: int,
+        source: str,
+    ) -> dict[str, Any]:
+        if not np.isfinite(threshold) or threshold <= 0:
+            raise ValueError("threshold must be a positive finite number")
+        if calibration_count < 1:
+            raise ValueError("calibration_count must be positive")
+        self.threshold = FixedVFDThreshold(
+            threshold=float(threshold),
+            quantile=float(quantile),
+            calibration_count=int(calibration_count),
+        )
+        payload = {
+            **self.threshold.__dict__,
+            "metric": self.vfd_metric,
+            "method": "fiper_success_trajectory_maximum_quantile",
+            "source": source,
+        }
+        _json_dump(self.output_dir / "calibration" / "active_two_way_vfd_threshold.json", payload)
+        self._write_status("threshold_configured")
+        return payload
 
     def _per_sample_flow_loss(self, member: ResidentMember, batch: dict[str, Any]) -> torch.Tensor:
         prepared = member.model.prepare_lerobot_sft_batch(batch)
@@ -528,7 +567,11 @@ class StackCubeOnlineWorker:
         raw_obs, info = env.reset(seed=seed)
         progress = StackCubeProgressState()
         oracle = StackCubePrivilegedChunkOracle(chunk_size=HORIZON)
-        controller = FixedThresholdChunkController(self.threshold)
+        controller = HysteresisChunkController(
+            self.threshold,
+            return_ratio=self.controller_return_ratio,
+            policy_release_streak=self.controller_release_streak,
+        )
         records = [_extract_record(raw_obs)]
         actions: list[np.ndarray] = []
         frames: list[OnlineAWBCFrame] = []
@@ -541,12 +584,13 @@ class StackCubeOnlineWorker:
             start = len(actions)
             phi = progress.update(env, info)
             obs = _wrap_obs(raw_obs, info, task="stack")
-            generator = torch.Generator(device=self.device).manual_seed(seed + start)
             with torch.inference_mode():
-                candidates, score = self.members["member0"].model.compute_vfd_uncertainty(
-                    obs, self.members["member1"].model, num_action_samples=5, generator=generator
+                candidates, _one_way, vfd = self._two_way_vfd(
+                    obs,
+                    seed=seed + start,
+                    num_action_samples=self.vfd_num_action_samples,
+                    sample_microbatch=self.vfd_sample_microbatch,
                 )
-            vfd = float(score.reshape(-1)[0].cpu())
             source = "expert" if controller.decide([vfd]).expert_mask.item() else "policy"
             plan = oracle.plan(env) if source == "expert" else None
             action_sequence = plan.actions if plan is not None else _action_chunk(first_vfd_action_candidate(candidates), HORIZON)
@@ -564,7 +608,7 @@ class StackCubeOnlineWorker:
             next_frame = len(actions)
             phi_next = progress.update(env, info)
             chunks.append(OnlineAWBCChunk(offset + start, episode_index, start, next_frame, source, phi, phi_next, vfd, self.threshold.threshold, _bool(info.get("success", False))))
-            timeline.append({"episode_index": episode_index, "chunk_index": len(chunks) - 1, "frame_index": start, "next_frame_index": next_frame, "controller": source, "vfd": vfd, "threshold": self.threshold.threshold})
+            timeline.append({"episode_index": episode_index, "chunk_index": len(chunks) - 1, "frame_index": start, "next_frame_index": next_frame, "controller": source, "vfd": vfd, "vfd_metric": self.vfd_metric, "threshold": self.threshold.threshold})
         video_frames = _build_frames(records=records, actions=actions, task=_task_label("stack"), main_camera=main_camera, wrist_camera=wrist_camera)
         return video_frames, frames, chunks, {"seed": seed, "success": _bool(info.get("success", False)), "timeline": timeline}
 
@@ -761,6 +805,8 @@ class StackCubeOnlineWorker:
             return self.status()
         if command == "preflight":
             return self.preflight()
+        if command == "set_fixed_threshold":
+            return self.set_fixed_threshold(**request.get("args", {}))
         if command == "calibrate":
             return self.calibrate(**request.get("args", {}))
         if command == "audit_vfd":
