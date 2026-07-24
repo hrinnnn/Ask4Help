@@ -155,6 +155,7 @@ def plot_id_only(
     *,
     quantile: float,
     output: Path,
+    num_action_samples: int = 64,
 ) -> None:
     """Render all successful calibration traces without OOD overlays."""
     import matplotlib.pyplot as plt
@@ -189,7 +190,8 @@ def plot_id_only(
         axis.set_ylabel("VFD uncertainty")
         axis.legend(loc="upper left", fontsize=7.5, frameon=False, ncol=2)
     figure.suptitle(
-        "StackCube step-7000: successful ID calibration trajectories (C=64)",
+        "StackCube step-7000: successful ID calibration trajectories "
+        f"(C={num_action_samples})",
         fontsize=14,
         fontweight="bold",
     )
@@ -198,7 +200,12 @@ def plot_id_only(
     figure.savefig(output, dpi=180, bbox_inches="tight")
 
 
-def plot_assisted_ood(episodes: list[dict[str, Any]], *, output: Path) -> None:
+def plot_assisted_ood(
+    episodes: list[dict[str, Any]],
+    *,
+    output: Path,
+    num_action_samples: int = 64,
+) -> None:
     """Render the online two-way VFD controller trace for each OOD rollout."""
     import matplotlib.pyplot as plt
 
@@ -246,7 +253,8 @@ def plot_assisted_ood(episodes: list[dict[str, Any]], *, output: Path) -> None:
     for axis in flat_axes[::columns]:
         axis.set_ylabel("two-way VFD")
     figure.suptitle(
-        f"StackCube OOD online ask-for-help: two-way VFD C=64, threshold={threshold:.3f}\n"
+        f"StackCube OOD online ask-for-help: two-way VFD C={num_action_samples}, "
+        f"threshold={threshold:.3f}\n"
         "red background = expert-controlled 10-step chunk",
         fontsize=14,
         fontweight="bold",
