@@ -612,9 +612,15 @@ class StackCubeOnlineWorker:
         video_frames = _build_frames(records=records, actions=actions, task=_task_label("stack"), main_camera=main_camera, wrist_camera=wrist_camera)
         return video_frames, frames, chunks, {"seed": seed, "success": _bool(info.get("success", False)), "timeline": timeline}
 
-    def collect(self, *, seeds: list[int], trajectories: int = 2) -> dict[str, Any]:
+    def collect(
+        self,
+        *,
+        seeds: list[int],
+        trajectories: int = 2,
+        collect_all: bool = False,
+    ) -> dict[str, Any]:
         if trajectories != 2:
-            raise ValueError("the first smoke intentionally collects exactly two trajectories")
+            raise ValueError("the first smoke intentionally collects exactly two assisted trajectories")
         # A failed trigger gate is still valuable online evidence. Keep each
         # collection attempt immutable instead of overwriting its raw archive.
         collection_id = f"collection_{time.time_ns()}"
@@ -632,7 +638,7 @@ class StackCubeOnlineWorker:
         assisted_episode_indices: list[int] = []
         try:
             for attempt, seed in enumerate(seeds):
-                if len(assisted_episode_indices) == trajectories:
+                if not collect_all and len(assisted_episode_indices) == trajectories:
                     break
                 video_frames, frames, chunks, episode = self._collect_episode(env, seed=seed, episode_index=len(episodes), offset=len(all_frames))
                 if dataset is None:
@@ -672,7 +678,7 @@ class StackCubeOnlineWorker:
         self._last_collection = {"episodes": episodes, "chunks": [chunk.diagnostic_dict() for chunk in all_chunks], "assisted_episode_indices": assisted_episode_indices}
         self._write_status("collected")
         result = {"dataset": str(durable_dataset), "episodes": episodes, "expert_chunks": sum(chunk.source == "expert" for chunk in all_chunks), "assisted_episode_indices": assisted_episode_indices}
-        if len(assisted_episode_indices) != trajectories:
+        if not collect_all and len(assisted_episode_indices) != trajectories:
             raise RuntimeError(f"collected {len(assisted_episode_indices)}/{trajectories} assisted trajectories after {len(episodes)} OOD attempts; raw archive={durable_dataset}")
         return result
 
