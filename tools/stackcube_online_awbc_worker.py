@@ -585,7 +585,7 @@ class StackCubeOnlineWorker:
             phi = progress.update(env, info)
             obs = _wrap_obs(raw_obs, info, task="stack")
             with torch.inference_mode():
-                candidates, _one_way, vfd = self._two_way_vfd(
+                policy_action, _one_way, vfd = self._two_way_vfd(
                     obs,
                     seed=seed + start,
                     num_action_samples=self.vfd_num_action_samples,
@@ -593,7 +593,7 @@ class StackCubeOnlineWorker:
                 )
             source = "expert" if controller.decide([vfd]).expert_mask.item() else "policy"
             plan = oracle.plan(env) if source == "expert" else None
-            action_sequence = plan.actions if plan is not None else _action_chunk(first_vfd_action_candidate(candidates), HORIZON)
+            action_sequence = plan.actions if plan is not None else _action_chunk(policy_action, HORIZON)
             for local_step, action in enumerate(action_sequence):
                 if plan is not None:
                     action = plan.action_at(raw_obs["agent"]["qpos"], local_step)
