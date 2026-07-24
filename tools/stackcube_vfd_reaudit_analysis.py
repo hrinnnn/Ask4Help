@@ -198,6 +198,64 @@ def plot_id_only(
     figure.savefig(output, dpi=180, bbox_inches="tight")
 
 
+def plot_assisted_ood(episodes: list[dict[str, Any]], *, output: Path) -> None:
+    """Render the online two-way VFD controller trace for each OOD rollout."""
+    import matplotlib.pyplot as plt
+
+    if not episodes:
+        raise ValueError("need at least one OOD episode")
+    thresholds = {
+        float(chunk["threshold"])
+        for episode in episodes
+        for chunk in episode.get("timeline", [])
+        if "threshold" in chunk
+    }
+    if len(thresholds) != 1:
+        raise ValueError(f"expected one fixed VFD threshold, got {sorted(thresholds)}")
+    threshold = thresholds.pop()
+
+    columns = 5
+    rows = int(np.ceil(len(episodes) / columns))
+    figure, axes = plt.subplots(rows, columns, figsize=(18, 3.6 * rows), sharey=True)
+    flat_axes = np.atleast_1d(axes).ravel()
+    max_score = max(
+        float(chunk["vfd"])
+        for episode in episodes
+        for chunk in episode.get("timeline", [])
+    )
+    for axis, episode in zip(flat_axes, episodes, strict=False):
+        timeline = episode.get("timeline", [])
+        scores = [float(chunk["vfd"]) for chunk in timeline]
+        chunks = np.arange(len(scores))
+        expert_chunks = [
+            index
+            for index, chunk in enumerate(timeline)
+            if chunk.get("controller") == "expert"
+        ]
+        for index in expert_chunks:
+            axis.axvspan(index - 0.48, index + 0.48, color="#dc2626", alpha=0.12)
+        axis.plot(chunks, scores, marker="o", markersize=4, linewidth=1.8, color="#2563eb")
+        axis.axhline(threshold, color="#c2410c", linestyle="--", linewidth=1.35)
+        outcome = "success" if episode.get("success", False) else "failure"
+        axis.set_title(f"OOD {episode['seed']} - {outcome}", fontsize=10)
+        axis.set_xlabel("10-step chunk")
+        axis.set_ylim(bottom=0, top=max_score * 1.08)
+        axis.grid(axis="y", alpha=0.22)
+    for axis in flat_axes[len(episodes) :]:
+        axis.set_visible(False)
+    for axis in flat_axes[::columns]:
+        axis.set_ylabel("two-way VFD")
+    figure.suptitle(
+        f"StackCube OOD online ask-for-help: two-way VFD C=64, threshold={threshold:.3f}\n"
+        "red background = expert-controlled 10-step chunk",
+        fontsize=14,
+        fontweight="bold",
+    )
+    figure.tight_layout()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output, dpi=180, bbox_inches="tight")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--id-episodes", type=Path, required=True)
@@ -205,6 +263,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--summary", type=Path, required=True)
     parser.add_argument("--id-only-output", type=Path)
+    parser.add_argument("--assisted-ood-output", type=Path)
     parser.add_argument("--quantile", type=float, default=0.95)
     args = parser.parse_args()
     report = plot_audit(
@@ -222,6 +281,11 @@ def main() -> None:
             read_json(args.id_episodes),
             quantile=args.quantile,
             output=args.id_only_output,
+        )
+    if args.assisted_ood_output:
+        plot_assisted_ood(
+            read_json(args.ood_episodes),
+            output=args.assisted_ood_output,
         )
     print(json.dumps(report, indent=2, sort_keys=True))
 
