@@ -285,7 +285,13 @@ def main() -> None:
                 main_camera=main_camera,
                 wrist_camera=wrist_camera,
             )
-            write_episode_video_durably(frames, args.output_dir / "videos", index, args.seed + index, fps=10)
+            write_episode_video_durably(
+                frames,
+                video_dir=args.output_dir / "videos",
+                episode_index=index,
+                seed=args.seed + index,
+                fps=10,
+            )
             episodes.append(episode)
             print(
                 f"[vla-fail] {index + 1}/{args.episodes} seed={episode['seed']} "
