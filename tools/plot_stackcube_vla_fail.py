@@ -18,11 +18,20 @@ def _episodes(path: Path) -> tuple[list[dict[str, Any]], dict[str, float] | None
     return list(payload["episodes"]), payload.get("thresholds")
 
 
-def _draw(axis: Any, episodes: list[dict[str, Any]], field: str, *, label: str) -> None:
-    for episode in episodes:
+def _draw(axis: Any, episodes: list[dict[str, Any]], field: str, *, label: str, color: str) -> None:
+    for index, episode in enumerate(episodes):
         values = [chunk[field] for chunk in episode["timeline"] if chunk[field] is not None]
         if values:
-            axis.plot(range(len(values)), values, marker="o", markersize=3, linewidth=1.3, alpha=0.8, label=f"{label} {episode['seed']}")
+            axis.plot(
+                range(len(values)),
+                values,
+                marker="o",
+                markersize=2.5,
+                linewidth=1.1,
+                alpha=0.42,
+                color=color,
+                label=label if index == 0 else None,
+            )
 
 
 def main() -> None:
@@ -40,8 +49,8 @@ def main() -> None:
     figure, axes = plt.subplots(1, 2, figsize=(15, 5.5))
     specs = (("llmd", "LLMD", "llmd_threshold"), ("acc_ema", "ACC (EMA)", "acc_threshold"))
     for axis, (field, title, threshold_key) in zip(axes, specs, strict=True):
-        _draw(axis, id_episodes, field, label="ID")
-        _draw(axis, ood_episodes, field, label="OOD")
+        _draw(axis, id_episodes, field, label="ID trajectories", color="#2563eb")
+        _draw(axis, ood_episodes, field, label="OOD trajectories", color="#ea580c")
         if thresholds and threshold_key in thresholds:
             axis.axhline(float(thresholds[threshold_key]), color="#dc2626", linestyle="--", linewidth=1.5, label="conformal threshold")
         axis.set_title(title)
@@ -49,9 +58,9 @@ def main() -> None:
         axis.set_ylabel("failure score")
         axis.grid(axis="y", alpha=0.2)
     handles, labels = axes[0].get_legend_handles_labels()
-    figure.legend(handles, labels, loc="center left", bbox_to_anchor=(1.0, 0.5), frameon=False)
+    figure.legend(handles, labels, loc="upper center", bbox_to_anchor=(0.5, 0.96), ncol=3, frameon=False)
     figure.suptitle("StackCube VLA-FAIL: fixed-prior LLMD and action-chunk consistency")
-    figure.tight_layout(rect=(0, 0, 0.88, 0.94))
+    figure.tight_layout(rect=(0, 0, 1, 0.9))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(args.output, dpi=180, bbox_inches="tight")
     print(args.output)
