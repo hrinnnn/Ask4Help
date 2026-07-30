@@ -132,3 +132,55 @@ The tool is deliberately non-destructive: rollout videos, episode timelines,
 threshold assets, and annotated videos are separate files.  It validates the
 result format, seed, calibrated per-layer threshold coverage, and source-video
 identity before encoding.
+
+## Training-Free Internal Detector Matrix
+
+`tools/build_stackcube_internal_detector_assets.py` reuses the immutable
+128-demo multi-layer feature cache and fits two additional detectors at the
+three pre-registered probes: `vlm_block_08_mean`,
+`vlm_bridge_final_mean`, and `action_expert_block_13`.  It never refits or
+changes the frozen LLMD baselines.  The resulting nine-way comparison is:
+
+| Score | Implementation contract | Important boundary |
+| --- | --- | --- |
+| LLMD | Existing tokenwise Gaussian score, maximum over tokens | Exact StackCube VLA-FAIL-style baseline |
+| Deep kNN | Official feature L2 normalization and k-th squared L2 neighbor distance, with `k=10` | A training-free OOD transfer to pi0.5, not a published VLA failure detector |
+| PCA residual | ViM's official principal-subspace dimension rule, then residual norm | Deliberately *not* full ViM: pi0.5 has no classifier logits or virtual-logit energy term |
+
+Build the persistent non-LLMD assets once for a fixed ID feature bank:
+
+```bash
+python tools/build_stackcube_internal_detector_assets.py \
+  --feature-cache /mnt/data/.../multilayer_feature_cache.pt \
+  --multilayer-statistics /mnt/data/.../multilayer_statistics.pt \
+  --output-dir /mnt/data/.../internal_detector_matrix/assets \
+  --knn-k 10
+```
+
+The asset records the source cache and LLMD-statistics SHA256s.  The evaluator
+refuses an asset when the frozen LLMD source no longer matches.  For each of
+the nine scores, calibrate independently on 20 policy-success held-out ID
+rollouts using the maximum score within each trajectory and a `q=0.95`
+constant split-conformal threshold.  Then evaluate the identical fixed policy
+on ID and OOD without allowing a detector to alter actions:
+
+```bash
+python tools/evaluate_stackcube_internal_detectors.py \
+  --checkpoint .../global_step_7000 --pi05-base ... --norm-stats ... \
+  --detector-assets /mnt/data/.../internal_detector_assets.pt \
+  --output-dir /mnt/data/.../calibration_id --split id --seed 10000 \
+  --calibrate --target-successes 20 --max-attempts 200
+
+python tools/evaluate_stackcube_internal_detectors.py \
+  --checkpoint .../global_step_7000 --pi05-base ... --norm-stats ... \
+  --detector-assets /mnt/data/.../internal_detector_assets.pt \
+  --output-dir /mnt/data/.../ood_eval --split ood --seed 20000 --episodes 50 \
+  --thresholds /mnt/data/.../calibration_id/thresholds.json
+```
+
+The calibration artifact stores every threshold, conformal order-statistic
+rank, trajectory-max score bounds, successful seed list, and detector-asset
+SHA.  Evaluation stores per-chunk timelines and Wilson 95% intervals for
+success-ID false positives and failed-rollout recall.  Refit the detector
+assets and recalibrate whenever the checkpoint, input normalization, fixed
+flow prior, action/execution horizon, or ID dataset changes.
