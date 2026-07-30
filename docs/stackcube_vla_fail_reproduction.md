@@ -86,3 +86,27 @@ token-wise Gaussian fitting and max aggregation, fixed prior reproducibility,
 finite-sample conformal trajectory-max calibration, EEF-only overlap ACC with
 EMA, and logical-OR fusion. The evaluator also fails closed when it cannot
 resolve a Panda end-effector link or calibration has insufficient success.
+
+## Multi-Layer Study
+
+The strict final-layer result is preserved as a frozen baseline.  The separate
+multi-layer study collects three completed-depth Action Expert blocks (25%,
+50%, and 75%), one middle VLM block, and the final VLM prefix representation
+that conditions the Action Expert.  VLM prefix tokens are valid-token mean
+pooled into one feature; Action Expert representations retain all action-token
+positions.  Each probe fits and calibrates an independent LLMD detector.
+
+```bash
+MODE=stats CHECKPOINT=... PI05_BASE=... NORM_STATS=... DATASET_ROOT=... \
+FINAL_BASELINE_STATS=... bash scripts/stackcube_vla_fail/run_multilayer_llmd.sh
+MODE=calibrate CHECKPOINT=... PI05_BASE=... NORM_STATS=... DATASET_ROOT=... \
+FINAL_BASELINE_STATS=... bash scripts/stackcube_vla_fail/run_multilayer_llmd.sh
+```
+
+The immutable asset directory contains a raw `fp16` feature bank, per-probe
+means and precision matrices, layer names/shapes, one fixed prior, complete
+provenance SHA256s, and a five-observation exact final-feature parity audit.
+Each threshold file records the finite conformal order statistic, calibration
+trajectory-maximum bounds (`min/p05/p50/p95/max`), coverage target, successful
+seed list, and the statistics SHA.  Each evaluation writes score bounds plus
+Wilson 95% intervals for ID false-positive rate and failure recall.
