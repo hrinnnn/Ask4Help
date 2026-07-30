@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -108,62 +110,69 @@ def render(*, episodes_path: Path, video_dir: Path, seed: int, output: Path, fps
     acc = [row["acc_ema"] for row in timeline]
     action_steps = [int(row["env_step"]) for row in timeline]
     output.parent.mkdir(parents=True, exist_ok=True)
-    writer = imageio.get_writer(output, fps=fps, codec="libx264", quality=8)
-    try:
-        for frame_index, frame in enumerate(frames):
-            step = min(frame_index, int(episode["steps"]))
-            decision = max((index for index, start in enumerate(action_steps) if start <= step), default=0)
-            canvas = np.zeros((height + panel_height, width, 3), dtype=np.uint8)
-            canvas[:height] = np.asarray(frame)[..., :3]
-            canvas[height:] = (22, 29, 40)
-            alarm = bool(timeline[decision]["alarm"])
-            status = "ALARM" if alarm else "normal"
-            color = (67, 97, 216) if alarm else (80, 210, 150)
-            cv2.rectangle(canvas, (10, 10), (245, 48), (18, 25, 35), -1)
-            cv2.putText(
-                canvas,
-                f"seed {seed} | step {step} | {status}",
-                (18, 35),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.56,
-                color,
-                2,
-                cv2.LINE_AA,
-            )
-            cv2.putText(
-                canvas,
-                f"outcome: {'success' if episode['success'] else 'failure'}",
-                (width - 190, 34),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.48,
-                (235, 235, 235),
-                1,
-                cv2.LINE_AA,
-            )
-            margin = 18
-            trace_width = width - 2 * margin
-            trace_height = 73
-            _draw_trace(
-                canvas,
-                origin=(margin, height + 22),
-                size=(trace_width, trace_height),
-                values=llmd,
-                threshold=float(thresholds["llmd_threshold"]),
-                current=decision,
-                title="LLMD (final Action Expert feature)",
-            )
-            _draw_trace(
-                canvas,
-                origin=(margin, height + 108),
-                size=(trace_width, trace_height),
-                values=acc,
-                threshold=float(thresholds["acc_threshold"]),
-                current=decision,
-                title="ACC-EMA (end-effector chunk consistency)",
-            )
-            writer.append_data(canvas)
-    finally:
-        writer.close()
+    # OSSFS can reject ffmpeg's trailer write. Finish locally, validate, then
+    # copy the complete file to the durable result directory.
+    with tempfile.TemporaryDirectory(prefix="stackcube-vla-fail-video-") as temporary_dir:
+        local_output = Path(temporary_dir) / output.name
+        writer = imageio.get_writer(local_output, fps=fps, codec="libx264", quality=8)
+        try:
+            for frame_index, frame in enumerate(frames):
+                step = min(frame_index, int(episode["steps"]))
+                decision = max((index for index, start in enumerate(action_steps) if start <= step), default=0)
+                canvas = np.zeros((height + panel_height, width, 3), dtype=np.uint8)
+                canvas[:height] = np.asarray(frame)[..., :3]
+                canvas[height:] = (22, 29, 40)
+                alarm = bool(timeline[decision]["alarm"])
+                status = "ALARM" if alarm else "normal"
+                color = (67, 97, 216) if alarm else (80, 210, 150)
+                cv2.rectangle(canvas, (10, 10), (245, 48), (18, 25, 35), -1)
+                cv2.putText(
+                    canvas,
+                    f"seed {seed} | step {step} | {status}",
+                    (18, 35),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.56,
+                    color,
+                    2,
+                    cv2.LINE_AA,
+                )
+                cv2.putText(
+                    canvas,
+                    f"outcome: {'success' if episode['success'] else 'failure'}",
+                    (width - 190, 34),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.48,
+                    (235, 235, 235),
+                    1,
+                    cv2.LINE_AA,
+                )
+                margin = 18
+                trace_width = width - 2 * margin
+                trace_height = 73
+                _draw_trace(
+                    canvas,
+                    origin=(margin, height + 22),
+                    size=(trace_width, trace_height),
+                    values=llmd,
+                    threshold=float(thresholds["llmd_threshold"]),
+                    current=decision,
+                    title="LLMD (final Action Expert feature)",
+                )
+                _draw_trace(
+                    canvas,
+                    origin=(margin, height + 108),
+                    size=(trace_width, trace_height),
+                    values=acc,
+                    threshold=float(thresholds["acc_threshold"]),
+                    current=decision,
+                    title="ACC-EMA (end-effector chunk consistency)",
+                )
+                writer.append_data(canvas)
+        finally:
+            writer.close()
+        if not local_output.is_file() or local_output.stat().st_size == 0:
+            raise RuntimeError(f"local video encoding did not create {local_output}")
+        shutil.copy2(local_output, output)
     print(output)
 
 
