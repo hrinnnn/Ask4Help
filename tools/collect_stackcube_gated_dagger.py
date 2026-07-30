@@ -74,6 +74,13 @@ def choose_split(
     return "id" if prefer_id else "ood"
 
 
+def alternating_split(attempt_index: int) -> str:
+    """Return the controlled reset split for an alternating raw-rollout stream."""
+    if attempt_index < 0:
+        raise ValueError("attempt_index must be non-negative")
+    return "id" if attempt_index % 2 == 0 else "ood"
+
+
 def selected_suffix_steps(suffix: ExpertSuffix, remaining_chunks: int) -> int:
     """Return the exact, non-overlapping 10-step label budget admitted from a suffix."""
 
@@ -89,6 +96,24 @@ def admitted_suffix_steps(
     if fixed_episode_collection:
         return suffix.trainable_chunks * CHUNK_LABEL_HORIZON
     return selected_suffix_steps(suffix, remaining_chunks)
+
+
+def is_successful_expert_trajectory(suffix: ExpertSuffix, *, success: bool) -> bool:
+    """A gated demonstration is usable only after a successful full expert chunk."""
+    return bool(success and suffix.start is not None and suffix.trainable_chunks > 0)
+
+
+def should_latch_expert(
+    method: str, *, action_step: int, score: float | None = None, threshold: float | None = None
+) -> bool:
+    """Centralize the three group intervention semantics for collection and tests."""
+    if method == "offline_oracle":
+        return True
+    if method == "late_success":
+        return action_step >= 50
+    if method in {"bridge_knn", "bridge_llmd"}:
+        return score is not None and threshold is not None and score >= threshold
+    raise ValueError(f"unknown collection method: {method}")
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -161,7 +186,7 @@ def _run_attempt(
     sources: list[str] = []
     timeline: list[dict[str, Any]] = []
     oracle = StackCubePrivilegedChunkOracle(chunk_size=EXECUTE_HORIZON)
-    expert_latched = method == "offline_oracle"
+    expert_latched = should_latch_expert(method, action_step=0)
     expert_start: int | None = 0 if expert_latched else None
     success = False
     terminated = truncated = False
@@ -173,10 +198,12 @@ def _run_attempt(
             assert model is not None and detector_spec is not None and prior is not None
             name, detector, threshold = detector_spec
             score = _detector_score(model, raw_obs, info, detector, prior)
-            if score >= threshold:
+            if should_latch_expert(
+                method, action_step=start, score=score, threshold=threshold
+            ):
                 expert_latched = True
                 expert_start = start
-        elif not expert_latched and method == "late_success" and start >= 50:
+        elif not expert_latched and should_latch_expert(method, action_step=start):
             expert_latched = True
             expert_start = start
 
@@ -272,6 +299,14 @@ def parse_args() -> argparse.Namespace:
             "rollouts and retain only naturally requested expert suffixes."
         ),
     )
+    parser.add_argument(
+        "--gated-successful-expert-episodes",
+        type=int,
+        help=(
+            "Stop after this many successful, expert-intervened trajectories. "
+            "Raw ID/OOD attempts alternate and only accepted expert suffixes train."
+        ),
+    )
     parser.add_argument("--id-seed", type=int, default=13000)
     parser.add_argument("--ood-seed", type=int, default=23000)
     parser.add_argument("--max-attempts-per-split", type=int, default=2000)
@@ -283,11 +318,17 @@ def main() -> None:
     if args.output_dir.exists() or args.repo_id.exists():
         raise FileExistsError("output-dir and repo-id must be new experiment paths")
     offline = args.method == "offline_oracle"
-    if not offline and not args.gated_fixed_episodes and (
+    if args.gated_fixed_episodes and args.gated_successful_expert_episodes is not None:
+        raise ValueError("choose either --gated-fixed-episodes or --gated-successful-expert-episodes")
+    successful_expert_target = args.gated_successful_expert_episodes
+    if successful_expert_target is not None and successful_expert_target <= 0:
+        raise ValueError("--gated-successful-expert-episodes must be positive")
+    if not offline and successful_expert_target is None and not args.gated_fixed_episodes and (
         args.id_target_chunks is None or args.ood_target_chunks is None
     ):
         raise ValueError(
-            "gated collection requires exact chunk targets, or --gated-fixed-episodes"
+            "gated collection requires chunk targets, --gated-fixed-episodes, or "
+            "--gated-successful-expert-episodes"
         )
     if not offline and (args.checkpoint is None or args.pi05_base is None or args.norm_stats is None):
         raise ValueError("gated collection requires checkpoint, pi05-base, and norm-stats")
@@ -310,7 +351,7 @@ def main() -> None:
     fixed_episode_collection = offline or args.gated_fixed_episodes
     targets = (
         {"id": int(args.id_episodes), "ood": int(args.ood_episodes)}
-        if fixed_episode_collection
+        if fixed_episode_collection or successful_expert_target is not None
         else {"id": int(args.id_target_chunks), "ood": int(args.ood_target_chunks)}
     )
     collected = {"id": 0, "ood": 0}
@@ -321,8 +362,19 @@ def main() -> None:
     dataset = None
     envs = {split: _build_env(100, task="stack", split=split) for split in ("id", "ood")}
     prefer_id = True
+    raw_attempt_index = 0
+    successful_expert_collected = 0
     try:
-        while (split := choose_split(collected, targets, prefer_id=prefer_id)) is not None:
+        while True:
+            if successful_expert_target is not None:
+                if successful_expert_collected >= successful_expert_target:
+                    break
+                split = alternating_split(raw_attempt_index)
+                raw_attempt_index += 1
+            else:
+                split = choose_split(collected, targets, prefer_id=prefer_id)
+                if split is None:
+                    break
             if attempts[split] >= args.max_attempts_per_split:
                 raise RuntimeError(f"{split} exhausted {attempts[split]} attempts before its target")
             prefer_id = not prefer_id
@@ -338,6 +390,12 @@ def main() -> None:
                 admitted_steps = (
                     suffix.trainable_chunks * CHUNK_LABEL_HORIZON if row["success"] else 0
                 )
+            elif successful_expert_target is not None:
+                admitted_steps = (
+                    suffix.trainable_chunks * CHUNK_LABEL_HORIZON
+                    if is_successful_expert_trajectory(suffix, success=bool(row["success"]))
+                    else 0
+                )
             else:
                 admitted_steps = admitted_suffix_steps(
                     suffix,
@@ -346,6 +404,9 @@ def main() -> None:
                 )
             row["admitted_expert_action_steps"] = admitted_steps
             row["admitted_expert_10_step_chunks"] = admitted_steps // CHUNK_LABEL_HORIZON
+            row["accepted_successful_expert_trajectory"] = bool(
+                successful_expert_target is not None and admitted_steps > 0
+            )
             rows.append(row)
             if admitted_steps:
                 assert suffix.start is not None
@@ -367,13 +428,22 @@ def main() -> None:
                     dataset.add_frame(frame)
                 dataset.save_episode()
                 train_rows.append({"dataset_episode_index": len(train_rows), "raw_episode_index": row["episode_index"], "seed": seed, "split": split, "start_step": begin, "action_steps": admitted_steps, "ten_step_chunks": admitted_steps // CHUNK_LABEL_HORIZON})
-            if fixed_episode_collection:
+            if successful_expert_target is not None and admitted_steps:
+                successful_expert_collected += 1
+                collected[split] += 1
+            elif fixed_episode_collection:
                 collected[split] += 1
             elif admitted_steps:
                 collected[split] += admitted_steps // CHUNK_LABEL_HORIZON
             _write_jsonl(args.output_dir / "episodes.jsonl", rows)
             _write_jsonl(args.output_dir / "training_episodes.jsonl", train_rows)
-            print(f"[collect] method={args.method} split={split} seed={seed} admitted={admitted_steps // CHUNK_LABEL_HORIZON} collected={collected} targets={targets}", flush=True)
+            print(
+                f"[collect] method={args.method} split={split} "
+                f"seed={seed} admitted={admitted_steps // CHUNK_LABEL_HORIZON} "
+                f"collected={collected} successful_total={successful_expert_collected} "
+                f"targets={targets} successful_target={successful_expert_target}",
+                flush=True,
+            )
     finally:
         if dataset is not None and getattr(dataset, "image_writer", None) is not None:
             dataset.image_writer.wait_until_done()
@@ -385,7 +455,7 @@ def main() -> None:
 
     if dataset is None:
         raise RuntimeError("collection produced no trainable expert suffixes")
-    if fixed_episode_collection:
+    if fixed_episode_collection or successful_expert_target is not None:
         # Fixed-rollout collection measures both task success and the natural
         # expert-query cost.  Its training budget is derived after collection.
         budget = {
@@ -394,7 +464,22 @@ def main() -> None:
         }
     else:
         budget = collected
-    summary = {"method": args.method, "target_unit": "episodes" if fixed_episode_collection else "ten_step_chunks", "targets": targets, "collected": collected, "training_chunk_budget": budget, "attempts": attempts, "dataset": str(args.repo_id), "raw_archive": str(raw_dir)}
+    summary = {
+        "method": args.method,
+        "target_unit": (
+            "successful_expert_trajectories"
+            if successful_expert_target is not None
+            else "episodes" if fixed_episode_collection else "ten_step_chunks"
+        ),
+        "targets": {"total": successful_expert_target}
+        if successful_expert_target is not None else targets,
+        "collected": {"total": successful_expert_collected, **collected}
+        if successful_expert_target is not None else collected,
+        "training_chunk_budget": budget,
+        "attempts": attempts,
+        "dataset": str(args.repo_id),
+        "raw_archive": str(raw_dir),
+    }
     _write_json(args.output_dir / "summary.json", summary)
     _write_json(args.output_dir / "label_budget.json", budget)
 

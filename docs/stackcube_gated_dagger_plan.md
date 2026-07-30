@@ -12,11 +12,13 @@ initialized from the immutable `member0/global_step_7000` checkpoint:
    has not succeeded, the oracle latches for the remaining episode.
 
 Every rollout executes five actions per decision and every training label is a
-complete 10-step expert segment.  Gated groups retain all raw attempts, but
-only their expert suffixes become SFT data.  The offline group's 100 full
-demos define the exact ID/OOD ten-step label budget; each gated group collects
-until it matches that budget.  The original 128 ID demonstrations are fixed
-replay.  Ordinary SFT uses `awbc.enabled=false` and a source-balanced batch:
+complete 10-step expert segment. Gated groups retain all raw attempts, but
+only successful expert suffixes become SFT data. Raw ID/OOD resets alternate
+strictly; each gated group continues until it has 100 successful trajectories
+with a real expert intervention. This intentionally permits the accepted data
+to be OOD-dominant. The offline group reuses its verified 100 full oracle demos.
+The original 128 ID demonstrations are fixed replay. Ordinary SFT uses
+`awbc.enabled=false` and a source-balanced batch:
 two original-ID and two new-expert samples per micro-batch, yielding 32/32 in
 the configured global batch of 64.
 
@@ -50,5 +52,5 @@ introduced for this experiment.
 The primary metric is pure-policy success on the same 50 unseen OOD seeds for
 all groups, with a Wilson 95% interval.  Collection cost is reported alongside
 it: attempted episodes, expert takeover rate, first takeover step, total raw
-expert actions, and admitted 10-step labels.  This keeps equal-label training
-separate from the detector's actual label efficiency.
+expert actions, and admitted 10-step labels. This reports the detector's
+actual label efficiency rather than artificially equalizing its ID/OOD labels.

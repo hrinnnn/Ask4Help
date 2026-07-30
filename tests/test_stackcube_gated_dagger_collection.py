@@ -17,6 +17,33 @@ def test_quota_scheduler_prefers_remaining_label_budget_and_alternates_ties():
     assert MODULE.choose_split({"id": 3, "ood": 3}, {"id": 3, "ood": 3}, prefer_id=True) is None
 
 
+def test_successful_expert_collection_alternates_raw_splits_and_filters_labels():
+    assert [MODULE.alternating_split(index) for index in range(6)] == [
+        "id", "ood", "id", "ood", "id", "ood"
+    ]
+    assert MODULE.is_successful_expert_trajectory(
+        MODULE.ExpertSuffix(start=50, action_count=10), success=True
+    )
+    assert not MODULE.is_successful_expert_trajectory(
+        MODULE.ExpertSuffix(start=50, action_count=9), success=True
+    )
+    assert not MODULE.is_successful_expert_trajectory(
+        MODULE.ExpertSuffix(start=50, action_count=10), success=False
+    )
+
+
+def test_collection_gate_semantics_are_latched_at_the_specified_boundary():
+    assert MODULE.should_latch_expert("offline_oracle", action_step=0)
+    assert not MODULE.should_latch_expert("late_success", action_step=45)
+    assert MODULE.should_latch_expert("late_success", action_step=50)
+    assert not MODULE.should_latch_expert(
+        "bridge_knn", action_step=10, score=0.9, threshold=1.0
+    )
+    assert MODULE.should_latch_expert(
+        "bridge_knn", action_step=10, score=1.0, threshold=1.0
+    )
+
+
 def test_only_complete_ten_step_expert_suffix_is_admitted():
     suffix = MODULE.ExpertSuffix(start=50, action_count=29)
     assert suffix.trainable_chunks == 2
