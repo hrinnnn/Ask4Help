@@ -340,6 +340,16 @@ def main() -> None:
             if any(chunk["acc_ema"] is not None for chunk in row["timeline"])
         ]
         if len(successful_llmd) != args.target_successes or len(successful_acc) != args.target_successes:
+            output["calibration_failure"] = {
+                "reason": "insufficient_successful_id_trajectories_with_acc_overlap",
+                "successful_llmd": len(successful_llmd),
+                "successful_acc": len(successful_acc),
+                "required": args.target_successes,
+                "attempts": len(episodes),
+            }
+            (args.output_dir / "episodes.json").write_text(
+                json.dumps(output, indent=2) + "\n", encoding="utf-8"
+            )
             raise RuntimeError(
                 "Strict calibration requires the requested number of successful ID rollouts with ACC overlap; "
                 f"got LLMD={len(successful_llmd)}/{args.target_successes}, "
