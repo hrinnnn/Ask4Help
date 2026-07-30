@@ -213,7 +213,13 @@ def _run_attempt(
     video = write_episode_video_durably(
         frames, video_dir=raw_dir / "videos", episode_index=episode_index, seed=seed, fps=10
     )
-    np.savez_compressed(raw_dir / "actions" / f"episode_{episode_index:06d}_seed_{seed:06d}.npz", actions=np.asarray(actions), sources=np.asarray(sources))
+    # OSSFS does not reliably support the random seek used by zip-based NPZ
+    # writers.  Keep raw actions in simple durable sidecars instead.
+    action_stem = raw_dir / "actions" / f"episode_{episode_index:06d}_seed_{seed:06d}"
+    np.save(str(action_stem) + ".npy", np.asarray(actions, dtype=np.float32))
+    (Path(str(action_stem) + ".sources.json")).write_text(
+        json.dumps(sources) + "\n", encoding="utf-8"
+    )
     suffix = ExpertSuffix(
         start=expert_start,
         action_count=(len(actions) - expert_start) if expert_start is not None else 0,
