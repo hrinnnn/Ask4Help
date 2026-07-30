@@ -101,7 +101,7 @@ def _resolve_detector(
         return None
     if detectors is None or thresholds is None:
         raise ValueError(f"{method} requires detector assets and thresholds")
-    expected = "vlm_bridge_final_mean__knn" if method == "bridge_knn" else "vlm_bridge_final_mean__llmd"
+    expected = "vlm_bridge_final_mean__knn_k10" if method == "bridge_knn" else "vlm_bridge_final_mean__llmd"
     detector = detectors.get(expected)
     threshold = thresholds.get("detectors", {}).get(expected, {}).get("threshold")
     if detector is None or threshold is None:

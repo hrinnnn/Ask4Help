@@ -23,3 +23,13 @@ def test_only_complete_ten_step_expert_suffix_is_admitted():
     assert MODULE.selected_suffix_steps(suffix, remaining_chunks=1) == 10
     assert MODULE.selected_suffix_steps(suffix, remaining_chunks=5) == 20
     assert MODULE.selected_suffix_steps(MODULE.ExpertSuffix(None, 0), 2) == 0
+
+
+def test_bridge_knn_uses_persisted_k10_detector_name():
+    detector = object()
+    resolved = MODULE._resolve_detector(
+        "bridge_knn",
+        {"vlm_bridge_final_mean__knn_k10": detector},
+        {"detectors": {"vlm_bridge_final_mean__knn_k10": {"threshold": 3.5}}},
+    )
+    assert resolved == ("vlm_bridge_final_mean__knn_k10", detector, 3.5)
