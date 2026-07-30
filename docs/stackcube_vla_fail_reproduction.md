@@ -40,6 +40,33 @@ It writes the statistics, fixed prior, manifest, and SHA256. `calibrate` tries
 held-out ID seeds until it has 20 successful trajectories with ACC overlap, or
 stops at 200 attempts without emitting a threshold.
 
+## Reusable Detector Assets
+
+The detector has two persistent, reusable assets. They are deliberately
+separate: fitting the normal feature distribution is not threshold calibration.
+
+1. `llmd_statistics.pt` plus `llmd_statistics.pt.json`: final Action Expert
+   Gaussian statistics, the one fixed flow prior, SFT dataset identity, model
+   path, sample count, and SHA256.
+2. `calibration_id/thresholds.json`: LLMD and ACC conformal thresholds plus
+   the source statistics SHA256, checkpoint, successful calibration seeds,
+   horizon, and finite-sample calibration parameters.
+
+For a later experiment with the *same* checkpoint, data contract, fixed-prior
+seed, and `H/R`, pass the existing locations explicitly instead of refitting:
+
+```bash
+STATS_PATH=/mnt/data/ask4help/results/stackcube_vla_fail/vla_fail_step7000/llmd_statistics.pt \
+THRESHOLDS_PATH=/mnt/data/ask4help/results/stackcube_vla_fail/vla_fail_step7000/calibration_id/thresholds.json \
+MODE=ood_eval CHECKPOINT=... PI05_BASE=... NORM_STATS=... DATASET_ROOT=... \
+  bash scripts/stackcube_vla_fail/run_reproduction.sh
+```
+
+The evaluator rejects a threshold whose recorded statistics SHA does not match
+the supplied `STATS_PATH`. Refit both assets whenever the policy checkpoint,
+normalization contract, action horizon, execution horizon, or fixed-prior seed
+changes.
+
 Every rollout writes `episodes.json`, per-chunk LLMD/ACC/FAIL timelines,
 outcome summaries, and videos under
 `/mnt/data/ask4help/results/stackcube_vla_fail/reproduction_v1/`.

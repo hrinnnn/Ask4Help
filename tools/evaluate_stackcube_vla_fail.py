@@ -9,6 +9,7 @@ that VLA-FAIL would emit while a normal π0.5 policy executes receding chunks.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -23,6 +24,7 @@ sys.path[:0] = [str(ROOT), str(RLINF_ROOT)]
 
 from rlinf.algorithms.vla_fail import (  # noqa: E402
     LLMDStatistics,
+    assert_threshold_statistics_compatible,
     constant_split_conformal_threshold,
     failure_alert,
     llmd_score,
@@ -91,7 +93,15 @@ def _load_statistics(path: Path) -> tuple[LLMDStatistics, torch.Tensor, dict[str
     return LLMDStatistics.from_state_dict(payload["statistics"]), payload["fixed_prior"], payload
 
 
-def _load_thresholds(path: Path | None) -> dict[str, float] | None:
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _load_thresholds(path: Path | None) -> dict[str, Any] | None:
     if path is None:
         return None
     payload = json.loads(path.read_text(encoding="utf-8"))
@@ -99,7 +109,7 @@ def _load_thresholds(path: Path | None) -> dict[str, float] | None:
     missing = required - set(payload)
     if missing:
         raise ValueError(f"Threshold file missing {sorted(missing)}")
-    return {key: float(payload[key]) for key in required}
+    return payload
 
 
 def _episode_metrics(episodes: list[dict[str, Any]]) -> dict[str, Any]:
@@ -255,10 +265,13 @@ def main() -> None:
         raise ValueError("target-successes cannot exceed max-attempts")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     statistics, prior, statistics_payload = _load_statistics(args.llmd_statistics)
+    statistics_sha256 = _sha256(args.llmd_statistics)
     model = _load_model(args.checkpoint, args.norm_stats, args.pi05_base)
     env = _build_env(args.max_episode_steps, task="stack", split=args.split)
     projector = PandaEndEffectorProjector(env, requested_link=args.eef_link_name)
     thresholds = _load_thresholds(args.thresholds)
+    if thresholds is not None:
+        assert_threshold_statistics_compatible(thresholds, statistics_sha256)
     episodes = []
     try:
         attempts = args.max_attempts if args.calibrate else args.episodes
@@ -333,9 +346,17 @@ def main() -> None:
                 f"ACC={len(successful_acc)}/{args.target_successes} after {len(episodes)} attempts."
             )
         thresholds = {
+            "format": "stackcube_vla_fail_threshold_v1",
             "delta": args.delta,
             "target_successes": args.target_successes,
             "attempts": len(episodes),
+            "checkpoint": str(args.checkpoint),
+            "llmd_statistics": str(args.llmd_statistics),
+            "llmd_statistics_sha256": statistics_sha256,
+            "fixed_prior_seed": statistics_payload["fixed_prior_seed"],
+            "execute_horizon": args.execute_horizon,
+            "action_horizon": int(prior.shape[1]),
+            "successful_seeds": [row["seed"] for row in successful],
             "llmd_threshold": constant_split_conformal_threshold(successful_llmd, delta=args.delta),
             "acc_threshold": constant_split_conformal_threshold(successful_acc, delta=args.delta),
         }

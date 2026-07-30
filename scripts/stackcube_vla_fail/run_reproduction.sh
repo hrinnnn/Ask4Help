@@ -14,6 +14,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-${ROOT}/RLinf/.venv/bin/python}"
 RESULT_ROOT="${RESULT_ROOT:-/mnt/data/ask4help/results/stackcube_vla_fail/reproduction_v1}"
 STATS_PATH="${STATS_PATH:-${RESULT_ROOT}/llmd_statistics.pt}"
+CALIBRATION_DIR="${CALIBRATION_DIR:-${RESULT_ROOT}/calibration_id}"
+THRESHOLDS_PATH="${THRESHOLDS_PATH:-${CALIBRATION_DIR}/thresholds.json}"
 CUDA_DEVICE="${CUDA_DEVICE:-0}"
 
 mkdir -p "${RESULT_ROOT}"
@@ -32,7 +34,7 @@ case "${MODE}" in
     "${PYTHON_BIN}" "${ROOT}/tools/evaluate_stackcube_vla_fail.py" \
       --checkpoint "${CHECKPOINT}" --pi05-base "${PI05_BASE}" \
       --norm-stats "${NORM_STATS}" --llmd-statistics "${STATS_PATH}" \
-      --output-dir "${RESULT_ROOT}/calibration_id" --split id \
+      --output-dir "${CALIBRATION_DIR}" --split id \
       --seed "${CALIBRATION_SEED:-10000}" --calibrate --delta 0.05 \
       --target-successes 20 --max-attempts "${CALIBRATION_MAX_ATTEMPTS:-200}" \
       --execute-horizon 5 --max-episode-steps 100
@@ -46,7 +48,7 @@ case "${MODE}" in
       --norm-stats "${NORM_STATS}" --llmd-statistics "${STATS_PATH}" \
       --output-dir "${RESULT_ROOT}/${split}_eval" --split "${split}" \
       --episodes "${EPISODES:-50}" --seed "${seed}" --execute-horizon 5 \
-      --max-episode-steps 100 --thresholds "${RESULT_ROOT}/calibration_id/thresholds.json"
+      --max-episode-steps 100 --thresholds "${THRESHOLDS_PATH}"
     ;;
   *)
     echo "unknown MODE=${MODE}; use stats, calibrate, id_eval, or ood_eval" >&2
