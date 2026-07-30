@@ -207,6 +207,7 @@ def _run_episode(
                 break
     return (
         {
+            "episode_index": -1,
             "seed": seed,
             "success": success,
             "steps": len(executed_actions),
@@ -306,6 +307,7 @@ def main() -> None:
                 fps=10,
             )
             episodes.append(episode)
+            episode["episode_index"] = index
             print(
                 f"[vla-fail] {index + 1}/{args.episodes} seed={episode['seed']} "
                 f"success={int(episode['success'])} alarm={int(episode['alarm'])}",

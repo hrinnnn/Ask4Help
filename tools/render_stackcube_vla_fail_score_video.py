@@ -21,9 +21,19 @@ def _episode_by_seed(path: Path, seed: int) -> tuple[dict[str, Any], dict[str, A
     payload = json.loads(path.read_text(encoding="utf-8"))
     if payload.get("format") != "stackcube_vla_fail_rollout_v1":
         raise ValueError(f"not a StackCube VLA-FAIL rollout file: {path}")
-    episode = next((row for row in payload["episodes"] if int(row["seed"]) == seed), None)
-    if episode is None:
+    episode_index, episode = next(
+        (
+            (index, row)
+            for index, row in enumerate(payload["episodes"])
+            if int(row["seed"]) == seed
+        ),
+        (None, None),
+    )
+    if episode is None or episode_index is None:
         raise KeyError(f"seed {seed} is not present in {path}")
+    # Historical evaluator outputs predate this explicit field. Their video
+    # writer uses list order, so preserve compatibility without guessing.
+    episode = {"episode_index": episode_index, **episode}
     thresholds = payload.get("thresholds")
     if not thresholds:
         raise ValueError("annotated score videos require calibrated thresholds")

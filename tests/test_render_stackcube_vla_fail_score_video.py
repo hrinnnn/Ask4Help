@@ -36,4 +36,5 @@ def test_episode_lookup_uses_seed_and_requires_calibrated_thresholds(tmp_path: P
     episode, thresholds = MODULE._episode_by_seed(path, 42)
 
     assert episode["seed"] == 42
+    assert episode["episode_index"] == 0
     assert thresholds["llmd_threshold"] == 1.0
