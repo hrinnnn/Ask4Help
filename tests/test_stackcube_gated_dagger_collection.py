@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import subprocess
 import sys
 
 
@@ -70,3 +71,8 @@ def test_bridge_knn_uses_persisted_k10_detector_name():
         {"detectors": {"vlm_bridge_final_mean__knn_k10": {"threshold": 3.5}}},
     )
     assert resolved == ("vlm_bridge_final_mean__knn_k10", detector, 3.5)
+
+
+def test_group_bc_launcher_has_valid_shell_syntax():
+    launcher = MODULE_PATH.parents[1] / "scripts" / "stackcube_gated_dagger" / "run_group_bc.sh"
+    subprocess.run(["bash", "-n", str(launcher)], check=True)
