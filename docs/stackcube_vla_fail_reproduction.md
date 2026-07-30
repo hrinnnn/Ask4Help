@@ -184,3 +184,19 @@ SHA.  Evaluation stores per-chunk timelines and Wilson 95% intervals for
 success-ID false positives and failed-rollout recall.  Refit the detector
 assets and recalibrate whenever the checkpoint, input normalization, fixed
 flow prior, action/execution horizon, or ID dataset changes.
+
+For inspectable rollout videos, repeat a small fixed subset of the passive
+evaluation with `--save-videos`, then render the two primary bridge scores:
+
+```bash
+python tools/evaluate_stackcube_internal_detectors.py ... --save-videos
+python tools/render_stackcube_bridge_detector_score_video.py \
+  --episodes /mnt/data/.../video_ood_examples/episodes.json \
+  --video-dir /mnt/data/.../video_ood_examples/videos \
+  --seed 20000 --output /mnt/data/.../video_ood_examples/annotated/seed_20000.mp4
+```
+
+The annotated MP4 contains the synchronized RGB rollout above, bridge LLMD and
+bridge Deep kNN trajectories below, their independent calibrated thresholds,
+the current 5-step decision cursor, and alarm state.  This is a visualization
+replay only: it does not let either detector alter policy actions.
