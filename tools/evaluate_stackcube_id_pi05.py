@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate an RLinf pi0.5 checkpoint on held-out controlled StackCube ID seeds."""
+"""Evaluate an RLinf pi0.5 checkpoint on controlled StackCube ID or OOD seeds."""
 
 from __future__ import annotations
 
@@ -18,8 +18,9 @@ sys.path[:0] = [str(ROOT), str(RLINF_ROOT)]
 
 from rlinf.envs.maniskill.stack_cube_variants import (  # noqa: E402
     STACK_CUBE_ID_ENV_ID,
+    STACK_CUBE_OOD_ENV_ID,
     STACK_CUBE_TASK,
-    register_controlled_stack_cube_variant,
+    register_controlled_stack_cube_variants,
     reset_metadata,
 )
 from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
@@ -61,6 +62,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--seed", type=int, default=10000)
+    parser.add_argument("--split", choices=("id", "ood"), default="id")
     parser.add_argument("--execute-horizon", type=int, default=5)
     parser.add_argument("--max-episode-steps", type=int, default=100)
     return parser.parse_args()
@@ -73,9 +75,9 @@ def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     model = _load_model(args.checkpoint, args.norm_stats, args.pi05_base)
-    register_controlled_stack_cube_variant()
+    register_controlled_stack_cube_variants()
     env = gym.make(
-        STACK_CUBE_ID_ENV_ID,
+        STACK_CUBE_ID_ENV_ID if args.split == "id" else STACK_CUBE_OOD_ENV_ID,
         robot_uids="panda_wristcam",
         num_envs=1,
         obs_mode="rgb",
@@ -94,7 +96,7 @@ def main() -> None:
         for episode in range(args.episodes):
             seed = args.seed + episode
             raw_obs, info = env.reset(seed=seed)
-            metadata = reset_metadata(env)
+            metadata = reset_metadata(env, split=args.split)
             records = [_extract_record(raw_obs)]
             actions = []
             success = False
@@ -163,6 +165,7 @@ def main() -> None:
         "grasp_rate": float(np.mean([row["grasped_once"] for row in rows])),
         "on_cube_rate": float(np.mean([row["on_cube_once"] for row in rows])),
         "execute_horizon": args.execute_horizon,
+        "split": args.split,
         "rows": rows,
     }
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
@@ -171,4 +174,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
