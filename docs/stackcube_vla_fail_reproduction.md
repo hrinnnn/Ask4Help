@@ -110,3 +110,25 @@ Each threshold file records the finite conformal order statistic, calibration
 trajectory-maximum bounds (`min/p05/p50/p95/max`), coverage target, successful
 seed list, and the statistics SHA.  Each evaluation writes score bounds plus
 Wilson 95% intervals for ID false-positive rate and failure recall.
+
+### Reusable Rollout Score Videos
+
+Passive evaluation can retain raw RGB rollouts without affecting detector
+scores.  Pass `--save-videos` to the multi-layer evaluator; it writes source
+videos to `OUTPUT_DIR/videos/` and records the exact video path in each episode
+row.  Render a separate inspectable diagnostic MP4 with the robot view on top
+and all five layer scores, their own thresholds, a synchronized decision cursor,
+and per-layer alarms below:
+
+```bash
+python tools/render_stackcube_multilayer_llmd_score_video.py \
+  --episodes /mnt/data/.../ood_video_examples/episodes.json \
+  --video-dir /mnt/data/.../ood_video_examples/videos \
+  --seed 20000 \
+  --output /mnt/data/.../ood_video_examples/annotated/seed_20000.mp4
+```
+
+The tool is deliberately non-destructive: rollout videos, episode timelines,
+threshold assets, and annotated videos are separate files.  It validates the
+result format, seed, calibrated per-layer threshold coverage, and source-video
+identity before encoding.

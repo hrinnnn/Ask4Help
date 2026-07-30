@@ -24,6 +24,16 @@ from rlinf.algorithms.vla_fail import (  # noqa: E402
     llmd_score,
 )
 from rlinf.envs.maniskill.stack_cube_variants import reset_metadata  # noqa: E402
+from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
+    MAIN_CAMERA_CANDIDATES,
+    WRIST_CAMERA_CANDIDATES,
+    _build_frames,
+    _extract_record,
+    _select_camera,
+)
+from toolkits.lerobot.collect_maniskill_plug_lerobot_joint import (  # noqa: E402
+    write_episode_video_durably,
+)
 from tools.maniskill_pi05_vfd_online_awbc import (  # noqa: E402
     _action_chunk,
     _bool,
@@ -110,10 +120,13 @@ def _metrics(episodes: list[dict[str, Any]], layer: str) -> dict[str, Any]:
 def _run_episode(
     *, env: Any, model: Any, statistics: dict[str, LLMDStatistics], prior: torch.Tensor,
     seed: int, execute_horizon: int, max_episode_steps: int, thresholds: dict[str, Any] | None,
+    episode_index: int, video_dir: Path | None,
 ) -> dict[str, Any]:
     raw_obs, info = env.reset(seed=seed)
     metadata = reset_metadata(env, split="id" if "ID" in env.spec.id else "ood")
     timeline: list[dict[str, Any]] = []
+    records = [_extract_record(raw_obs)]
+    actions: list[np.ndarray] = []
     executed = 0
     success = False
     while executed < max_episode_steps and not success:
@@ -133,10 +146,31 @@ def _run_episode(
             raw_obs, _reward, terminated, truncated, info = env.step(
                 torch.as_tensor(action, device=env.unwrapped.device).unsqueeze(0)
             )
+            actions.append(np.asarray(action, dtype=np.float32))
+            records.append(_extract_record(raw_obs))
             executed += 1
             success = _bool(info.get("success", False))
             if success or _bool(terminated) or _bool(truncated):
                 break
+    video_path = None
+    if video_dir is not None and actions:
+        main_camera = _select_camera(records[0].obs, "", MAIN_CAMERA_CANDIDATES, "main")
+        wrist_camera = _select_camera(records[0].obs, "", WRIST_CAMERA_CANDIDATES, "wrist")
+        frames = _build_frames(
+            records=records,
+            actions=actions,
+            task="stack the green cube on the yellow cube",
+            main_camera=main_camera,
+            wrist_camera=wrist_camera,
+        )
+        write_episode_video_durably(
+            frames,
+            video_dir=video_dir,
+            episode_index=episode_index,
+            seed=seed,
+            fps=10,
+        )
+        video_path = str(video_dir / f"episode_{episode_index:06d}_seed_{seed:06d}.mp4")
     return {
         "seed": seed,
         "success": success,
@@ -147,6 +181,7 @@ def _run_episode(
             for name in statistics
         },
         "timeline": timeline,
+        "video_path": video_path,
         **metadata,
     }
 
@@ -168,6 +203,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-successes", type=int, default=20)
     parser.add_argument("--max-attempts", type=int, default=200)
     parser.add_argument("--delta", type=float, default=0.05)
+    parser.add_argument(
+        "--save-videos",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Write raw RGB rollout videos under OUTPUT_DIR/videos for later score-video rendering.",
+    )
     return parser.parse_args()
 
 
@@ -191,6 +232,8 @@ def main() -> None:
                 env=env, model=model, statistics=stats, prior=prior.to("cuda"),
                 seed=args.seed + index, execute_horizon=args.execute_horizon,
                 max_episode_steps=args.max_episode_steps, thresholds=thresholds,
+                episode_index=index,
+                video_dir=(args.output_dir / "videos") if args.save_videos else None,
             )
             episode["episode_index"] = index
             episodes.append(episode)
