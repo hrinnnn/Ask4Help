@@ -82,6 +82,15 @@ def selected_suffix_steps(suffix: ExpertSuffix, remaining_chunks: int) -> int:
     return min(suffix.trainable_chunks, remaining_chunks) * CHUNK_LABEL_HORIZON
 
 
+def admitted_suffix_steps(
+    suffix: ExpertSuffix, *, remaining_chunks: int, fixed_episode_collection: bool
+) -> int:
+    """Keep every complete suffix chunk for fixed-rollout DAgger collection."""
+    if fixed_episode_collection:
+        return suffix.trainable_chunks * CHUNK_LABEL_HORIZON
+    return selected_suffix_steps(suffix, remaining_chunks)
+
+
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -255,6 +264,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--ood-episodes", type=int, default=50)
     parser.add_argument("--id-target-chunks", type=int)
     parser.add_argument("--ood-target-chunks", type=int)
+    parser.add_argument(
+        "--gated-fixed-episodes",
+        action="store_true",
+        help=(
+            "For a DAgger-cost comparison, collect a fixed number of raw ID/OOD "
+            "rollouts and retain only naturally requested expert suffixes."
+        ),
+    )
     parser.add_argument("--id-seed", type=int, default=13000)
     parser.add_argument("--ood-seed", type=int, default=23000)
     parser.add_argument("--max-attempts-per-split", type=int, default=2000)
@@ -266,8 +283,12 @@ def main() -> None:
     if args.output_dir.exists() or args.repo_id.exists():
         raise FileExistsError("output-dir and repo-id must be new experiment paths")
     offline = args.method == "offline_oracle"
-    if not offline and (args.id_target_chunks is None or args.ood_target_chunks is None):
-        raise ValueError("gated collection requires exact --id-target-chunks and --ood-target-chunks")
+    if not offline and not args.gated_fixed_episodes and (
+        args.id_target_chunks is None or args.ood_target_chunks is None
+    ):
+        raise ValueError(
+            "gated collection requires exact chunk targets, or --gated-fixed-episodes"
+        )
     if not offline and (args.checkpoint is None or args.pi05_base is None or args.norm_stats is None):
         raise ValueError("gated collection requires checkpoint, pi05-base, and norm-stats")
     args.output_dir.mkdir(parents=True, exist_ok=False)
@@ -286,9 +307,10 @@ def main() -> None:
         prior = torch.load(Path(asset["llmd_source_statistics"]), map_location="cpu", weights_only=False)["fixed_prior"].to("cuda")
     detector_spec = _resolve_detector(args.method, detectors, thresholds)
 
+    fixed_episode_collection = offline or args.gated_fixed_episodes
     targets = (
         {"id": int(args.id_episodes), "ood": int(args.ood_episodes)}
-        if offline
+        if fixed_episode_collection
         else {"id": int(args.id_target_chunks), "ood": int(args.ood_target_chunks)}
     )
     collected = {"id": 0, "ood": 0}
@@ -302,7 +324,7 @@ def main() -> None:
     try:
         while (split := choose_split(collected, targets, prefer_id=prefer_id)) is not None:
             if attempts[split] >= args.max_attempts_per_split:
-                raise RuntimeError(f"{split} exhausted {attempts[split]} attempts before its label budget")
+                raise RuntimeError(f"{split} exhausted {attempts[split]} attempts before its target")
             prefer_id = not prefer_id
             seed = next_seed[split]
             next_seed[split] += 1
@@ -317,7 +339,11 @@ def main() -> None:
                     suffix.trainable_chunks * CHUNK_LABEL_HORIZON if row["success"] else 0
                 )
             else:
-                admitted_steps = selected_suffix_steps(suffix, targets[split] - collected[split])
+                admitted_steps = admitted_suffix_steps(
+                    suffix,
+                    remaining_chunks=targets[split] - collected[split],
+                    fixed_episode_collection=args.gated_fixed_episodes,
+                )
             row["admitted_expert_action_steps"] = admitted_steps
             row["admitted_expert_10_step_chunks"] = admitted_steps // CHUNK_LABEL_HORIZON
             rows.append(row)
@@ -341,7 +367,10 @@ def main() -> None:
                     dataset.add_frame(frame)
                 dataset.save_episode()
                 train_rows.append({"dataset_episode_index": len(train_rows), "raw_episode_index": row["episode_index"], "seed": seed, "split": split, "start_step": begin, "action_steps": admitted_steps, "ten_step_chunks": admitted_steps // CHUNK_LABEL_HORIZON})
-                collected[split] += admitted_steps // CHUNK_LABEL_HORIZON if not offline else 1
+            if fixed_episode_collection:
+                collected[split] += 1
+            elif admitted_steps:
+                collected[split] += admitted_steps // CHUNK_LABEL_HORIZON
             _write_jsonl(args.output_dir / "episodes.jsonl", rows)
             _write_jsonl(args.output_dir / "training_episodes.jsonl", train_rows)
             print(f"[collect] method={args.method} split={split} seed={seed} admitted={admitted_steps // CHUNK_LABEL_HORIZON} collected={collected} targets={targets}", flush=True)
@@ -356,15 +385,16 @@ def main() -> None:
 
     if dataset is None:
         raise RuntimeError("collection produced no trainable expert suffixes")
-    if offline:
-        # Offline targets count complete demonstrations; the label budget is derived below.
+    if fixed_episode_collection:
+        # Fixed-rollout collection measures both task success and the natural
+        # expert-query cost.  Its training budget is derived after collection.
         budget = {
             split: sum(row["action_steps"] // CHUNK_LABEL_HORIZON for row in train_rows if row["split"] == split)
             for split in ("id", "ood")
         }
     else:
         budget = collected
-    summary = {"method": args.method, "targets": targets, "collected": collected, "training_chunk_budget": budget, "attempts": attempts, "dataset": str(args.repo_id), "raw_archive": str(raw_dir)}
+    summary = {"method": args.method, "target_unit": "episodes" if fixed_episode_collection else "ten_step_chunks", "targets": targets, "collected": collected, "training_chunk_budget": budget, "attempts": attempts, "dataset": str(args.repo_id), "raw_archive": str(raw_dir)}
     _write_json(args.output_dir / "summary.json", summary)
     _write_json(args.output_dir / "label_budget.json", budget)
 

@@ -25,6 +25,16 @@ def test_only_complete_ten_step_expert_suffix_is_admitted():
     assert MODULE.selected_suffix_steps(MODULE.ExpertSuffix(None, 0), 2) == 0
 
 
+def test_fixed_rollout_collection_keeps_all_complete_expert_suffix_chunks():
+    suffix = MODULE.ExpertSuffix(start=50, action_count=29)
+    assert MODULE.admitted_suffix_steps(
+        suffix, remaining_chunks=1, fixed_episode_collection=True
+    ) == 20
+    assert MODULE.admitted_suffix_steps(
+        suffix, remaining_chunks=1, fixed_episode_collection=False
+    ) == 10
+
+
 def test_bridge_knn_uses_persisted_k10_detector_name():
     detector = object()
     resolved = MODULE._resolve_detector(
