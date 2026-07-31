@@ -18,6 +18,13 @@ assert REBUILD_SPEC.loader is not None
 sys.modules[REBUILD_SPEC.name] = REBUILD
 REBUILD_SPEC.loader.exec_module(REBUILD)
 
+NORM_PATH = Path(__file__).resolve().parents[1] / "tools" / "calculate_source_balanced_openpi_norm_stats.py"
+NORM_SPEC = importlib.util.spec_from_file_location("stackcube_gated_dagger_norm", NORM_PATH)
+NORM = importlib.util.module_from_spec(NORM_SPEC)
+assert NORM_SPEC.loader is not None
+sys.modules[NORM_SPEC.name] = NORM
+NORM_SPEC.loader.exec_module(NORM)
+
 
 def test_quota_scheduler_prefers_remaining_label_budget_and_alternates_ties():
     assert MODULE.choose_split({"id": 0, "ood": 0}, {"id": 3, "ood": 3}, prefer_id=True) == "id"
@@ -129,6 +136,11 @@ def test_rebuild_retries_contact_jitter_but_never_accepts_a_failed_replay(monkey
     )
     assert records == ["success-records"]
     assert attempts == 2
+
+
+def test_valid_action_anchor_indices_exclude_exactly_the_episode_tail():
+    indices = NORM.valid_anchor_indices([(0, 20), (20, 50)], horizon=10)
+    assert indices.tolist() == list(range(0, 11)) + list(range(20, 41))
 
 
 def test_group_bc_launcher_has_valid_shell_syntax():
