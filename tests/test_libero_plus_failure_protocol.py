@@ -84,9 +84,15 @@ def test_aucpdt_penalizes_missed_failure_and_uses_episode_horizon() -> None:
         {"episode_id": "late", "success": False, "scores": [0.0, 0.0, 0.0, 0.9]},
         {"episode_id": "missed", "success": False, "scores": [0.0, 0.0, 0.0, 0.2]},
     ]
-    curve = PROTOCOL.penalized_detection_time_curve(episodes)
-    assert any(point["pdt"] == pytest.approx(1.0) for point in curve)
-    assert any(point["pdt"] == pytest.approx(0.75) for point in curve)
+    # The no-alert threshold can be Pareto dominated and therefore absent from
+    # the plotted front, but it must still count as a full-horizon miss.
+    missed = PROTOCOL.evaluate_fixed_threshold(episodes, threshold=1.0)
+    missed_metrics = PROTOCOL.fixed_threshold_metrics(missed)
+    assert missed_metrics["mean_normalized_detection_time"] == pytest.approx(1.0)
+
+    late = PROTOCOL.evaluate_fixed_threshold(episodes, threshold=0.8)
+    late_metrics = PROTOCOL.fixed_threshold_metrics(late)
+    assert late_metrics["mean_normalized_detection_time"] == pytest.approx(0.875)
 
 
 def test_bootstrap_confidence_interval_is_deterministic() -> None:
@@ -101,4 +107,7 @@ def test_absolute_eef_and_single_sample_overlap_are_well_defined() -> None:
     actions = np.array([[1.0, 0.0, 0.0], [0.0, 2.0, 0.0], [0.0, 0.0, 3.0]])
     points = PROTOCOL.action_chunk_to_absolute_eef(actions, np.array([10.0, 20.0, 30.0]))
     np.testing.assert_allclose(points[-1], [11.0, 22.0, 33.0])
-    assert PROTOCOL.single_sample_overlap_score(points, points, execute_horizon=1) == pytest.approx(0.0)
+    # After executing one action, the following plan should begin at the
+    # previous plan's second absolute point for a perfectly consistent overlap.
+    next_chunk = np.vstack([points[1:], points[-1] + np.array([0.0, 0.0, 1.0])])
+    assert PROTOCOL.single_sample_overlap_score(points, next_chunk, execute_horizon=1) == pytest.approx(0.0)
