@@ -65,9 +65,14 @@ def main() -> None:
     parser.add_argument("--calibration-id", required=True)
     parser.add_argument("--policy-checkpoint", required=True)
     parser.add_argument("--source-commit", required=True)
-    parser.add_argument("--protocol-json", type=Path, required=True)
+    parser.add_argument("--protocol-json", type=Path)
+    parser.add_argument("--protocol", default="{}", help="inline JSON protocol metadata")
     args = parser.parse_args()
-    protocol = json.loads(args.protocol_json.read_text(encoding="utf-8"))
+    protocol = (
+        json.loads(args.protocol_json.read_text(encoding="utf-8"))
+        if args.protocol_json is not None
+        else json.loads(args.protocol)
+    )
     destination = register_calibration(
         thresholds_path=args.thresholds,
         reference_assets_path=args.reference_assets,
