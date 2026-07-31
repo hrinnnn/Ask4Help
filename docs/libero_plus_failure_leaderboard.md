@@ -62,3 +62,4 @@ scored_v1/
 - `feature_probe_mean_ms` 是增加的一次确定性 PaliGemma probe 的开销；`policy_mean_ms` 是官方 action sampling。两者相加报告为主榜每个 decision 的总延迟。
 - Action Total Variance 需要 `C=10` action sampling，必须另跑/另报开销，不能与单样本主榜比较时隐瞒额外计算。
 - 一旦环境在成功后自然 `done`，episode 停止；模型从未观察 `done`、success、剩余时长或评测标签。该 simulator 生命周期限制记录在最终报告中。
+- 本榜单选定的三类 Plus 扰动没有 image corruption。非 root 服务器若 ImageMagick ABI 无法稳定加载，可显式设置 `LIBERO_PLUS_DISABLE_UNUSED_WAND=1`；此时仅替换官方 import-time 的未使用 Wand backend，任何 motion-blur 调用都会 fail-closed。所有该模式下的 episode 会写入 `environment_compat.unused_wand_motion_blur_stub=true`。

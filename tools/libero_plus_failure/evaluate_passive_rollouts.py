@@ -12,6 +12,7 @@ import argparse
 import collections
 import json
 import math
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
@@ -20,6 +21,12 @@ import imageio
 import numpy as np
 from openpi_client import image_tools
 from openpi_client.websocket_client_policy import WebsocketClientPolicy
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / "tools"))
+from libero_plus_failure.libero_plus_compat import install_unused_wand_stub  # noqa: E402
+
+WAND_STUB_ACTIVE = install_unused_wand_stub()
 
 # Official LIBERO is packaged as ``libero.libero`` while the official
 # LIBERO-Plus clone exposes the same API directly as ``libero``.  The two are
@@ -32,8 +39,6 @@ except ModuleNotFoundError:
     from libero import benchmark, get_libero_path
     from libero.envs import OffScreenRenderEnv
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools"))
 from libero_plus_failure.rollout_records import (  # noqa: E402
     absolute_eef_points,
     single_sample_overlap,
@@ -169,6 +174,7 @@ def run_episode(
         "task_index": task_index, "task_instruction": prompt, "seed": seed, "success": success,
         "done": bool(done), "steps": steps, "execute_horizon": REPLAN_STEPS,
         "action_horizon": ACTION_HORIZON, "timeline": timeline,
+        "environment_compat": {"unused_wand_motion_blur_stub": WAND_STUB_ACTIVE},
     }
     write_rollout(output_dir, episode=episode, features=feature_rows)
     video_path = output_dir / "rollout.mp4"
