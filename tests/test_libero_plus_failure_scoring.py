@@ -60,3 +60,18 @@ def test_action_variance_is_only_calibrated_when_every_success_has_c10_trace() -
         record["scores"]["action_total_variance"] = [0.2]
     thresholds = MODULE.calibrate(records, "asset", required_successes=5)
     assert "action_total_variance" in thresholds["thresholds"]
+
+
+def test_reference_asset_loading_falls_back_for_legacy_torch(monkeypatch) -> None:
+    calls: list[dict] = []
+    expected = {"asset": "loaded"}
+
+    def legacy_load(*_args, **kwargs):
+        calls.append(dict(kwargs))
+        if "weights_only" in kwargs:
+            raise TypeError("'weights_only' is an invalid keyword argument")
+        return expected
+
+    monkeypatch.setattr(MODULE.torch, "load", legacy_load)
+    assert MODULE.load_reference_assets(Path("reference.pt")) == expected
+    assert calls == [{"map_location": "cpu", "weights_only": False}, {"map_location": "cpu"}]

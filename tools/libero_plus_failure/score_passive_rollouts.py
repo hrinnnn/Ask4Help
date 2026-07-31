@@ -47,6 +47,19 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def load_reference_assets(path: Path) -> Mapping[str, Any]:
+    """Load frozen assets on both current and legacy PyTorch clients."""
+
+    try:
+        return torch.load(path, map_location="cpu", weights_only=False)
+    except TypeError as error:
+        # PyTorch < 2.0 has no ``weights_only`` keyword.  The archive is an
+        # internal, SHA-verified artifact, so legacy loading is intentional.
+        if "weights_only" not in str(error):
+            raise
+        return torch.load(path, map_location="cpu")
+
+
 def raw_rollout_dirs(roots: Iterable[Path]) -> list[Path]:
     found: list[Path] = []
     for root in roots:
@@ -241,7 +254,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.output_dir.exists():
         raise FileExistsError("refusing to overwrite " + str(args.output_dir))
-    assets = torch.load(args.assets, map_location="cpu", weights_only=False)
+    assets = load_reference_assets(args.assets)
     asset_sha = sha256(args.assets)
     records = [score_one(path, assets) for path in raw_rollout_dirs(args.raw_root)]
     args.output_dir.mkdir(parents=True, exist_ok=False)
