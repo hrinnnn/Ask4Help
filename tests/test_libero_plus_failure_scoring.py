@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import torch
+import pytest
 
 
 ROOT = Path(__file__).parents[1]
@@ -75,3 +76,20 @@ def test_reference_asset_loading_falls_back_for_legacy_torch(monkeypatch) -> Non
     monkeypatch.setattr(MODULE.torch, "load", legacy_load)
     assert MODULE.load_reference_assets(Path("reference.pt")) == expected
     assert calls == [{"map_location": "cpu", "weights_only": False}, {"map_location": "cpu"}]
+
+
+def test_joint_bootstrap_matches_individual_metric_bootstraps() -> None:
+    rows = [_record(index, index % 2 == 0) for index in range(8)]
+    threshold = 3.5
+    intervals = MODULE.bootstrap_metric_intervals(rows, threshold=threshold, seed=9, samples=25)
+    for key in MODULE.BOOTSTRAP_METRICS:
+        def metric(sample, key=key):
+            fixed = MODULE.PROTOCOL.fixed_threshold_metrics(
+                MODULE.PROTOCOL.evaluate_fixed_threshold(sample, threshold=threshold)
+            )
+            independent = MODULE.PROTOCOL.threshold_independent_metrics(sample)
+            value = ({**fixed, **independent})[key]
+            return float("nan") if value is None else float(value)
+
+        expected = MODULE.PROTOCOL.bootstrap_interval(rows, metric, seed=9, samples=25)
+        assert intervals[key] == pytest.approx(expected)

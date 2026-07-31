@@ -37,6 +37,16 @@ PROTOCOL = _load(TOOLS / "libero_plus_failure_protocol.py", "libero_plus_failure
 BASE_METHODS = ("bridge_llmd", "bridge_deep_knn", "bridge_pca_residual", "final_llmd", "acc", "stac_single")
 ALL_METHODS = BASE_METHODS + ("vla_fail_final_or_acc",)
 OPTIONAL_METHODS = ("action_total_variance",)
+BOOTSTRAP_METRICS = (
+    "balanced_accuracy",
+    "weighted_accuracy",
+    "recall",
+    "precision",
+    "f1",
+    "roc_auc",
+    "average_precision",
+    "aucpdt",
+)
 
 
 def sha256(path: Path) -> str:
@@ -178,6 +188,38 @@ def _protocol_records(records: list[dict[str, Any]], method: str, threshold: flo
     return [{"episode_id": record["episode_id"], "success": record["success"], "scores": record["scores"][method]} for record in records if record["scores"][method]]
 
 
+def bootstrap_metric_intervals(
+    rows: list[dict[str, Any]], *, threshold: float, seed: int, samples: int = 1000
+) -> dict[str, tuple[float, float] | None]:
+    """Compute all leaderboard CIs from the same bootstrap resamples.
+
+    The original implementation called ``bootstrap_interval`` once per metric.
+    Since every invocation used the same seed, those calls generated identical
+    resamples yet repeated AUCPDT (the expensive metric) eight times.  This is
+    mathematically equivalent, while evaluating fixed and threshold-free
+    metrics once per resample.
+    """
+
+    if samples < 1:
+        raise ValueError("bootstrap samples must be positive")
+    rng = np.random.default_rng(seed)
+    values: dict[str, list[float]] = {key: [] for key in BOOTSTRAP_METRICS}
+    for _ in range(samples):
+        indices = rng.integers(0, len(rows), size=len(rows))
+        sample = [rows[int(index)] for index in indices]
+        fixed = PROTOCOL.fixed_threshold_metrics(PROTOCOL.evaluate_fixed_threshold(sample, threshold=threshold))
+        independent = PROTOCOL.threshold_independent_metrics(sample)
+        combined = {**fixed, **independent}
+        for key in BOOTSTRAP_METRICS:
+            value = combined.get(key)
+            if value is not None and math.isfinite(float(value)):
+                values[key].append(float(value))
+    return {
+        key: None if not sample_values else (float(np.quantile(sample_values, 0.025)), float(np.quantile(sample_values, 0.975)))
+        for key, sample_values in values.items()
+    }
+
+
 def _metric_summary(records: list[dict[str, Any]], method: str, threshold: float) -> dict[str, Any]:
     rows = _protocol_records(records, method, threshold)
     if not rows:
@@ -187,17 +229,9 @@ def _metric_summary(records: list[dict[str, Any]], method: str, threshold: float
     # Keep the paper's usual name alongside the implementation's explicit
     # average-precision name.  They are the same trajectory-level quantity.
     result = {"episodes": len(rows), **fixed, **independent, "aucpr": independent["average_precision"]}
-    for key in ("balanced_accuracy", "weighted_accuracy", "recall", "precision", "f1", "roc_auc", "average_precision", "aucpdt"):
-        def metric(sample: list[Mapping[str, Any]], key: str = key) -> float:
-            if key in ("roc_auc", "average_precision", "aucpdt"):
-                value = PROTOCOL.threshold_independent_metrics(sample)[key]
-            else:
-                value = PROTOCOL.fixed_threshold_metrics(PROTOCOL.evaluate_fixed_threshold(sample, threshold=threshold))[key]
-            return float("nan") if value is None else float(value)
-        try:
-            result[key + "_bootstrap_95_ci"] = PROTOCOL.bootstrap_interval(rows, metric, seed=20260731, samples=1000)
-        except ValueError:
-            result[key + "_bootstrap_95_ci"] = None
+    intervals = bootstrap_metric_intervals(rows, threshold=threshold, seed=20260731, samples=1000)
+    for key, interval in intervals.items():
+        result[key + "_bootstrap_95_ci"] = interval
     return result
 
 
