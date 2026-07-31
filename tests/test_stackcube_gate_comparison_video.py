@@ -12,6 +12,13 @@ assert SPEC.loader is not None
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
+COMPOSE_PATH = Path(__file__).resolve().parents[1] / "tools" / "compose_stackcube_gate_comparison_video.py"
+COMPOSE_SPEC = importlib.util.spec_from_file_location("stackcube_gate_comparison", COMPOSE_PATH)
+COMPOSE = importlib.util.module_from_spec(COMPOSE_SPEC)
+assert COMPOSE_SPEC.loader is not None
+sys.modules[COMPOSE_SPEC.name] = COMPOSE
+COMPOSE_SPEC.loader.exec_module(COMPOSE)
+
 
 def test_overlay_uses_recorded_controller_boundary_and_preserves_image_content():
     row = {
@@ -80,3 +87,13 @@ def test_render_uses_imageio_writer_append_data(tmp_path, monkeypatch):
     assert summary["frames"] == 2
     assert len(writer.frames) == 2
     assert writer.closed
+
+
+def test_comparison_frame_keeps_both_inputs_and_a_neutral_divider():
+    left = np.full((3, 4, 3), 11, dtype=np.uint8)
+    right = np.full((2, 5, 3), 22, dtype=np.uint8)
+    combined = COMPOSE.build_comparison_frame(left, right)
+    assert combined.shape == (3, 4 + COMPOSE.DIVIDER + 5, 3)
+    assert np.all(combined[:3, :4] == 11)
+    assert np.all(combined[:2, 4 + COMPOSE.DIVIDER :] == 22)
+    assert np.all(combined[:, 4 : 4 + COMPOSE.DIVIDER] == 21)
