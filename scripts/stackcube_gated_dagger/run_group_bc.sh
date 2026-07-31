@@ -15,6 +15,7 @@ NORM_STATS=${NORM_STATS:?Set NORM_STATS}
 OUTPUT_DIR=${OUTPUT_DIR:?Set OUTPUT_DIR}
 MAX_STEPS=${MAX_STEPS:-500}
 SAVE_INTERVAL=${SAVE_INTERVAL:-250}
+GLOBAL_BATCH_SIZE=${GLOBAL_BATCH_SIZE:-64}
 RESUME_DIR=${RESUME_DIR:-}
 
 unset CUDA_VISIBLE_DEVICES
@@ -37,6 +38,7 @@ fi
   runner.max_steps="${MAX_STEPS}" \
   runner.save_interval="${SAVE_INTERVAL}" \
   actor.optim.total_training_steps="${MAX_STEPS}" \
+  actor.global_batch_size="${GLOBAL_BATCH_SIZE}" \
   actor.seed="${SEED}" \
   "data.train_data_paths=[{dataset_path:${ID_REPLAY},weight:1.0},{dataset_path:${NEW_EXPERT_DATASET},weight:1.0}]" \
   +data.openpi_source_balanced=true \
