@@ -54,3 +54,15 @@ all groups, with a Wilson 95% interval.  Collection cost is reported alongside
 it: attempted episodes, expert takeover rate, first takeover step, total raw
 expert actions, and admitted 10-step labels. This reports the detector's
 actual label efficiency rather than artificially equalizing its ID/OOD labels.
+# Training-boundary correction (v2)
+
+The initial bridge-kNN collection retained each successful expert intervention
+until the task completed, but its training materialization rounded the suffix
+down to a multiple of ten actions.  That discarded terminal placement motion.
+The v2 pipeline preserves every action from the first expert latch through
+success, then filters SFT anchors rather than episodes: only a start with a
+fully in-episode 10-step action target is sampled.  This also excludes
+LeRobot's terminal action padding from the loss for both the frozen 128-ID
+replay and the new gated data.  Legacy checkpoints and archives are immutable;
+the v2 dataset is rebuilt to a new result path from raw action sidecars and
+deterministic seed replay.

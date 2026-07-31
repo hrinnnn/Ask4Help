@@ -11,6 +11,13 @@ assert SPEC.loader is not None
 sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
+REBUILD_PATH = Path(__file__).resolve().parents[1] / "tools" / "rebuild_stackcube_gated_dagger_dataset.py"
+REBUILD_SPEC = importlib.util.spec_from_file_location("stackcube_gated_dagger_rebuild", REBUILD_PATH)
+REBUILD = importlib.util.module_from_spec(REBUILD_SPEC)
+assert REBUILD_SPEC.loader is not None
+sys.modules[REBUILD_SPEC.name] = REBUILD
+REBUILD_SPEC.loader.exec_module(REBUILD)
+
 
 def test_quota_scheduler_prefers_remaining_label_budget_and_alternates_ties():
     assert MODULE.choose_split({"id": 0, "ood": 0}, {"id": 3, "ood": 3}, prefer_id=True) == "id"
@@ -82,6 +89,34 @@ def test_bridge_knn_uses_persisted_k10_detector_name():
         {"detectors": {"vlm_bridge_final_mean__knn_k10": {"threshold": 3.5}}},
     )
     assert resolved == ("vlm_bridge_final_mean__knn_k10", detector, 3.5)
+
+
+def test_rebuild_resolves_legacy_row_to_full_terminal_expert_suffix():
+    episodes = [
+        {
+            "episode_index": 7,
+            "success": True,
+            "expert_start_step": 50,
+            "expert_action_steps": 26,
+        }
+    ]
+    selected = REBUILD.select_complete_successful_suffixes(
+        episodes, [{"raw_episode_index": 7, "action_steps": 20}]
+    )
+    assert selected[0]["expert_action_steps"] == 26
+
+
+def test_rebuild_rejects_failed_or_incomplete_legacy_suffixes():
+    for row in (
+        {"episode_index": 1, "success": False, "expert_start_step": 0, "expert_action_steps": 20},
+        {"episode_index": 2, "success": True, "expert_start_step": 0, "expert_action_steps": 9},
+    ):
+        try:
+            REBUILD.select_complete_successful_suffixes([row], [{"raw_episode_index": row["episode_index"]}])
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("invalid suffix was accepted")
 
 
 def test_group_bc_launcher_has_valid_shell_syntax():
