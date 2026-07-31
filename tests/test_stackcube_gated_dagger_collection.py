@@ -119,6 +119,18 @@ def test_rebuild_rejects_failed_or_incomplete_legacy_suffixes():
             raise AssertionError("invalid suffix was accepted")
 
 
+def test_rebuild_retries_contact_jitter_but_never_accepts_a_failed_replay(monkeypatch):
+    outcomes = iter(
+        [(["failed-records"], False), (["success-records"], True)]
+    )
+    monkeypatch.setattr(REBUILD, "_replay_full_episode", lambda *_args: next(outcomes))
+    records, attempts = REBUILD.replay_until_success(
+        object(), {"episode_index": 3}, None, max_attempts=3
+    )
+    assert records == ["success-records"]
+    assert attempts == 2
+
+
 def test_group_bc_launcher_has_valid_shell_syntax():
     launcher = MODULE_PATH.parents[1] / "scripts" / "stackcube_gated_dagger" / "run_group_bc.sh"
     subprocess.run(["bash", "-n", str(launcher)], check=True)
