@@ -64,13 +64,16 @@ def quat_to_axisangle(quat: np.ndarray) -> np.ndarray:
     return quat[:3] * (2.0 * math.acos(float(quat[3]))) / denominator
 
 
-def get_env(task: Any, seed: int) -> tuple[Any, str]:
+def get_env(task: Any, seed: int, render_gpu_device_id: int = 1) -> tuple[Any, str]:
     task_description = str(task.language)
     bddl_file = Path(get_libero_path("bddl_files")) / task.problem_folder / task.bddl_file
     env = OffScreenRenderEnv(
         # Original LIBERO accepts Path, while official LIBERO-Plus parses this
         # value as a string to decode its perturbation suffixes.
-        bddl_file_name=str(bddl_file), camera_heights=RESOLUTION, camera_widths=RESOLUTION
+        bddl_file_name=str(bddl_file),
+        camera_heights=RESOLUTION,
+        camera_widths=RESOLUTION,
+        render_gpu_device_id=render_gpu_device_id,
     )
     env.seed(seed)
     return env, task_description
@@ -97,11 +100,11 @@ def policy_input(
 def run_episode(
     *, client: WebsocketClientPolicy, task: Any, task_index: int, seed: int, output_dir: Path,
     suite: str, source: str, category: str | None, configuration_id: int | None, resize_size: int,
-    action_variance_samples: int,
+    action_variance_samples: int, render_gpu_device_id: int = 1,
 ) -> None:
     if output_dir.exists():
         raise FileExistsError("refusing to overwrite rollout " + str(output_dir))
-    env, prompt = get_env(task, seed)
+    env, prompt = get_env(task, seed, render_gpu_device_id)
     env.reset()
     initial_states = benchmark.get_benchmark_dict()[suite]().get_task_init_states(task_index)
     if len(initial_states) == 0:
@@ -196,6 +199,7 @@ def main() -> None:
     parser.add_argument("--category")
     parser.add_argument("--configuration-id", type=int)
     parser.add_argument("--action-variance-samples", type=int, default=0)
+    parser.add_argument("--render-gpu-device-id", type=int, default=1)
     args = parser.parse_args()
     task_suite = benchmark.get_benchmark_dict()[args.suite]()
     if not 0 <= args.task_index < task_suite.n_tasks:
@@ -205,6 +209,7 @@ def main() -> None:
         task_index=args.task_index, seed=args.seed, output_dir=args.output_dir, suite=args.suite,
         source=args.source, category=args.category, configuration_id=args.configuration_id,
         resize_size=args.resize_size, action_variance_samples=args.action_variance_samples,
+        render_gpu_device_id=args.render_gpu_device_id,
     )
 
 
