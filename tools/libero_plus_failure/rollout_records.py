@@ -56,6 +56,21 @@ def single_sample_overlap(previous_points: np.ndarray, current_points: np.ndarra
     return float(np.linalg.norm(previous[execute_horizon:] - current[: -execute_horizon], axis=-1).mean())
 
 
+def action_total_variance(action_candidates: np.ndarray) -> float:
+    """Sum component-wise variance across stochastic action candidates.
+
+    This is an appendix-only baseline because it consumes ``C`` full policy
+    samples at one decision, unlike the single-sample main leaderboard.
+    """
+
+    values = np.asarray(action_candidates, dtype=np.float64)
+    if values.ndim != 3 or values.shape[0] < 2 or values.shape[1] < 1 or values.shape[2] < 1:
+        raise ValueError("action candidates must have shape [samples>=2, horizon, action_dim]")
+    if not np.isfinite(values).all():
+        raise ValueError("action candidates must be finite")
+    return float(np.var(values, axis=0).sum())
+
+
 def write_rollout(output_dir: Path, *, episode: Mapping[str, Any], features: Mapping[str, Sequence[np.ndarray]]) -> None:
     """Atomically persist one JSON timeline and aligned compressed features."""
     output_dir.mkdir(parents=True, exist_ok=False)

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import zipfile
 from pathlib import Path
@@ -21,6 +22,50 @@ def sha256(path: Path) -> str:
         while chunk := handle.read(1024 * 1024):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def asset_member_prefix(names: list[str]) -> str:
+    """Find the archive prefix immediately preceding the official assets dir.
+
+    The upstream `assets.zip` currently retains its historic build-machine
+    prefix (`inspire/.../LIBERO-plus-0/assets/`) instead of a portable
+    top-level `assets/` directory.  Exactly one assets subtree is accepted.
+    """
+
+    prefixes = set()
+    for name in names:
+        parts = Path(name).parts
+        for index, part in enumerate(parts):
+            if part == "assets":
+                prefixes.add("/".join(parts[: index + 1]) + "/")
+                break
+    if len(prefixes) != 1:
+        raise ValueError("cannot uniquely locate official assets directory: " + repr(sorted(prefixes)))
+    return next(iter(prefixes))
+
+
+def extract_assets(bundle: zipfile.ZipFile, target: Path) -> str:
+    """Extract only the official assets subtree into a clean target directory."""
+
+    prefix = asset_member_prefix(bundle.namelist())
+    resolved_target = target.resolve()
+    for member in bundle.infolist():
+        if not member.filename.startswith(prefix):
+            continue
+        relative = member.filename[len(prefix) :]
+        if not relative:
+            continue
+        destination = target / relative
+        resolved_destination = destination.resolve()
+        if resolved_destination.parent != resolved_target and resolved_target not in resolved_destination.parents:
+            raise ValueError("unsafe path in official assets.zip: " + relative)
+        if member.is_dir():
+            destination.mkdir(parents=True, exist_ok=True)
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with bundle.open(member) as source, destination.open("wb") as output:
+            shutil.copyfileobj(source, output, length=1024 * 1024)
+    return prefix
 
 
 def main() -> None:
@@ -39,10 +84,7 @@ def main() -> None:
     if actual_sha != ASSET_SHA256:
         raise RuntimeError("official assets.zip SHA256 mismatch: " + actual_sha)
     with zipfile.ZipFile(archive) as bundle:
-        roots = {Path(name).parts[0] for name in bundle.namelist() if name and not name.endswith("/")}
-        if roots != {"assets"}:
-            raise ValueError("unexpected official assets.zip top level: " + repr(sorted(roots)))
-        bundle.extractall(args.libero_root)
+        archive_prefix = extract_assets(bundle, target)
     if not target.is_dir() or not any(target.iterdir()):
         raise RuntimeError("asset extraction created no assets directory")
     manifest = {
@@ -52,6 +94,7 @@ def main() -> None:
         "archive": str(archive),
         "archive_sha256": actual_sha,
         "target": str(target),
+        "archive_assets_prefix": archive_prefix,
         "top_level_entries": sorted(path.name for path in target.iterdir()),
     }
     (args.archive_dir / "assets_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

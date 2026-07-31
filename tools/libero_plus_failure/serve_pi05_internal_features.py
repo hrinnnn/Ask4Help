@@ -107,6 +107,13 @@ class InternalFeaturePolicy(_policy.Policy):
 
     def infer(self, obs: dict, *, noise: np.ndarray | None = None) -> dict:  # type: ignore[override]
         # This is intentionally kept equivalent to upstream Policy.infer.
+        obs = dict(obs)
+        # Remove this private diagnostic request before ordinary OpenPI
+        # transforms. The policy action sent to the environment still follows
+        # the exact one-sample upstream path below.
+        variance_samples = int(obs.pop("failure_probe/action_variance_samples", 0))
+        if variance_samples < 0:
+            raise ValueError("failure_probe/action_variance_samples must be nonnegative")
         inputs = jax.tree.map(lambda x: x, obs)
         inputs = self._input_transform(inputs)
         inputs = jax.tree.map(lambda x: jnp.asarray(x)[np.newaxis, ...], inputs)
@@ -124,8 +131,13 @@ class InternalFeaturePolicy(_policy.Policy):
         features = self._probe_features(observation, self._fixed_prior, jnp.asarray(self._probe_spec.flow_timestep))
         probe_ms = (time.monotonic() - probe_start) * 1000.0
 
-        outputs = jax.tree.map(lambda x: np.asarray(x[0, ...]), {"state": inputs["state"], "actions": actions})
-        outputs = self._output_transform(outputs)
+        def output_actions(raw_actions: jax.Array) -> np.ndarray:
+            payload = jax.tree.map(
+                lambda x: np.asarray(x[0, ...]), {"state": inputs["state"], "actions": raw_actions}
+            )
+            return np.asarray(self._output_transform(payload)["actions"], dtype=np.float32)
+
+        outputs = {"state": np.asarray(inputs["state"][0, ...]), "actions": output_actions(actions)}
         outputs["failure_features"] = jax.tree.map(lambda x: np.asarray(x[0, ...], dtype=np.float32), features)
         outputs["failure_probe"] = {
             "format": "pi05_libero_internal_feature_probe_v1",
@@ -137,6 +149,23 @@ class InternalFeaturePolicy(_policy.Policy):
             "action_expert_layer": "final_hidden_before_action_out_proj",
             "feature_ms": probe_ms,
         }
+        if variance_samples:
+            variance_start = time.monotonic()
+            candidates = [outputs["actions"]]
+            if variance_samples > 1:
+                # Fold the action sample key after the official policy action
+                # has been generated; its action is never replaced by a
+                # diagnostic candidate.
+                candidate_keys = jax.random.split(jax.random.fold_in(sample_rng, 1), variance_samples - 1)
+                for candidate_key in candidate_keys:
+                    candidates.append(output_actions(self._sample_actions(candidate_key, observation, **sample_kwargs)))
+            outputs["failure_probe"].update(
+                {
+                    "action_variance_samples": variance_samples,
+                    "action_total_variance": float(np.var(np.stack(candidates, axis=0), axis=0).sum()),
+                    "action_variance_ms": (time.monotonic() - variance_start) * 1000.0,
+                }
+            )
         outputs["policy_timing"] = {"infer_ms": action_ms}
         return outputs
 

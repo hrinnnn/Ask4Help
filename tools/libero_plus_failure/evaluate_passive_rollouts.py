@@ -60,22 +60,28 @@ def get_env(task: Any, seed: int) -> tuple[Any, str]:
     return env, task_description
 
 
-def policy_input(obs: Dict[str, Any], prompt: str, resize_size: int) -> tuple[dict, np.ndarray]:
+def policy_input(
+    obs: Dict[str, Any], prompt: str, resize_size: int, action_variance_samples: int
+) -> tuple[dict, np.ndarray]:
     base = np.ascontiguousarray(obs["agentview_image"][::-1, ::-1])
     wrist = np.ascontiguousarray(obs["robot0_eye_in_hand_image"][::-1, ::-1])
     base = image_tools.convert_to_uint8(image_tools.resize_with_pad(base, resize_size, resize_size))
     wrist = image_tools.convert_to_uint8(image_tools.resize_with_pad(wrist, resize_size, resize_size))
-    return {
+    result = {
         "observation/image": base,
         "observation/wrist_image": wrist,
         "observation/state": np.concatenate((obs["robot0_eef_pos"], quat_to_axisangle(obs["robot0_eef_quat"]), obs["robot0_gripper_qpos"])),
         "prompt": prompt,
-    }, base
+    }
+    if action_variance_samples:
+        result["failure_probe/action_variance_samples"] = int(action_variance_samples)
+    return result, base
 
 
 def run_episode(
     *, client: WebsocketClientPolicy, task: Any, task_index: int, seed: int, output_dir: Path,
     suite: str, source: str, category: str | None, configuration_id: int | None, resize_size: int,
+    action_variance_samples: int,
 ) -> None:
     if output_dir.exists():
         raise FileExistsError("refusing to overwrite rollout " + str(output_dir))
@@ -101,7 +107,7 @@ def run_episode(
                 steps += 1
                 continue
             if not plan:
-                element, frame = policy_input(obs, prompt, resize_size)
+                element, frame = policy_input(obs, prompt, resize_size, action_variance_samples)
                 frames.append(frame)
                 response = client.infer(element)
                 chunk = np.asarray(response["actions"], dtype=np.float32)
@@ -122,12 +128,17 @@ def run_episode(
                     )
                     acc_value = acc_ema
                     stac = single_sample_overlap(previous_points, points, execute_horizon=REPLAN_STEPS)
+                action_total_var = response.get("failure_probe", {}).get("action_total_variance")
+                if action_variance_samples:
+                    if action_total_var is None or not math.isfinite(float(action_total_var)):
+                        raise ValueError("server did not return a finite requested action total variance")
                 timeline.append({
                     "decision_index": len(timeline), "env_step": steps, "eef_position": np.asarray(obs["robot0_eef_pos"]).tolist(),
                     "action_chunk": chunk.tolist(), "acc_raw": acc_raw, "acc": acc_value, "stac_single": stac,
                     "policy_ms": float(response.get("policy_timing", {}).get("infer_ms", float("nan"))),
                     "feature_ms": float(response.get("failure_probe", {}).get("feature_ms", float("nan"))),
                     "probe": response.get("failure_probe", {}),
+                    "action_total_variance": action_total_var,
                 })
                 feature_rows["bridge"].append(bridge)
                 feature_rows["action_expert_final"].append(final)
@@ -167,6 +178,7 @@ def main() -> None:
     parser.add_argument("--source", choices=("clean", "libero_plus"), required=True)
     parser.add_argument("--category")
     parser.add_argument("--configuration-id", type=int)
+    parser.add_argument("--action-variance-samples", type=int, default=0)
     args = parser.parse_args()
     task_suite = benchmark.get_benchmark_dict()[args.suite]()
     if not 0 <= args.task_index < task_suite.n_tasks:
@@ -175,7 +187,7 @@ def main() -> None:
         client=WebsocketClientPolicy(args.host, args.port), task=task_suite.get_task(args.task_index),
         task_index=args.task_index, seed=args.seed, output_dir=args.output_dir, suite=args.suite,
         source=args.source, category=args.category, configuration_id=args.configuration_id,
-        resize_size=args.resize_size,
+        resize_size=args.resize_size, action_variance_samples=args.action_variance_samples,
     )
 
 

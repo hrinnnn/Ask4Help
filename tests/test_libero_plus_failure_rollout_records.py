@@ -23,6 +23,13 @@ def test_acc_and_single_sample_overlap_use_replan_alignment() -> None:
     assert MODULE.single_sample_overlap(previous, current, execute_horizon=1) == pytest.approx(0.0)
 
 
+def test_action_total_variance_is_nonnegative_and_requires_multiple_samples() -> None:
+    candidates = np.array([[[0.0, 1.0]], [[2.0, 1.0]]])
+    assert MODULE.action_total_variance(candidates) == pytest.approx(1.0)
+    with pytest.raises(ValueError, match="samples"):
+        MODULE.action_total_variance(candidates[:1])
+
+
 def test_rollout_io_rejects_misaligned_feature_timelines(tmp_path: Path) -> None:
     episode = {"timeline": [{"decision": 0}, {"decision": 1}]}
     with pytest.raises(ValueError, match="expected 2"):
