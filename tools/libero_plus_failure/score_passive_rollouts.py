@@ -159,7 +159,9 @@ def _metric_summary(records: list[dict[str, Any]], method: str, threshold: float
         return {"episodes": 0}
     fixed = PROTOCOL.fixed_threshold_metrics(PROTOCOL.evaluate_fixed_threshold(rows, threshold=threshold))
     independent = PROTOCOL.threshold_independent_metrics(rows)
-    result = {"episodes": len(rows), **fixed, **independent}
+    # Keep the paper's usual name alongside the implementation's explicit
+    # average-precision name.  They are the same trajectory-level quantity.
+    result = {"episodes": len(rows), **fixed, **independent, "aucpr": independent["average_precision"]}
     for key in ("balanced_accuracy", "weighted_accuracy", "recall", "precision", "f1", "roc_auc", "average_precision", "aucpdt"):
         def metric(sample: list[Mapping[str, Any]], key: str = key) -> float:
             if key in ("roc_auc", "average_precision", "aucpdt"):
@@ -174,8 +176,27 @@ def _metric_summary(records: list[dict[str, Any]], method: str, threshold: float
     return result
 
 
+def _runtime_summary(records: list[dict[str, Any]]) -> dict[str, float | int | None]:
+    """Report policy and extra detector-probe latency from raw trace timing."""
+
+    policy = [value for record in records for value in record["runtime_ms"]["policy"]]
+    feature = [value for record in records for value in record["runtime_ms"]["feature"]]
+    policy_mean = None if not policy else float(np.mean(policy))
+    feature_mean = None if not feature else float(np.mean(feature))
+    total_mean = None if policy_mean is None or feature_mean is None else policy_mean + feature_mean
+    return {
+        "decision_points": len(policy),
+        "policy_mean_ms": policy_mean,
+        "feature_probe_mean_ms": feature_mean,
+        "total_mean_ms": total_mean,
+        "feature_probe_overhead_percent": (
+            None if policy_mean in (None, 0.0) or feature_mean is None else 100.0 * feature_mean / policy_mean
+        ),
+    }
+
+
 def summarize(records: list[dict[str, Any]], thresholds: Mapping[str, Any]) -> dict[str, Any]:
-    result: dict[str, Any] = {"all": {}}
+    result: dict[str, Any] = {"all": {}, "runtime_ms": _runtime_summary(records)}
     for method in ALL_METHODS:
         threshold = 1.0 if method == "vla_fail_final_or_acc" else float(thresholds["thresholds"][method]["threshold"])
         result["all"][method] = _metric_summary(records, method, threshold)
@@ -187,7 +208,7 @@ def summarize(records: list[dict[str, Any]], thresholds: Mapping[str, Any]) -> d
         groups.setdefault("outcome=" + ("success" if record["success"] else "failure"), []).append(record)
     result["groups"] = {}
     for name, subset in sorted(groups.items()):
-        result["groups"][name] = {}
+        result["groups"][name] = {"runtime_ms": _runtime_summary(subset)}
         for method in ALL_METHODS:
             threshold = 1.0 if method == "vla_fail_final_or_acc" else float(thresholds["thresholds"][method]["threshold"])
             result["groups"][name][method] = _metric_summary(subset, method, threshold)

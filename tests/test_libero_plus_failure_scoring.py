@@ -46,3 +46,5 @@ def test_calibration_and_union_annotation_preserve_vla_fail_or_gate() -> None:
     assert annotated[0]["first_alert"]["vla_fail_final_or_acc"] is not None
     summary = MODULE.summarize(annotated, thresholds)
     assert set(summary["all"]) == set(MODULE.ALL_METHODS)
+    assert summary["all"]["bridge_llmd"]["aucpr"] == summary["all"]["bridge_llmd"]["average_precision"]
+    assert summary["runtime_ms"]["decision_points"] == 0
