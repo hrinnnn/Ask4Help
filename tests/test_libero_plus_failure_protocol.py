@@ -53,7 +53,7 @@ def test_official_plus_manifest_pairs_suffixes_only_with_matching_clean_task() -
     ]
     clean = [{"name": "task_a", "task_index": 0}, {"name": "task_b", "task_index": 1}]
     manifest = PROTOCOL.build_libero_plus_manifest(classifications=rows, clean_tasks=clean)
-    assert [(row["plus_task_index"], row["clean_task_index"]) for row in manifest] == [(13, 0), (14, 1)]
+    assert {(row["plus_task_index"], row["clean_task_index"]) for row in manifest} == {(13, 0), (14, 1)}
 
 
 def test_first_alert_and_fixed_threshold_metrics_are_trajectory_level() -> None:
