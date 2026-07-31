@@ -52,7 +52,7 @@ scored_v1/
 3. 用 `fit_reference_assets.py` 从同一个 cache 建立全部主榜 distribution/reference bank。
 4. 用 clean LIBERO client 调用 `run_passive_batch.py --mode calibration`，直到得到严格的 100 条 policy 自身成功轨迹；不足则明确失败，不伪造阈值。
 5. 用 `score_passive_rollouts.py --mode calibrate` 固化 threshold JSON 与 reference assets SHA。
-6. 分别在隔离的 official LIBERO-Plus client 和 clean LIBERO client 上，以同一 official manifest 跑 Plus 扰动与匹配 clean controls。两套环境不能修改彼此的 `LIBERO_CONFIG_PATH` 或 assets。
+6. 分别在隔离的 official LIBERO-Plus client 和 clean LIBERO client 上，以同一 official manifest 跑 Plus 扰动与匹配 clean controls。两套环境不能修改彼此的 `LIBERO_CONFIG_PATH` 或 assets；评测器会兼容原版的 `libero.libero` 与 Plus 的顶层 `libero` 官方包结构。
 7. 离线 replay 已存的 raw features，输出表格、分任务/类别/成功失败分层、bootstrap 95% CI，并用 `render_score_video.py` 输出包含视频、多个分数曲线、阈值与 first alert 的案例。
 
 ## 解释约束

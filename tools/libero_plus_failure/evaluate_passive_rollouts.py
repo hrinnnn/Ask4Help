@@ -18,10 +18,19 @@ from typing import Any, Dict, List
 
 import imageio
 import numpy as np
-from libero.libero import benchmark, get_libero_path
-from libero.libero.envs import OffScreenRenderEnv
 from openpi_client import image_tools
 from openpi_client.websocket_client_policy import WebsocketClientPolicy
+
+# Official LIBERO is packaged as ``libero.libero`` while the official
+# LIBERO-Plus clone exposes the same API directly as ``libero``.  The two are
+# kept in separate client environments; this compatibility import merely
+# selects the installed official package and never modifies either source.
+try:
+    from libero.libero import benchmark, get_libero_path
+    from libero.libero.envs import OffScreenRenderEnv
+except ModuleNotFoundError:
+    from libero import benchmark, get_libero_path
+    from libero.envs import OffScreenRenderEnv
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
