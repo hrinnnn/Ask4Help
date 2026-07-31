@@ -48,3 +48,15 @@ def test_calibration_and_union_annotation_preserve_vla_fail_or_gate() -> None:
     assert set(summary["all"]) == set(MODULE.ALL_METHODS)
     assert summary["all"]["bridge_llmd"]["aucpr"] == summary["all"]["bridge_llmd"]["average_precision"]
     assert summary["runtime_ms"]["decision_points"] == 0
+
+
+def test_action_variance_is_only_calibrated_when_every_success_has_c10_trace() -> None:
+    assets = _assets()
+    records = [_record(index, True) for index in range(5)]
+    records[0]["scores"]["action_total_variance"] = [0.2]
+    thresholds = MODULE.calibrate(records, "asset", required_successes=5)
+    assert "action_total_variance" not in thresholds["thresholds"]
+    for record in records:
+        record["scores"]["action_total_variance"] = [0.2]
+    thresholds = MODULE.calibrate(records, "asset", required_successes=5)
+    assert "action_total_variance" in thresholds["thresholds"]

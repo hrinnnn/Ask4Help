@@ -36,6 +36,7 @@ PROTOCOL = _load(TOOLS / "libero_plus_failure_protocol.py", "libero_plus_failure
 
 BASE_METHODS = ("bridge_llmd", "bridge_deep_knn", "bridge_pca_residual", "final_llmd", "acc", "stac_single")
 ALL_METHODS = BASE_METHODS + ("vla_fail_final_or_acc",)
+OPTIONAL_METHODS = ("action_total_variance",)
 
 
 def sha256(path: Path) -> str:
@@ -78,6 +79,7 @@ def score_one(path: Path, assets: Mapping[str, Any]) -> dict[str, Any]:
             values[name].append(float(value))
     values["acc"] = _optional_trace(timeline, "acc")
     values["stac_single"] = _optional_trace(timeline, "stac_single")
+    values["action_total_variance"] = _optional_trace(timeline, "action_total_variance")
     return {
         "episode_path": str(path),
         "episode_id": path.name,
@@ -94,6 +96,12 @@ def score_one(path: Path, assets: Mapping[str, Any]) -> dict[str, Any]:
         "runtime_ms": {
             "policy": [float(point["policy_ms"]) for point in timeline if math.isfinite(float(point["policy_ms"]))],
             "feature": [float(point["feature_ms"]) for point in timeline if math.isfinite(float(point["feature_ms"]))],
+            "action_variance": [
+                float(point.get("probe", {}).get("action_variance_ms"))
+                for point in timeline
+                if point.get("probe", {}).get("action_variance_ms") is not None
+                and math.isfinite(float(point["probe"]["action_variance_ms"]))
+            ],
         },
     }
 
@@ -106,7 +114,11 @@ def calibrate(records: list[dict[str, Any]], assets_sha: str, required_successes
             "need %d successful clean rollouts with ACC/STAC overlap, found %d" % (required_successes, len(usable))
         )
     selected = usable[:required_successes]
-    traces = {name: [record["scores"][name] for record in selected] for name in BASE_METHODS}
+    methods = list(BASE_METHODS)
+    for name in OPTIONAL_METHODS:
+        if all(record["scores"].get(name, []) for record in selected):
+            methods.append(name)
+    traces = {name: [record["scores"][name] for record in selected] for name in methods}
     thresholds = ASSETS.conformal_thresholds(traces, delta=0.05)
     thresholds.update(
         {
@@ -140,7 +152,7 @@ def annotate(records: list[dict[str, Any]], thresholds: Mapping[str, Any]) -> li
             copied["scores"]["final_llmd"], copied["scores"]["acc"], thresholds
         )
         alerts: dict[str, int | None] = {}
-        for name in BASE_METHODS:
+        for name in thresholds["thresholds"]:
             trace = copied["scores"][name]
             alerts[name] = None if not trace else PROTOCOL.first_alert_index(trace, float(values[name]["threshold"]))
         alerts["vla_fail_final_or_acc"] = PROTOCOL.first_alert_index(copied["scores"]["vla_fail_final_or_acc"], 1.0)
@@ -181,6 +193,7 @@ def _runtime_summary(records: list[dict[str, Any]]) -> dict[str, float | int | N
 
     policy = [value for record in records for value in record["runtime_ms"]["policy"]]
     feature = [value for record in records for value in record["runtime_ms"]["feature"]]
+    variance = [value for record in records for value in record["runtime_ms"].get("action_variance", [])]
     policy_mean = None if not policy else float(np.mean(policy))
     feature_mean = None if not feature else float(np.mean(feature))
     total_mean = None if policy_mean is None or feature_mean is None else policy_mean + feature_mean
@@ -192,12 +205,14 @@ def _runtime_summary(records: list[dict[str, Any]]) -> dict[str, float | int | N
         "feature_probe_overhead_percent": (
             None if policy_mean in (None, 0.0) or feature_mean is None else 100.0 * feature_mean / policy_mean
         ),
+        "action_variance_mean_ms": None if not variance else float(np.mean(variance)),
     }
 
 
 def summarize(records: list[dict[str, Any]], thresholds: Mapping[str, Any]) -> dict[str, Any]:
     result: dict[str, Any] = {"all": {}, "runtime_ms": _runtime_summary(records)}
-    for method in ALL_METHODS:
+    methods = [*thresholds["thresholds"].keys(), "vla_fail_final_or_acc"]
+    for method in methods:
         threshold = 1.0 if method == "vla_fail_final_or_acc" else float(thresholds["thresholds"][method]["threshold"])
         result["all"][method] = _metric_summary(records, method, threshold)
     groups: dict[str, list[dict[str, Any]]] = {}
@@ -209,7 +224,7 @@ def summarize(records: list[dict[str, Any]], thresholds: Mapping[str, Any]) -> d
     result["groups"] = {}
     for name, subset in sorted(groups.items()):
         result["groups"][name] = {"runtime_ms": _runtime_summary(subset)}
-        for method in ALL_METHODS:
+        for method in methods:
             threshold = 1.0 if method == "vla_fail_final_or_acc" else float(thresholds["thresholds"][method]["threshold"])
             result["groups"][name][method] = _metric_summary(subset, method, threshold)
     return result
