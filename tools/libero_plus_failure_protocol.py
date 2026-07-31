@@ -123,10 +123,18 @@ def build_libero_plus_manifest(
         if plus_id in seen_ids:
             raise ValueError(f"duplicate official LIBERO-Plus task id: {plus_id}")
         seen_ids.add(plus_id)
-        base_name = libero_plus_base_task_name(str(row["name"]))
-        if base_name not in by_name:
-            raise ValueError(f"cannot pair LIBERO-Plus task {plus_id} with a clean task: {base_name}")
-        clean = by_name[base_name]
+        plus_name = str(row["name"])
+        # The official layout variants use more than one suffix convention
+        # (for example ``_add_*`` and ``_level*_sample*``).  Match the full
+        # clean task prefix instead of maintaining an incomplete suffix list.
+        matches = [
+            (name, clean)
+            for name, clean in by_name.items()
+            if plus_name == name or plus_name.startswith(name + "_")
+        ]
+        if len(matches) != 1:
+            raise ValueError(f"cannot uniquely pair LIBERO-Plus task {plus_id}: {plus_name}")
+        _base_name, clean = matches[0]
         manifest.append(
             {
                 "plus_task_id": plus_id,
