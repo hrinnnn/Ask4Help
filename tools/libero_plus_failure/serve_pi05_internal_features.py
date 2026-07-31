@@ -157,7 +157,10 @@ def main(args: Args) -> None:
     ordinary = _policy_config.create_trained_policy(config, args.checkpoint)
     policy = InternalFeaturePolicy(
         ordinary._model,
-        rng=ordinary._rng,
+        # Upstream Policy currently evaluates ``rng or key(0)``; an explicit
+        # JAX key has no boolean truth value. Passing None preserves its normal
+        # deterministic seed-0 initialization.
+        rng=None,
         transforms=(),
         output_transforms=(),
         sample_kwargs=ordinary._sample_kwargs,
