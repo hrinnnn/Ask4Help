@@ -68,7 +68,9 @@ def get_env(task: Any, seed: int) -> tuple[Any, str]:
     task_description = str(task.language)
     bddl_file = Path(get_libero_path("bddl_files")) / task.problem_folder / task.bddl_file
     env = OffScreenRenderEnv(
-        bddl_file_name=bddl_file, camera_heights=RESOLUTION, camera_widths=RESOLUTION
+        # Original LIBERO accepts Path, while official LIBERO-Plus parses this
+        # value as a string to decode its perturbation suffixes.
+        bddl_file_name=str(bddl_file), camera_heights=RESOLUTION, camera_widths=RESOLUTION
     )
     env.seed(seed)
     return env, task_description
