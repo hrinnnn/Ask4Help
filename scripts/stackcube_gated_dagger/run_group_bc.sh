@@ -19,7 +19,13 @@ GLOBAL_BATCH_SIZE=${GLOBAL_BATCH_SIZE:-64}
 RESUME_DIR=${RESUME_DIR:-}
 
 unset CUDA_VISIBLE_DEVICES
-export RAY_ADDRESS=""
+# Leave RAY_ADDRESS empty for the first local job, or set it to `auto` for a
+# second independently placed job on the same Ray cluster.
+if [[ -n "${RAY_ADDRESS:-}" ]]; then
+  export RAY_ADDRESS
+else
+  unset RAY_ADDRESS
+fi
 export ASK4HELP_RLINF_PLACEMENT="${GPU_ID}-${GPU_ID}"
 export EMBODIED_PATH="${RLINF_ROOT}/examples/sft"
 export PYTHONPATH="${RLINF_ROOT}:${PYTHONPATH:-}"
