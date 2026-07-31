@@ -52,7 +52,9 @@ class ProbeSpec:
     """Immutable probe contract saved with every rollout."""
 
     action_horizon: int = 10
-    action_dim: int = 7
+    # The LIBERO control API exposes seven values, but pi05_libero pads them
+    # to the model's native 32-dimensional Action Expert input.
+    action_dim: int = 32
     feature_seed: int = 20260731
     flow_timestep: float = 1.0
 
