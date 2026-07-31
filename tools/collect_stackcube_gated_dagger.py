@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Collect equal-label StackCube oracle and detector-gated BC datasets.
+"""Collect StackCube oracle and detector-gated BC datasets.
 
-The raw archive retains every attempted rollout.  The LeRobot training dataset
-contains only the latching expert suffix, truncated on 10-step boundaries so
-all experiment groups receive exactly the same number of action labels.
+The raw archive retains every attempted rollout.  For an accepted successful
+expert intervention, the LeRobot dataset retains *every* expert action from
+the latch through task completion.  The SFT loader is responsible for drawing
+only valid 10-step anchors; collection must never discard the terminal motion
+just to align an episode length to the action horizon.
 """
 
 from __future__ import annotations
@@ -57,7 +59,17 @@ class ExpertSuffix:
     action_count: int
 
     @property
+    def valid_10_step_anchors(self) -> int:
+        """Number of in-episode starts with a fully real 10-step target."""
+        return max(0, self.action_count - CHUNK_LABEL_HORIZON + 1)
+
+    @property
+    def has_full_horizon(self) -> bool:
+        return self.valid_10_step_anchors > 0
+
+    @property
     def trainable_chunks(self) -> int:
+        """Legacy non-overlapping count used only for historical cost reports."""
         return self.action_count // CHUNK_LABEL_HORIZON
 
 
@@ -82,7 +94,12 @@ def alternating_split(attempt_index: int) -> str:
 
 
 def selected_suffix_steps(suffix: ExpertSuffix, remaining_chunks: int) -> int:
-    """Return the exact, non-overlapping 10-step label budget admitted from a suffix."""
+    """Return a legacy capped action budget for old chunk-quota experiments.
+
+    New successful-trajectory collection does not use this helper: retaining a
+    suffix must retain its terminal actions even when its length is not a
+    multiple of ``CHUNK_LABEL_HORIZON``.
+    """
 
     if suffix.start is None or remaining_chunks <= 0:
         return 0
@@ -92,15 +109,17 @@ def selected_suffix_steps(suffix: ExpertSuffix, remaining_chunks: int) -> int:
 def admitted_suffix_steps(
     suffix: ExpertSuffix, *, remaining_chunks: int, fixed_episode_collection: bool
 ) -> int:
-    """Keep every complete suffix chunk for fixed-rollout DAgger collection."""
+    """Keep the complete expert suffix whenever it has one valid anchor."""
+    if suffix.start is None or not suffix.has_full_horizon:
+        return 0
     if fixed_episode_collection:
-        return suffix.trainable_chunks * CHUNK_LABEL_HORIZON
+        return suffix.action_count
     return selected_suffix_steps(suffix, remaining_chunks)
 
 
 def is_successful_expert_trajectory(suffix: ExpertSuffix, *, success: bool) -> bool:
     """A gated demonstration is usable only after a successful full expert chunk."""
-    return bool(success and suffix.start is not None and suffix.trainable_chunks > 0)
+    return bool(success and suffix.start is not None and suffix.has_full_horizon)
 
 
 def should_latch_expert(
@@ -388,11 +407,13 @@ def main() -> None:
             if offline:
                 suffix = ExpertSuffix(start=0, action_count=len(actions))
                 admitted_steps = (
-                    suffix.trainable_chunks * CHUNK_LABEL_HORIZON if row["success"] else 0
+                    suffix.action_count
+                    if row["success"] and suffix.has_full_horizon
+                    else 0
                 )
             elif successful_expert_target is not None:
                 admitted_steps = (
-                    suffix.trainable_chunks * CHUNK_LABEL_HORIZON
+                    suffix.action_count
                     if is_successful_expert_trajectory(suffix, success=bool(row["success"]))
                     else 0
                 )
@@ -403,6 +424,10 @@ def main() -> None:
                     fixed_episode_collection=args.gated_fixed_episodes,
                 )
             row["admitted_expert_action_steps"] = admitted_steps
+            row["admitted_expert_valid_10_step_anchors"] = max(
+                0, admitted_steps - CHUNK_LABEL_HORIZON + 1
+            )
+            # Retained for compatibility with previous experiment summaries.
             row["admitted_expert_10_step_chunks"] = admitted_steps // CHUNK_LABEL_HORIZON
             row["accepted_successful_expert_trajectory"] = bool(
                 successful_expert_target is not None and admitted_steps > 0
@@ -427,7 +452,21 @@ def main() -> None:
                 for frame in label_frames:
                     dataset.add_frame(frame)
                 dataset.save_episode()
-                train_rows.append({"dataset_episode_index": len(train_rows), "raw_episode_index": row["episode_index"], "seed": seed, "split": split, "start_step": begin, "action_steps": admitted_steps, "ten_step_chunks": admitted_steps // CHUNK_LABEL_HORIZON})
+                train_rows.append(
+                    {
+                        "dataset_episode_index": len(train_rows),
+                        "raw_episode_index": row["episode_index"],
+                        "seed": seed,
+                        "split": split,
+                        "start_step": begin,
+                        "action_steps": admitted_steps,
+                        "valid_10_step_anchors": max(
+                            0, admitted_steps - CHUNK_LABEL_HORIZON + 1
+                        ),
+                        "non_overlapping_10_step_chunks": admitted_steps
+                        // CHUNK_LABEL_HORIZON,
+                    }
+                )
             if successful_expert_target is not None and admitted_steps:
                 successful_expert_collected += 1
                 collected[split] += 1
@@ -459,7 +498,11 @@ def main() -> None:
         # Fixed-rollout collection measures both task success and the natural
         # expert-query cost.  Its training budget is derived after collection.
         budget = {
-            split: sum(row["action_steps"] // CHUNK_LABEL_HORIZON for row in train_rows if row["split"] == split)
+            split: sum(
+                row["valid_10_step_anchors"]
+                for row in train_rows
+                if row["split"] == split
+            )
             for split in ("id", "ood")
         }
     else:

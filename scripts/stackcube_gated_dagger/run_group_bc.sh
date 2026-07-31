@@ -40,6 +40,8 @@ fi
   actor.seed="${SEED}" \
   "data.train_data_paths=[{dataset_path:${ID_REPLAY},weight:1.0},{dataset_path:${NEW_EXPERT_DATASET},weight:1.0}]" \
   +data.openpi_source_balanced=true \
+  +data.openpi_exclude_padded_action_targets=true \
+  +data.openpi_valid_action_horizon=10 \
   actor.model.model_path="${BASE_CHECKPOINT}" \
   actor.model.openpi_data.norm_stats_path="${NORM_STATS}" \
   awbc.enabled=false \

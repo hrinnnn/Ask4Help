@@ -45,22 +45,33 @@ def test_collection_gate_semantics_are_latched_at_the_specified_boundary():
     )
 
 
-def test_only_complete_ten_step_expert_suffix_is_admitted():
+def test_successful_suffix_retains_terminal_actions_and_counts_valid_anchors():
     suffix = MODULE.ExpertSuffix(start=50, action_count=29)
     assert suffix.trainable_chunks == 2
+    assert suffix.valid_10_step_anchors == 20
+    assert suffix.has_full_horizon
     assert MODULE.selected_suffix_steps(suffix, remaining_chunks=1) == 10
     assert MODULE.selected_suffix_steps(suffix, remaining_chunks=5) == 20
     assert MODULE.selected_suffix_steps(MODULE.ExpertSuffix(None, 0), 2) == 0
 
 
-def test_fixed_rollout_collection_keeps_all_complete_expert_suffix_chunks():
+def test_fixed_rollout_collection_keeps_every_terminal_expert_action():
     suffix = MODULE.ExpertSuffix(start=50, action_count=29)
     assert MODULE.admitted_suffix_steps(
         suffix, remaining_chunks=1, fixed_episode_collection=True
-    ) == 20
+    ) == 29
     assert MODULE.admitted_suffix_steps(
         suffix, remaining_chunks=1, fixed_episode_collection=False
     ) == 10
+
+
+def test_suffix_shorter_than_horizon_is_not_admitted():
+    suffix = MODULE.ExpertSuffix(start=50, action_count=9)
+    assert suffix.valid_10_step_anchors == 0
+    assert not suffix.has_full_horizon
+    assert MODULE.admitted_suffix_steps(
+        suffix, remaining_chunks=10, fixed_episode_collection=True
+    ) == 0
 
 
 def test_bridge_knn_uses_persisted_k10_detector_name():
