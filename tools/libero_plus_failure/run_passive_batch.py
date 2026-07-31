@@ -93,6 +93,7 @@ def evaluator_command(args: argparse.Namespace, row: Mapping[str, Any], output_d
         "--host", args.host,
         "--port", str(args.port),
         "--resize-size", str(args.resize_size),
+        "--render-gpu-device-id", str(args.render_gpu_device_id),
         "--source", args.source,
     ]
     if row.get("category") is not None:
@@ -158,6 +159,7 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8011)
     parser.add_argument("--resize-size", type=int, default=224)
+    parser.add_argument("--render-gpu-device-id", type=int, default=1)
     parser.add_argument("--required-successes", type=int, default=100)
     parser.add_argument("--max-attempts", type=int, default=300)
     parser.add_argument("--task-count", type=int, default=10)
