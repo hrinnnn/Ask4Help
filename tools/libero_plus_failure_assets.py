@@ -10,6 +10,7 @@ the passive evaluator later queries.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -18,20 +19,24 @@ from typing import Any, Mapping
 import torch
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "RLinf")]
+_VLA_FAIL_PATH = ROOT / "RLinf" / "rlinf" / "algorithms" / "vla_fail.py"
+_VLA_FAIL_SPEC = importlib.util.spec_from_file_location("ask4help_vla_fail_core", _VLA_FAIL_PATH)
+if _VLA_FAIL_SPEC is None or _VLA_FAIL_SPEC.loader is None:
+    raise ImportError(f"cannot load standalone VLA-FAIL core from {_VLA_FAIL_PATH}")
+_VLA_FAIL = importlib.util.module_from_spec(_VLA_FAIL_SPEC)
+sys.modules[_VLA_FAIL_SPEC.name] = _VLA_FAIL
+_VLA_FAIL_SPEC.loader.exec_module(_VLA_FAIL)
 
-from rlinf.algorithms.vla_fail import (  # noqa: E402
-    KNNStatistics,
-    LLMDStatistics,
-    PCAResidualStatistics,
-    constant_split_conformal_threshold,
-    fit_knn_statistics,
-    fit_llmd_statistics,
-    fit_pca_residual_statistics,
-    knn_score,
-    llmd_score,
-    pca_residual_score,
-)
+KNNStatistics = _VLA_FAIL.KNNStatistics
+LLMDStatistics = _VLA_FAIL.LLMDStatistics
+PCAResidualStatistics = _VLA_FAIL.PCAResidualStatistics
+constant_split_conformal_threshold = _VLA_FAIL.constant_split_conformal_threshold
+fit_knn_statistics = _VLA_FAIL.fit_knn_statistics
+fit_llmd_statistics = _VLA_FAIL.fit_llmd_statistics
+fit_pca_residual_statistics = _VLA_FAIL.fit_pca_residual_statistics
+knn_score = _VLA_FAIL.knn_score
+llmd_score = _VLA_FAIL.llmd_score
+pca_residual_score = _VLA_FAIL.pca_residual_score
 
 
 FEATURE_KEYS = ("bridge", "action_expert_final")
