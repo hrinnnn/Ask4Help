@@ -1,0 +1,36 @@
+{
+  "format": "libero_plus_failure_calibration_spec_v1",
+  "calibration_id": "libero10_pi05_clean_policy_q95_n42_lightweight_v1",
+  "qualifier": "lightweight: 42 clean policy-success trajectories; use a 100-trajectory calibration for a strict leaderboard.",
+  "threshold_bundle_sha256": "7e5830b1772a28f376747c02ecccd6c0a247d898e8764e3aaf6c8553c247b43e",
+  "reference_assets_sha256": "15193b3ca52278bcfa7467f257e27ce048264a296c29d48f8928876fd9ed9af6",
+  "policy_checkpoint": "/data/zhaozhixuan/libero_pi05_eval/models/openpi/openpi-assets/checkpoints/pi05_libero",
+  "calibration_source": "clean_policy_success_only",
+  "successful_policy_rollouts": 42,
+  "selection": {
+    "suite": "libero_10",
+    "seed_schedule": "100000 + attempt_index",
+    "attempt_indices": "0-3,5-42",
+    "task_index": "attempt_index modulo 10"
+  },
+  "protocol": {
+    "conformal_delta": 0.05,
+    "order_statistic_rank": 41,
+    "score_aggregation": "maximum decision-point score per successful trajectory",
+    "action_horizon": 10,
+    "execute_horizon": 5,
+    "alert_rule": "alert at the first score greater than or equal to the detector threshold"
+  },
+  "thresholds": {
+    "bridge_llmd": 1441411.25,
+    "bridge_deep_knn": 0.04682111740112305,
+    "bridge_pca_residual": 1.1973240375518799,
+    "final_llmd": 10049.9091796875,
+    "acc": 12.285397684770299,
+    "stac_single": 6.138864617850722
+  },
+  "vla_fail_final_or_acc": {
+    "rule": "final_llmd >= final_llmd_threshold OR acc >= acc_threshold",
+    "normalized_threshold": 1.0
+  }
+}

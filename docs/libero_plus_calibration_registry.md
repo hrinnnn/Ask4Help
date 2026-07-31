@@ -18,3 +18,9 @@ changes.
 The initial LIBERO-10 bundle is deliberately named `lightweight`: it uses 42
 clean policy-success trajectories at `q=0.95`, not the planned 100-trajectory
 strict calibration. Results using it must retain that qualifier.
+
+The small, versioned reproduction spec is also tracked in Git at
+`configs/calibrations/libero10_pi05_clean_policy_q95_n42_lightweight_v1.json`.
+It records every threshold, the compatible feature-bank SHA, policy checkpoint,
+and the exact successful calibration-attempt schedule. The full registry bundle
+remains a runtime artifact because it includes the selected rollout paths.
