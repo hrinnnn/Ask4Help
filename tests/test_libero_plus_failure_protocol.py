@@ -56,6 +56,22 @@ def test_official_plus_manifest_pairs_suffixes_only_with_matching_clean_task() -
     assert {(row["plus_task_index"], row["clean_task_index"]) for row in manifest} == {(13, 0), (14, 1)}
 
 
+def test_official_plus_manifest_can_select_one_category_at_one_difficulty() -> None:
+    rows = [
+        {"id": 1, "name": "task_a_view_easy", "category": "Camera Viewpoints", "difficulty_level": 2},
+        {"id": 2, "name": "task_a_view_hard", "category": "Camera Viewpoints", "difficulty_level": 5},
+        {"id": 3, "name": "task_a_add_hard", "category": "Objects Layout", "difficulty_level": 5},
+    ]
+    manifest = PROTOCOL.build_libero_plus_manifest(
+        classifications=rows,
+        clean_tasks=[{"name": "task_a", "task_index": 0}],
+        categories=["Camera Viewpoints"],
+        min_difficulty_level=5,
+        max_difficulty_level=5,
+    )
+    assert [row["plus_task_id"] for row in manifest] == [2]
+
+
 def test_first_alert_and_fixed_threshold_metrics_are_trajectory_level() -> None:
     episodes = [
         {"episode_id": "success", "success": True, "scores": [0.1, 0.2, 0.3]},

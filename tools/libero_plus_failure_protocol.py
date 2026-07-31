@@ -99,6 +99,8 @@ def build_libero_plus_manifest(
     classifications: Sequence[Mapping[str, Any]],
     clean_tasks: Sequence[Mapping[str, Any]],
     categories: Sequence[str] = ("Camera Viewpoints", "Robot Initial States", "Objects Layout"),
+    min_difficulty_level: int | None = None,
+    max_difficulty_level: int | None = None,
 ) -> list[dict[str, Any]]:
     """Pair every official selected perturbation with exactly one clean task.
 
@@ -106,6 +108,17 @@ def build_libero_plus_manifest(
     zero-based ``task_index``.  Ambiguous or unmatched official variants are
     rejected rather than silently paired to the wrong task.
     """
+
+    if min_difficulty_level is not None and min_difficulty_level < 1:
+        raise ValueError("min_difficulty_level must be positive")
+    if max_difficulty_level is not None and max_difficulty_level < 1:
+        raise ValueError("max_difficulty_level must be positive")
+    if (
+        min_difficulty_level is not None
+        and max_difficulty_level is not None
+        and min_difficulty_level > max_difficulty_level
+    ):
+        raise ValueError("min_difficulty_level cannot exceed max_difficulty_level")
 
     allowed = set(categories)
     by_name: dict[str, Mapping[str, Any]] = {}
@@ -118,6 +131,11 @@ def build_libero_plus_manifest(
     seen_ids: set[int] = set()
     for row in classifications:
         if str(row.get("category")) not in allowed:
+            continue
+        difficulty_level = int(row["difficulty_level"])
+        if min_difficulty_level is not None and difficulty_level < min_difficulty_level:
+            continue
+        if max_difficulty_level is not None and difficulty_level > max_difficulty_level:
             continue
         plus_id = int(row["id"])
         if plus_id in seen_ids:
@@ -141,7 +159,7 @@ def build_libero_plus_manifest(
                 "plus_task_index": plus_id - 1,
                 "plus_task_name": str(row["name"]),
                 "category": str(row["category"]),
-                "difficulty_level": int(row["difficulty_level"]),
+                "difficulty_level": difficulty_level,
                 "clean_task_index": int(clean["task_index"]),
                 "clean_task_name": str(clean["name"]),
             }

@@ -28,6 +28,9 @@ def main() -> None:
     parser.add_argument("--clean-tasks", type=Path, required=True, help="JSON list from the unmodified LIBERO-10 install")
     parser.add_argument("--suite", default="libero_10")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--categories", nargs="+", default=["Camera Viewpoints", "Robot Initial States", "Objects Layout"])
+    parser.add_argument("--min-difficulty-level", type=int)
+    parser.add_argument("--max-difficulty-level", type=int)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError("refusing to overwrite " + str(args.output))
@@ -35,11 +38,19 @@ def main() -> None:
     clean = json.loads(args.clean_tasks.read_text(encoding="utf-8"))
     if args.suite not in classifications:
         raise KeyError("classification has no suite " + args.suite)
-    rows = build_libero_plus_manifest(classifications=classifications[args.suite], clean_tasks=clean)
+    rows = build_libero_plus_manifest(
+        classifications=classifications[args.suite],
+        clean_tasks=clean,
+        categories=args.categories,
+        min_difficulty_level=args.min_difficulty_level,
+        max_difficulty_level=args.max_difficulty_level,
+    )
     payload = {
         "format": "libero_plus_failure_task_manifest_v1",
         "suite": args.suite,
-        "categories": ["Camera Viewpoints", "Robot Initial States", "Objects Layout"],
+        "categories": args.categories,
+        "min_difficulty_level": args.min_difficulty_level,
+        "max_difficulty_level": args.max_difficulty_level,
         "classification": str(args.classification),
         "classification_sha256": sha256(args.classification),
         "clean_tasks": str(args.clean_tasks),
