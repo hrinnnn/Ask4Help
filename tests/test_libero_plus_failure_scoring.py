@@ -79,7 +79,7 @@ def test_reference_asset_loading_falls_back_for_legacy_torch(monkeypatch) -> Non
 
 
 def test_joint_bootstrap_matches_individual_metric_bootstraps() -> None:
-    rows = [_record(index, index % 2 == 0) for index in range(8)]
+    rows = MODULE._protocol_records([_record(index, index % 2 == 0) for index in range(8)], "bridge_llmd", 3.5)
     threshold = 3.5
     intervals = MODULE.bootstrap_metric_intervals(rows, threshold=threshold, seed=9, samples=25)
     for key in MODULE.BOOTSTRAP_METRICS:
