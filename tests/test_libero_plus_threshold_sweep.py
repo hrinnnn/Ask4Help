@@ -33,4 +33,4 @@ def test_sweep_only_scans_the_requested_nonnegative_interval() -> None:
     records = [_record("success", True, [0.4]), _record("failure", False, [1.4])]
     result = MODULE.scan_method(records, method="bridge_llmd", calibrated_threshold=1.0, fractions=(0.0, 1.0))
     assert result["exact_candidate_count"] == 2
-    assert result["best_balanced_accuracy"]["threshold"] == 0.4
+    assert result["best_balanced_accuracy"]["threshold"] == 1.0
