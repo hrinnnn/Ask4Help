@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import io
 import json
+import shutil
 import sys
 import urllib.request
 from pathlib import Path
@@ -50,7 +51,9 @@ def ensure_download(dataset_root: Path, episode_index: int) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     relative = "data/chunk-%03d/episode_%06d.parquet" % (episode_index // 1000, episode_index)
     partial = destination.with_suffix(".partial")
-    urllib.request.urlretrieve(HF_MIRROR + relative + "?download=true", partial)
+    with urllib.request.urlopen(HF_MIRROR + relative + "?download=true", timeout=120) as response:
+        with partial.open("wb") as handle:
+            shutil.copyfileobj(response, handle)
     partial.replace(destination)
     return destination
 
