@@ -45,6 +45,17 @@ def test_expert_selection_rejects_short_or_unbalanced_inputs() -> None:
         PROTOCOL.select_expert_anchors([_expert("task", "only", 2)] * 2, demos_per_task=2, anchors_per_demo=3, seed=0)
 
 
+def test_official_plus_manifest_pairs_suffixes_only_with_matching_clean_task() -> None:
+    rows = [
+        {"id": 14, "name": "task_a_view_0_0_100_0_0_initstate_1", "category": "Robot Initial States", "difficulty_level": 2},
+        {"id": 15, "name": "task_b_add_3", "category": "Objects Layout", "difficulty_level": 1},
+        {"id": 16, "name": "task_a_language_paraphrase", "category": "Language Instructions", "difficulty_level": 1},
+    ]
+    clean = [{"name": "task_a", "task_index": 0}, {"name": "task_b", "task_index": 1}]
+    manifest = PROTOCOL.build_libero_plus_manifest(classifications=rows, clean_tasks=clean)
+    assert [(row["plus_task_index"], row["clean_task_index"]) for row in manifest] == [(13, 0), (14, 1)]
+
+
 def test_first_alert_and_fixed_threshold_metrics_are_trajectory_level() -> None:
     episodes = [
         {"episode_id": "success", "success": True, "scores": [0.1, 0.2, 0.3]},

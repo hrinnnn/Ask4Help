@@ -21,6 +21,7 @@ import hashlib
 import logging
 import socket
 import time
+import types
 from pathlib import Path
 from typing import Any
 
@@ -59,6 +60,30 @@ class ProbeSpec:
     flow_timestep: float = 1.0
 
 
+def _model_probe_features(
+    model: Any, observation: _model.Observation, fixed_prior: jax.Array, flow_timestep: jax.Array
+) -> dict[str, jax.Array]:
+    """One PaliGemma forward; bound to the NNX model before module_jit."""
+    observation = _model.preprocess_observation(None, observation, train=False)
+    batch_size = observation.state.shape[0]
+    noisy_actions = jnp.broadcast_to(fixed_prior, (batch_size,) + fixed_prior.shape[1:])
+    timestep = jnp.full((batch_size,), flow_timestep, dtype=jnp.float32)
+    prefix_tokens, prefix_mask, prefix_ar_mask = model.embed_prefix(observation)
+    suffix_tokens, suffix_mask, suffix_ar_mask, adarms_cond = model.embed_suffix(observation, noisy_actions, timestep)
+    input_mask = jnp.concatenate([prefix_mask, suffix_mask], axis=1)
+    ar_mask = jnp.concatenate([prefix_ar_mask, suffix_ar_mask], axis=0)
+    attention_mask = make_attn_mask(input_mask, ar_mask)
+    positions = jnp.cumsum(input_mask, axis=1) - 1
+    (prefix_out, suffix_out), _ = model.PaliGemma.llm(
+        [prefix_tokens, suffix_tokens], mask=attention_mask, positions=positions, adarms_cond=[None, adarms_cond]
+    )
+    if prefix_out is None or suffix_out is None:
+        raise RuntimeError("PaliGemma probe unexpectedly returned an empty segment")
+    valid = prefix_mask.astype(prefix_out.dtype)[..., None]
+    bridge = (prefix_out * valid).sum(axis=1, keepdims=True) / valid.sum(axis=1, keepdims=True)
+    return {"bridge": bridge, "action_expert_final": suffix_out[:, -model.action_horizon :]}
+
+
 class InternalFeaturePolicy(_policy.Policy):
     """Official policy with one deterministic, input-only feature forward."""
 
@@ -77,36 +102,8 @@ class InternalFeaturePolicy(_policy.Policy):
         self._fixed_prior = jax.random.normal(
             key, (1, probe_spec.action_horizon, probe_spec.action_dim), dtype=jnp.float32
         )
-        self._probe_features = nnx_utils.module_jit(self._probe_features_impl)
-
-    def _probe_features_impl(self, observation: _model.Observation) -> dict[str, jax.Array]:
-        """Return bridge and final expert features in one PaliGemma forward."""
-        model = self._model
-        observation = _model.preprocess_observation(None, observation, train=False)
-        batch_size = observation.state.shape[0]
-        noisy_actions = jnp.broadcast_to(self._fixed_prior, (batch_size,) + self._fixed_prior.shape[1:])
-        timestep = jnp.full((batch_size,), self._probe_spec.flow_timestep, dtype=jnp.float32)
-
-        prefix_tokens, prefix_mask, prefix_ar_mask = model.embed_prefix(observation)
-        suffix_tokens, suffix_mask, suffix_ar_mask, adarms_cond = model.embed_suffix(
-            observation, noisy_actions, timestep
-        )
-        input_mask = jnp.concatenate([prefix_mask, suffix_mask], axis=1)
-        ar_mask = jnp.concatenate([prefix_ar_mask, suffix_ar_mask], axis=0)
-        attention_mask = make_attn_mask(input_mask, ar_mask)
-        positions = jnp.cumsum(input_mask, axis=1) - 1
-        (prefix_out, suffix_out), _ = model.PaliGemma.llm(
-            [prefix_tokens, suffix_tokens],
-            mask=attention_mask,
-            positions=positions,
-            adarms_cond=[None, adarms_cond],
-        )
-        if prefix_out is None or suffix_out is None:
-            raise RuntimeError("PaliGemma probe unexpectedly returned an empty segment")
-        valid = prefix_mask.astype(prefix_out.dtype)[..., None]
-        bridge = (prefix_out * valid).sum(axis=1, keepdims=True) / valid.sum(axis=1, keepdims=True)
-        action_final = suffix_out[:, -model.action_horizon :]
-        return {"bridge": bridge, "action_expert_final": action_final}
+        model_probe_method = types.MethodType(_model_probe_features, model)
+        self._probe_features = nnx_utils.module_jit(model_probe_method)
 
     def infer(self, obs: dict, *, noise: np.ndarray | None = None) -> dict:  # type: ignore[override]
         # This is intentionally kept equivalent to upstream Policy.infer.
@@ -124,7 +121,7 @@ class InternalFeaturePolicy(_policy.Policy):
         actions = self._sample_actions(sample_rng, observation, **sample_kwargs)
         action_ms = (time.monotonic() - start) * 1000.0
         probe_start = time.monotonic()
-        features = self._probe_features(observation)
+        features = self._probe_features(observation, self._fixed_prior, jnp.asarray(self._probe_spec.flow_timestep))
         probe_ms = (time.monotonic() - probe_start) * 1000.0
 
         outputs = jax.tree.map(lambda x: np.asarray(x[0, ...]), {"state": inputs["state"], "actions": actions})

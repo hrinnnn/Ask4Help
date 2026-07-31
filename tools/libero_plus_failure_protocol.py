@@ -80,6 +80,69 @@ def select_expert_anchors(
     return selected
 
 
+def libero_plus_base_task_name(task_name: str) -> str:
+    """Remove the official perturbation suffix without guessing task identity.
+
+    LIBERO-Plus records Camera/Robot variants as ``..._view_*`` and layout
+    variants as ``..._add_*``.  The stable prefix is the only legal key for
+    pairing a Plus configuration with its clean LIBERO-10 task.
+    """
+
+    for marker in ("_view_", "_add_"):
+        if marker in task_name:
+            return task_name.split(marker, 1)[0]
+    return task_name
+
+
+def build_libero_plus_manifest(
+    *,
+    classifications: Sequence[Mapping[str, Any]],
+    clean_tasks: Sequence[Mapping[str, Any]],
+    categories: Sequence[str] = ("Camera Viewpoints", "Robot Initial States", "Objects Layout"),
+) -> list[dict[str, Any]]:
+    """Pair every official selected perturbation with exactly one clean task.
+
+    The caller supplies clean task rows with a canonical ``name`` and a
+    zero-based ``task_index``.  Ambiguous or unmatched official variants are
+    rejected rather than silently paired to the wrong task.
+    """
+
+    allowed = set(categories)
+    by_name: dict[str, Mapping[str, Any]] = {}
+    for clean in clean_tasks:
+        name = libero_plus_base_task_name(str(clean["name"]))
+        if name in by_name:
+            raise ValueError(f"duplicate clean LIBERO task name: {name}")
+        by_name[name] = clean
+    manifest: list[dict[str, Any]] = []
+    seen_ids: set[int] = set()
+    for row in classifications:
+        if str(row.get("category")) not in allowed:
+            continue
+        plus_id = int(row["id"])
+        if plus_id in seen_ids:
+            raise ValueError(f"duplicate official LIBERO-Plus task id: {plus_id}")
+        seen_ids.add(plus_id)
+        base_name = libero_plus_base_task_name(str(row["name"]))
+        if base_name not in by_name:
+            raise ValueError(f"cannot pair LIBERO-Plus task {plus_id} with a clean task: {base_name}")
+        clean = by_name[base_name]
+        manifest.append(
+            {
+                "plus_task_id": plus_id,
+                "plus_task_index": plus_id - 1,
+                "plus_task_name": str(row["name"]),
+                "category": str(row["category"]),
+                "difficulty_level": int(row["difficulty_level"]),
+                "clean_task_index": int(clean["task_index"]),
+                "clean_task_name": str(clean["name"]),
+            }
+        )
+    if not manifest:
+        raise ValueError("no official LIBERO-Plus tasks match the requested categories")
+    return sorted(manifest, key=lambda row: (row["category"], row["plus_task_id"]))
+
+
 def action_chunk_to_absolute_eef(action_chunk: np.ndarray, current_eef_position: np.ndarray) -> np.ndarray:
     """Convert LIBERO delta-position actions into chunk-wise absolute EEF points."""
 
