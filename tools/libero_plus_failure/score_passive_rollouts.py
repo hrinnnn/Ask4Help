@@ -45,7 +45,6 @@ BOOTSTRAP_METRICS = (
     "f1",
     "roc_auc",
     "average_precision",
-    "aucpdt",
 )
 
 
@@ -197,7 +196,9 @@ def bootstrap_metric_intervals(
     Since every invocation used the same seed, those calls generated identical
     resamples yet repeated AUCPDT (the expensive metric) eight times.  This is
     mathematically equivalent, while evaluating fixed and threshold-free
-    metrics once per resample.
+    metrics once per resample.  AUCPDT itself remains an exact point estimate;
+    its bootstrap CI is intentionally omitted because its nested
+    threshold-by-time scan would dominate the whole leaderboard runtime.
     """
 
     if samples < 1:
@@ -208,8 +209,13 @@ def bootstrap_metric_intervals(
         indices = rng.integers(0, len(rows), size=len(rows))
         sample = [rows[int(index)] for index in indices]
         fixed = PROTOCOL.fixed_threshold_metrics(PROTOCOL.evaluate_fixed_threshold(sample, threshold=threshold))
-        independent = PROTOCOL.threshold_independent_metrics(sample)
-        combined = {**fixed, **independent}
+        labels = [not bool(record["success"]) for record in sample]
+        scores = [float(max(record["scores"])) for record in sample]
+        combined = {
+            **fixed,
+            "roc_auc": PROTOCOL.roc_auc(labels, scores),
+            "average_precision": PROTOCOL.average_precision(labels, scores),
+        }
         for key in BOOTSTRAP_METRICS:
             value = combined.get(key)
             if value is not None and math.isfinite(float(value)):
@@ -232,6 +238,7 @@ def _metric_summary(records: list[dict[str, Any]], method: str, threshold: float
     intervals = bootstrap_metric_intervals(rows, threshold=threshold, seed=20260731, samples=1000)
     for key, interval in intervals.items():
         result[key + "_bootstrap_95_ci"] = interval
+    result["aucpdt_bootstrap_95_ci"] = None
     return result
 
 

@@ -87,7 +87,12 @@ def test_joint_bootstrap_matches_individual_metric_bootstraps() -> None:
             fixed = MODULE.PROTOCOL.fixed_threshold_metrics(
                 MODULE.PROTOCOL.evaluate_fixed_threshold(sample, threshold=threshold)
             )
-            independent = MODULE.PROTOCOL.threshold_independent_metrics(sample)
+            labels = [not bool(record["success"]) for record in sample]
+            scores = [float(max(record["scores"])) for record in sample]
+            independent = {
+                "roc_auc": MODULE.PROTOCOL.roc_auc(labels, scores),
+                "average_precision": MODULE.PROTOCOL.average_precision(labels, scores),
+            }
             value = ({**fixed, **independent})[key]
             return float("nan") if value is None else float(value)
 
