@@ -16,7 +16,17 @@ OUTPUT_DIR=${OUTPUT_DIR:?Set OUTPUT_DIR}
 MAX_STEPS=${MAX_STEPS:-500}
 SAVE_INTERVAL=${SAVE_INTERVAL:-250}
 GLOBAL_BATCH_SIZE=${GLOBAL_BATCH_SIZE:-64}
+MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-4}
 RESUME_DIR=${RESUME_DIR:-}
+
+if (( MICRO_BATCH_SIZE <= 0 || MICRO_BATCH_SIZE % 2 != 0 )); then
+  echo "MICRO_BATCH_SIZE must be a positive even number for 1:1 source-balanced batches" >&2
+  exit 2
+fi
+if (( GLOBAL_BATCH_SIZE <= 0 || GLOBAL_BATCH_SIZE % MICRO_BATCH_SIZE != 0 )); then
+  echo "GLOBAL_BATCH_SIZE must be divisible by MICRO_BATCH_SIZE" >&2
+  exit 2
+fi
 
 unset CUDA_VISIBLE_DEVICES
 # Leave RAY_ADDRESS empty for the first local job, or set it to `auto` for a
@@ -45,6 +55,7 @@ fi
   runner.save_interval="${SAVE_INTERVAL}" \
   actor.optim.total_training_steps="${MAX_STEPS}" \
   actor.global_batch_size="${GLOBAL_BATCH_SIZE}" \
+  actor.micro_batch_size="${MICRO_BATCH_SIZE}" \
   actor.seed="${SEED}" \
   "data.train_data_paths=[{dataset_path:${ID_REPLAY},weight:1.0},{dataset_path:${NEW_EXPERT_DATASET},weight:1.0}]" \
   +data.openpi_source_balanced=true \
