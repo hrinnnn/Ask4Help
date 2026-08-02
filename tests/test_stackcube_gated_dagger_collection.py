@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 from pathlib import Path
 import subprocess
 import sys
@@ -90,6 +91,28 @@ def test_bridge_knn_uses_persisted_k10_detector_name():
         {"detectors": {"vlm_bridge_final_mean__knn_k10": {"threshold": 3.5}}},
     )
     assert resolved == ("vlm_bridge_final_mean__knn_k10", detector, 3.5)
+
+
+def test_policy_provenance_requires_and_hashes_the_exact_checkpoint(tmp_path):
+    checkpoint = tmp_path / "global_step_7000"
+    weights = checkpoint / "actor" / "model_state_dict" / "full_weights.pt"
+    weights.parent.mkdir(parents=True)
+    weights.write_bytes(b"immutable policy")
+    pi05_base = tmp_path / "pi05_base"
+    pi05_base.mkdir()
+    norm_stats = tmp_path / "norm_stats.json"
+    norm_stats.write_text("{}", encoding="utf-8")
+
+    provenance = MODULE.policy_provenance(
+        method="failure_recovery",
+        checkpoint=checkpoint,
+        pi05_base=pi05_base,
+        norm_stats=norm_stats,
+    )
+
+    assert provenance["policy_checkpoint_name"] == "global_step_7000"
+    assert provenance["policy_full_weights_sha256"] == hashlib.sha256(b"immutable policy").hexdigest()
+    assert provenance["norm_stats_sha256"] == hashlib.sha256(b"{}").hexdigest()
 
 
 def test_group_bc_launcher_has_valid_shell_syntax():

@@ -9,6 +9,7 @@ all experiment groups receive exactly the same number of action labels.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from dataclasses import dataclass
@@ -143,6 +144,38 @@ def _write_json(path: Path, payload: Any) -> None:
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def policy_provenance(
+    *, method: str, checkpoint: Path | None, pi05_base: Path | None, norm_stats: Path | None
+) -> dict[str, Any]:
+    """Make the policy used for collection immutable and auditable on disk."""
+    if method == "offline_oracle":
+        return {"controller": "privileged_oracle", "policy_checkpoint": None}
+    if checkpoint is None or pi05_base is None or norm_stats is None:
+        raise ValueError("gated collection requires checkpoint, pi05-base, and norm-stats")
+    checkpoint = checkpoint.resolve(strict=True)
+    full_weights = checkpoint / "actor" / "model_state_dict" / "full_weights.pt"
+    if not full_weights.is_file():
+        raise FileNotFoundError(f"checkpoint full_weights.pt is missing: {full_weights}")
+    return {
+        "controller": "pi05_policy",
+        "policy_checkpoint": str(checkpoint),
+        "policy_checkpoint_name": checkpoint.name,
+        "policy_full_weights": str(full_weights),
+        "policy_full_weights_sha256": _sha256_file(full_weights),
+        "pi05_base": str(pi05_base.resolve(strict=True)),
+        "norm_stats": str(norm_stats.resolve(strict=True)),
+        "norm_stats_sha256": _sha256_file(norm_stats.resolve(strict=True)),
+    }
 
 
 def _resolve_detector(
@@ -469,9 +502,25 @@ def main() -> None:
             "gated collection requires chunk targets, --gated-fixed-episodes, or "
             "--gated-successful-expert-episodes"
         )
-    if not offline and (args.checkpoint is None or args.pi05_base is None or args.norm_stats is None):
-        raise ValueError("gated collection requires checkpoint, pi05-base, and norm-stats")
+    provenance = policy_provenance(
+        method=args.method,
+        checkpoint=args.checkpoint,
+        pi05_base=args.pi05_base,
+        norm_stats=args.norm_stats,
+    )
     args.output_dir.mkdir(parents=True, exist_ok=False)
+    _write_json(
+        args.output_dir / "collection_provenance.json",
+        {
+            "method": args.method,
+            "policy": provenance,
+            "id_seed_start": args.id_seed,
+            "ood_seed_start": args.ood_seed,
+            "raw_split_schedule": "strict_alternation_id_then_ood"
+            if args.gated_successful_expert_episodes is not None
+            else "target_scheduler",
+        },
+    )
     raw_dir = args.output_dir / "raw_archive"
     (raw_dir / "actions").mkdir(parents=True)
 
@@ -622,6 +671,7 @@ def main() -> None:
         budget = collected
     summary = {
         "method": args.method,
+        "policy": provenance,
         "target_unit": (
             "successful_expert_trajectories"
             if successful_expert_target is not None
