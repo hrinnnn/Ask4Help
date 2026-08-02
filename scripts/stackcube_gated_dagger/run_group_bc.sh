@@ -18,6 +18,7 @@ SAVE_INTERVAL=${SAVE_INTERVAL:-250}
 GLOBAL_BATCH_SIZE=${GLOBAL_BATCH_SIZE:-64}
 MICRO_BATCH_SIZE=${MICRO_BATCH_SIZE:-4}
 RESUME_DIR=${RESUME_DIR:-}
+PADDED_ACTION_MODE=${PADDED_ACTION_MODE:-mask}
 
 if (( MICRO_BATCH_SIZE <= 0 || MICRO_BATCH_SIZE % 2 != 0 )); then
   echo "MICRO_BATCH_SIZE must be a positive even number for 1:1 source-balanced batches" >&2
@@ -27,6 +28,28 @@ if (( GLOBAL_BATCH_SIZE <= 0 || GLOBAL_BATCH_SIZE % MICRO_BATCH_SIZE != 0 )); th
   echo "GLOBAL_BATCH_SIZE must be divisible by MICRO_BATCH_SIZE" >&2
   exit 2
 fi
+
+case "${PADDED_ACTION_MODE}" in
+  mask)
+    padded_action_args=(
+      +data.openpi_mask_padded_action_targets=true
+      +data.openpi_valid_action_horizon=10
+    )
+    ;;
+  exclude)
+    padded_action_args=(
+      +data.openpi_exclude_padded_action_targets=true
+      +data.openpi_valid_action_horizon=10
+    )
+    ;;
+  official_padded)
+    padded_action_args=()
+    ;;
+  *)
+    echo "PADDED_ACTION_MODE must be mask, exclude, or official_padded" >&2
+    exit 2
+    ;;
+esac
 
 unset CUDA_VISIBLE_DEVICES
 # Leave RAY_ADDRESS empty for the first local job, or set it to `auto` for a
@@ -59,8 +82,7 @@ fi
   actor.seed="${SEED}" \
   "data.train_data_paths=[{dataset_path:${ID_REPLAY},weight:1.0},{dataset_path:${NEW_EXPERT_DATASET},weight:1.0}]" \
   +data.openpi_source_balanced=true \
-  +data.openpi_exclude_padded_action_targets=true \
-  +data.openpi_valid_action_horizon=10 \
+  "${padded_action_args[@]}" \
   actor.model.model_path="${BASE_CHECKPOINT}" \
   actor.model.openpi_data.norm_stats_path="${NORM_STATS}" \
   awbc.enabled=false \
