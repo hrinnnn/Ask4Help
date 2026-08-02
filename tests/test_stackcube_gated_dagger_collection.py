@@ -25,7 +25,7 @@ def test_successful_expert_collection_alternates_raw_splits_and_filters_labels()
     assert MODULE.is_successful_expert_trajectory(
         MODULE.ExpertSuffix(start=50, action_count=10), success=True
     )
-    assert not MODULE.is_successful_expert_trajectory(
+    assert MODULE.is_successful_expert_trajectory(
         MODULE.ExpertSuffix(start=50, action_count=9), success=True
     )
     assert not MODULE.is_successful_expert_trajectory(
@@ -43,6 +43,10 @@ def test_collection_gate_semantics_are_latched_at_the_specified_boundary():
     assert MODULE.should_latch_expert(
         "bridge_knn", action_step=10, score=1.0, threshold=1.0
     )
+    assert MODULE.should_latch_expert(
+        "diffdagger", action_step=10, score=1.0, threshold=1.0
+    )
+    assert not MODULE.should_latch_expert("failure_recovery", action_step=100)
 
 
 def test_only_complete_ten_step_expert_suffix_is_admitted():
@@ -61,6 +65,15 @@ def test_fixed_rollout_collection_keeps_all_complete_expert_suffix_chunks():
     assert MODULE.admitted_suffix_steps(
         suffix, remaining_chunks=1, fixed_episode_collection=False
     ) == 10
+    assert MODULE.admitted_suffix_steps(
+        suffix, remaining_chunks=1, fixed_episode_collection=True,
+        preserve_terminal_suffix=True,
+    ) == 29
+
+
+def test_failure_recovery_oracle_only_latches_after_a_recorded_predicate():
+    state = MODULE.FailureRecoveryState(initial_height=0.02, best_goal_distance=0.1)
+    assert state.stagnant_chunks == 0
 
 
 def test_bridge_knn_uses_persisted_k10_detector_name():

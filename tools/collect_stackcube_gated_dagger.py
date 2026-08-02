@@ -24,6 +24,7 @@ sys.path[:0] = [str(ROOT), str(RLINF_ROOT)]
 
 from rlinf.envs.maniskill.stack_cube_privileged_oracle import StackCubePrivilegedChunkOracle  # noqa: E402
 from rlinf.envs.maniskill.stack_cube_variants import STACK_CUBE_TASK, reset_metadata  # noqa: E402
+from rlinf.algorithms.diffdagger import DiffDAggerQueryGate, load_calibration_scores  # noqa: E402
 from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     MAIN_CAMERA_CANDIDATES,
     WRIST_CAMERA_CANDIDATES,
@@ -90,17 +91,27 @@ def selected_suffix_steps(suffix: ExpertSuffix, remaining_chunks: int) -> int:
 
 
 def admitted_suffix_steps(
-    suffix: ExpertSuffix, *, remaining_chunks: int, fixed_episode_collection: bool
+    suffix: ExpertSuffix, *, remaining_chunks: int, fixed_episode_collection: bool,
+    preserve_terminal_suffix: bool = False,
 ) -> int:
-    """Keep every complete suffix chunk for fixed-rollout DAgger collection."""
+    """Keep an expert suffix, optionally including its terminal partial chunk."""
+    if suffix.start is None:
+        return 0
+    if preserve_terminal_suffix:
+        return suffix.action_count
     if fixed_episode_collection:
         return suffix.trainable_chunks * CHUNK_LABEL_HORIZON
     return selected_suffix_steps(suffix, remaining_chunks)
 
 
 def is_successful_expert_trajectory(suffix: ExpertSuffix, *, success: bool) -> bool:
-    """A gated demonstration is usable only after a successful full expert chunk."""
-    return bool(success and suffix.start is not None and suffix.trainable_chunks > 0)
+    """A successful assisted trajectory retains every real expert action.
+
+    The SFT temporal loss mask handles a suffix shorter than one full action
+    horizon, so a terminal action must not be discarded merely because it has
+    fewer than ten following actions.
+    """
+    return bool(success and suffix.start is not None and suffix.action_count > 0)
 
 
 def should_latch_expert(
@@ -111,8 +122,10 @@ def should_latch_expert(
         return True
     if method == "late_success":
         return action_step >= 50
-    if method in {"bridge_knn", "bridge_llmd"}:
+    if method in {"bridge_knn", "bridge_llmd", "diffdagger"}:
         return score is not None and threshold is not None and score >= threshold
+    if method == "failure_recovery":
+        return False
     raise ValueError(f"unknown collection method: {method}")
 
 
@@ -144,6 +157,14 @@ def _resolve_detector(
 
 
 def _policy_chunk(model: Any, raw_obs: dict[str, Any], info: dict[str, Any], *, seed: int, step: int) -> np.ndarray:
+    candidate, _ = _policy_prediction(model, raw_obs, info, seed=seed, step=step)
+    return candidate
+
+
+def _policy_prediction(
+    model: Any, raw_obs: dict[str, Any], info: dict[str, Any], *, seed: int, step: int
+) -> tuple[np.ndarray, torch.Tensor]:
+    """Generate a policy chunk once and retain the full chunk for DiffDAgger."""
     env_obs = _wrap_obs(raw_obs, info, task="stack")
     # Keep policy actions identical across detector groups until the first gate.
     with torch.random.fork_rng(devices=[torch.cuda.current_device()]):
@@ -151,7 +172,69 @@ def _policy_chunk(model: Any, raw_obs: dict[str, Any], info: dict[str, Any], *, 
         torch.cuda.manual_seed_all(seed * 1000 + step)
         with torch.inference_mode():
             predicted, _ = model.predict_action_batch(env_obs=env_obs, mode="eval", compute_values=False)
-    return _action_chunk(predicted, EXECUTE_HORIZON)
+    return _action_chunk(predicted, EXECUTE_HORIZON), predicted
+
+
+def _diffdagger_score(
+    model: Any,
+    raw_obs: dict[str, Any],
+    info: dict[str, Any],
+    predicted_actions: torch.Tensor,
+    *,
+    num_timesteps: int,
+    num_noise_samples: int,
+) -> float:
+    env_obs = _wrap_obs(raw_obs, info, task="stack")
+    with torch.inference_mode():
+        score = model.compute_diffdagger_uncertainty(
+            env_obs,
+            predicted_actions,
+            num_timesteps=num_timesteps,
+            num_noise_samples=num_noise_samples,
+        )
+    return float(score.reshape(-1)[0].detach().cpu())
+
+
+@dataclass
+class FailureRecoveryState:
+    """Deterministic simulator-only subgoal failure monitor.
+
+    This is deliberately an oracle recovery baseline, not a vision deployable
+    detector: it reads cube positions from ManiSkill and records its reason in
+    the controller timeline.
+    """
+
+    initial_height: float
+    best_goal_distance: float
+    lifted_once: bool = False
+    stagnant_chunks: int = 0
+
+
+def _failure_recovery_reason(
+    env: Any, state: FailureRecoveryState, *, action_step: int, min_policy_steps: int
+) -> str | None:
+    base = env.unwrapped
+    cube = np.asarray(base.cubeA.pose.p.detach().cpu())[0]
+    target = np.asarray(base.cubeB.pose.p.detach().cpu())[0]
+    height = float(cube[2])
+    goal_distance = float(np.linalg.norm(cube[:2] - target[:2]))
+    lifted = height >= state.initial_height + 0.03
+    state.lifted_once = state.lifted_once or lifted
+    if goal_distance < state.best_goal_distance - 0.003:
+        state.best_goal_distance = goal_distance
+        state.stagnant_chunks = 0
+    elif state.lifted_once:
+        state.stagnant_chunks += 1
+
+    if action_step < min_policy_steps:
+        return None
+    if not state.lifted_once:
+        return "grasp_timeout_no_lift"
+    if height <= state.initial_height + 0.012:
+        return "dropped_after_lift"
+    if state.stagnant_chunks >= 3:
+        return "post_grasp_stagnation"
+    return None
 
 
 def _detector_score(
@@ -176,6 +259,10 @@ def _run_attempt(
     model: Any | None,
     detector_spec: tuple[str, Detector, float] | None,
     prior: torch.Tensor | None,
+    diffdagger_gate: DiffDAggerQueryGate | None,
+    diffdagger_num_timesteps: int,
+    diffdagger_num_noise_samples: int,
+    failure_min_policy_steps: int,
     episode_index: int,
     raw_dir: Path,
 ) -> tuple[list[Any], list[np.ndarray], list[str], ExpertSuffix, dict[str, Any]]:
@@ -186,6 +273,10 @@ def _run_attempt(
     sources: list[str] = []
     timeline: list[dict[str, Any]] = []
     oracle = StackCubePrivilegedChunkOracle(chunk_size=EXECUTE_HORIZON)
+    cube_height = float(np.asarray(env.unwrapped.cubeA.pose.p.detach().cpu())[0, 2])
+    cube_xy = np.asarray(env.unwrapped.cubeA.pose.p.detach().cpu())[0, :2]
+    target_xy = np.asarray(env.unwrapped.cubeB.pose.p.detach().cpu())[0, :2]
+    failure_state = FailureRecoveryState(cube_height, float(np.linalg.norm(cube_xy - target_xy)))
     expert_latched = should_latch_expert(method, action_step=0)
     expert_start: int | None = 0 if expert_latched else None
     success = False
@@ -194,6 +285,7 @@ def _run_attempt(
         start = len(actions)
         score: float | None = None
         threshold: float | None = None
+        failure_reason: str | None = None
         if not expert_latched and method in {"bridge_knn", "bridge_llmd"}:
             assert model is not None and detector_spec is not None and prior is not None
             name, detector, threshold = detector_spec
@@ -201,6 +293,26 @@ def _run_attempt(
             if should_latch_expert(
                 method, action_step=start, score=score, threshold=threshold
             ):
+                expert_latched = True
+                expert_start = start
+        elif not expert_latched and method == "diffdagger":
+            assert model is not None and diffdagger_gate is not None
+            candidate, predicted_actions = _policy_prediction(model, raw_obs, info, seed=seed, step=start)
+            score = _diffdagger_score(
+                model, raw_obs, info, predicted_actions,
+                num_timesteps=diffdagger_num_timesteps,
+                num_noise_samples=diffdagger_num_noise_samples,
+            )
+            decision = diffdagger_gate.decide(torch.tensor([score], device="cuda"))
+            threshold = decision.threshold
+            if bool(decision.query_mask.item()):
+                expert_latched = True
+                expert_start = start
+        elif not expert_latched and method == "failure_recovery":
+            failure_reason = _failure_recovery_reason(
+                env, failure_state, action_step=start, min_policy_steps=failure_min_policy_steps
+            )
+            if failure_reason is not None:
                 expert_latched = True
                 expert_start = start
         elif not expert_latched and should_latch_expert(method, action_step=start):
@@ -214,7 +326,8 @@ def _run_attempt(
         else:
             assert model is not None
             plan = None
-            candidate = _policy_chunk(model, raw_obs, info, seed=seed, step=start)
+            if method != "diffdagger":
+                candidate = _policy_chunk(model, raw_obs, info, seed=seed, step=start)
             source = "policy"
         timeline.append(
             {
@@ -224,6 +337,7 @@ def _run_attempt(
                 "score": score,
                 "threshold": threshold,
                 "alarm": bool(score is not None and threshold is not None and score >= threshold),
+                "failure_reason": failure_reason,
             }
         )
         for local_step, action in enumerate(candidate):
@@ -279,7 +393,14 @@ def _run_attempt(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--method", choices=("offline_oracle", "bridge_knn", "bridge_llmd", "late_success"), required=True)
+    parser.add_argument(
+        "--method",
+        choices=(
+            "offline_oracle", "bridge_knn", "bridge_llmd", "late_success",
+            "diffdagger", "failure_recovery",
+        ),
+        required=True,
+    )
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--repo-id", type=Path, required=True, help="Absolute destination for the LeRobot training dataset.")
     parser.add_argument("--checkpoint", type=Path)
@@ -287,6 +408,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--norm-stats", type=Path)
     parser.add_argument("--detector-assets", type=Path)
     parser.add_argument("--thresholds", type=Path)
+    parser.add_argument("--diffdagger-calibration", type=Path)
+    parser.add_argument("--diffdagger-alpha", type=float, default=0.95)
+    parser.add_argument("--diffdagger-patience", type=int, default=2)
+    parser.add_argument("--diffdagger-num-timesteps", type=int, default=16)
+    parser.add_argument("--diffdagger-num-noise-samples", type=int, default=1)
+    parser.add_argument("--failure-min-policy-steps", type=int, default=50)
+    parser.add_argument(
+        "--preserve-terminal-suffix",
+        action="store_true",
+        help="Keep all real expert actions; SFT masks only unavailable future targets.",
+    )
     parser.add_argument("--id-episodes", type=int, default=50)
     parser.add_argument("--ood-episodes", type=int, default=50)
     parser.add_argument("--id-target-chunks", type=int)
@@ -347,6 +479,15 @@ def main() -> None:
             raise ValueError("threshold asset does not match detector assets")
         prior = torch.load(Path(asset["llmd_source_statistics"]), map_location="cpu", weights_only=False)["fixed_prior"].to("cuda")
     detector_spec = _resolve_detector(args.method, detectors, thresholds)
+    diffdagger_gate = None
+    if args.method == "diffdagger":
+        if args.diffdagger_calibration is None:
+            raise ValueError("diffdagger collection requires --diffdagger-calibration")
+        diffdagger_gate = DiffDAggerQueryGate(
+            load_calibration_scores(args.diffdagger_calibration),
+            alpha=args.diffdagger_alpha,
+            patience=args.diffdagger_patience,
+        )
 
     fixed_episode_collection = offline or args.gated_fixed_episodes
     targets = (
@@ -381,9 +522,16 @@ def main() -> None:
             seed = next_seed[split]
             next_seed[split] += 1
             attempts[split] += 1
+            if diffdagger_gate is not None:
+                diffdagger_gate.reset()
             records, actions, _sources, suffix, row = _run_attempt(
                 env=envs[split], split=split, seed=seed, method=args.method, model=model,
-                detector_spec=detector_spec, prior=prior, episode_index=len(rows), raw_dir=raw_dir,
+                detector_spec=detector_spec, prior=prior,
+                diffdagger_gate=diffdagger_gate,
+                diffdagger_num_timesteps=args.diffdagger_num_timesteps,
+                diffdagger_num_noise_samples=args.diffdagger_num_noise_samples,
+                failure_min_policy_steps=args.failure_min_policy_steps,
+                episode_index=len(rows), raw_dir=raw_dir,
             )
             if offline:
                 suffix = ExpertSuffix(start=0, action_count=len(actions))
@@ -392,7 +540,8 @@ def main() -> None:
                 )
             elif successful_expert_target is not None:
                 admitted_steps = (
-                    suffix.trainable_chunks * CHUNK_LABEL_HORIZON
+                    suffix.action_count if args.preserve_terminal_suffix
+                    else suffix.trainable_chunks * CHUNK_LABEL_HORIZON
                     if is_successful_expert_trajectory(suffix, success=bool(row["success"]))
                     else 0
                 )
@@ -401,6 +550,7 @@ def main() -> None:
                     suffix,
                     remaining_chunks=targets[split] - collected[split],
                     fixed_episode_collection=args.gated_fixed_episodes,
+                    preserve_terminal_suffix=args.preserve_terminal_suffix,
                 )
             row["admitted_expert_action_steps"] = admitted_steps
             row["admitted_expert_10_step_chunks"] = admitted_steps // CHUNK_LABEL_HORIZON
@@ -439,7 +589,7 @@ def main() -> None:
             _write_jsonl(args.output_dir / "training_episodes.jsonl", train_rows)
             print(
                 f"[collect] method={args.method} split={split} "
-                f"seed={seed} admitted={admitted_steps // CHUNK_LABEL_HORIZON} "
+                f"seed={seed} admitted_actions={admitted_steps} "
                 f"collected={collected} successful_total={successful_expert_collected} "
                 f"targets={targets} successful_target={successful_expert_target}",
                 flush=True,
