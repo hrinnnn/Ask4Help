@@ -45,8 +45,8 @@ manifest = {
     "save_interval": 500,
     "awbc_enabled": False,
     "source_mix": "1:1 original_id:new_expert",
-    "code_commit": "873c45d",
-    "rlinf_commit": "a2a68e73",
+    "code_commit": "$(git -C "${CODE_ROOT}" rev-parse HEAD)",
+    "rlinf_commit": "$(git -C "${CODE_ROOT}/RLinf" rev-parse HEAD)",
 }
 (root / "run_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 PY
