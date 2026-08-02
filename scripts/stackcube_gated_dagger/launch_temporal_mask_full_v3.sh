@@ -58,7 +58,7 @@ GPU_ID=0 SEED=4000 ID_REPLAY="${ID_REPLAY}" NEW_EXPERT_DATASET="${KNN_DATASET}" 
 BASE_CHECKPOINT="${BASE_CHECKPOINT}" NORM_STATS="${ORIGINAL_NORM}" \
 OUTPUT_DIR="${RESULT_ROOT}/bridge_knn" MAX_STEPS=5000 SAVE_INTERVAL=500 \
 GLOBAL_BATCH_SIZE=128 MICRO_BATCH_SIZE=32 PADDED_ACTION_MODE=mask \
-nohup "${RUNNER}" > "${RESULT_ROOT}/logs/bridge_knn.log" 2>&1 &
+nohup bash "${RUNNER}" > "${RESULT_ROOT}/logs/bridge_knn.log" 2>&1 &
 echo $! > "${RESULT_ROOT}/bridge_knn.pid"
 
 sleep 15
@@ -67,7 +67,7 @@ RAY_ADDRESS=auto GPU_ID=1 SEED=4001 ID_REPLAY="${ID_REPLAY}" NEW_EXPERT_DATASET=
 BASE_CHECKPOINT="${BASE_CHECKPOINT}" NORM_STATS="${ORIGINAL_NORM}" \
 OUTPUT_DIR="${RESULT_ROOT}/offline_oracle" MAX_STEPS=5000 SAVE_INTERVAL=500 \
 GLOBAL_BATCH_SIZE=128 MICRO_BATCH_SIZE=32 PADDED_ACTION_MODE=mask \
-nohup "${RUNNER}" > "${RESULT_ROOT}/logs/offline_oracle.log" 2>&1 &
+nohup bash "${RUNNER}" > "${RESULT_ROOT}/logs/offline_oracle.log" 2>&1 &
 echo $! > "${RESULT_ROOT}/offline_oracle.pid"
 
 echo "launched $(cat "${RESULT_ROOT}/bridge_knn.pid") and $(cat "${RESULT_ROOT}/offline_oracle.pid")"
