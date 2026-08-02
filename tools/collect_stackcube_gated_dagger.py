@@ -170,22 +170,23 @@ def _policy_chunk(model: Any, raw_obs: dict[str, Any], info: dict[str, Any], *, 
 def _policy_prediction(
     model: Any, raw_obs: dict[str, Any], info: dict[str, Any], *, seed: int, step: int
 ) -> tuple[np.ndarray, torch.Tensor]:
-    """Generate a policy chunk once and retain the full chunk for DiffDAgger."""
+    """Generate an env action chunk and the model-space chunk used by DiffDAgger."""
     env_obs = _wrap_obs(raw_obs, info, task="stack")
     # Keep policy actions identical across detector groups until the first gate.
     with torch.random.fork_rng(devices=[torch.cuda.current_device()]):
         torch.manual_seed(seed * 1000 + step)
         torch.cuda.manual_seed_all(seed * 1000 + step)
         with torch.inference_mode():
-            predicted, _ = model.predict_action_batch(env_obs=env_obs, mode="eval", compute_values=False)
-    return _action_chunk(predicted, EXECUTE_HORIZON), predicted
+            predicted, result = model.predict_action_batch(env_obs=env_obs, mode="train")
+    model_actions = result["forward_inputs"]["model_action"]
+    return _action_chunk(predicted, EXECUTE_HORIZON), model_actions
 
 
 def _diffdagger_score(
     model: Any,
     raw_obs: dict[str, Any],
     info: dict[str, Any],
-    predicted_actions: torch.Tensor,
+    model_actions: torch.Tensor,
     *,
     num_timesteps: int,
     num_noise_samples: int,
@@ -194,7 +195,7 @@ def _diffdagger_score(
     with torch.inference_mode():
         score = model.compute_diffdagger_uncertainty(
             env_obs,
-            predicted_actions,
+            model_actions,
             num_timesteps=num_timesteps,
             num_noise_samples=num_noise_samples,
         )
@@ -303,9 +304,9 @@ def _run_attempt(
                 expert_start = start
         elif not expert_latched and method == "diffdagger":
             assert model is not None and diffdagger_gate is not None
-            candidate, predicted_actions = _policy_prediction(model, raw_obs, info, seed=seed, step=start)
+            candidate, model_actions = _policy_prediction(model, raw_obs, info, seed=seed, step=start)
             score = _diffdagger_score(
-                model, raw_obs, info, predicted_actions,
+                model, raw_obs, info, model_actions,
                 num_timesteps=diffdagger_num_timesteps,
                 num_noise_samples=diffdagger_num_noise_samples,
             )
