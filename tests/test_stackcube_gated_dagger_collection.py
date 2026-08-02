@@ -25,7 +25,7 @@ def test_successful_expert_collection_alternates_raw_splits_and_filters_labels()
     assert MODULE.is_successful_expert_trajectory(
         MODULE.ExpertSuffix(start=50, action_count=10), success=True
     )
-    assert MODULE.is_successful_expert_trajectory(
+    assert not MODULE.is_successful_expert_trajectory(
         MODULE.ExpertSuffix(start=50, action_count=9), success=True
     )
     assert not MODULE.is_successful_expert_trajectory(
@@ -52,6 +52,7 @@ def test_collection_gate_semantics_are_latched_at_the_specified_boundary():
 def test_only_complete_ten_step_expert_suffix_is_admitted():
     suffix = MODULE.ExpertSuffix(start=50, action_count=29)
     assert suffix.trainable_chunks == 2
+    assert suffix.valid_10_step_anchors == 20
     assert MODULE.selected_suffix_steps(suffix, remaining_chunks=1) == 10
     assert MODULE.selected_suffix_steps(suffix, remaining_chunks=5) == 20
     assert MODULE.selected_suffix_steps(MODULE.ExpertSuffix(None, 0), 2) == 0
@@ -61,7 +62,7 @@ def test_fixed_rollout_collection_keeps_all_complete_expert_suffix_chunks():
     suffix = MODULE.ExpertSuffix(start=50, action_count=29)
     assert MODULE.admitted_suffix_steps(
         suffix, remaining_chunks=1, fixed_episode_collection=True
-    ) == 20
+    ) == 29
     assert MODULE.admitted_suffix_steps(
         suffix, remaining_chunks=1, fixed_episode_collection=False
     ) == 10
@@ -74,6 +75,11 @@ def test_fixed_rollout_collection_keeps_all_complete_expert_suffix_chunks():
 def test_failure_recovery_oracle_only_latches_after_a_recorded_predicate():
     state = MODULE.FailureRecoveryState(initial_height=0.02, best_goal_distance=0.1)
     assert state.stagnant_chunks == 0
+    short = MODULE.ExpertSuffix(start=50, action_count=9)
+    assert short.valid_10_step_anchors == 0
+    assert MODULE.admitted_suffix_steps(
+        short, remaining_chunks=1, fixed_episode_collection=True
+    ) == 0
 
 
 def test_bridge_knn_uses_persisted_k10_detector_name():

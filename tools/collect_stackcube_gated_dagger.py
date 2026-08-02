@@ -61,6 +61,14 @@ class ExpertSuffix:
     def trainable_chunks(self) -> int:
         return self.action_count // CHUNK_LABEL_HORIZON
 
+    @property
+    def valid_10_step_anchors(self) -> int:
+        return max(0, self.action_count - CHUNK_LABEL_HORIZON + 1)
+
+    @property
+    def has_full_horizon(self) -> bool:
+        return self.valid_10_step_anchors > 0
+
 
 def choose_split(
     collected: dict[str, int], targets: dict[str, int], *, prefer_id: bool
@@ -95,23 +103,21 @@ def admitted_suffix_steps(
     preserve_terminal_suffix: bool = False,
 ) -> int:
     """Keep an expert suffix, optionally including its terminal partial chunk."""
-    if suffix.start is None:
+    if suffix.start is None or not suffix.has_full_horizon:
         return 0
-    if preserve_terminal_suffix:
+    if preserve_terminal_suffix or fixed_episode_collection:
         return suffix.action_count
-    if fixed_episode_collection:
-        return suffix.trainable_chunks * CHUNK_LABEL_HORIZON
     return selected_suffix_steps(suffix, remaining_chunks)
 
 
 def is_successful_expert_trajectory(suffix: ExpertSuffix, *, success: bool) -> bool:
     """A successful assisted trajectory retains every real expert action.
 
-    The SFT temporal loss mask handles a suffix shorter than one full action
-    horizon, so a terminal action must not be discarded merely because it has
-    fewer than ten following actions.
+    The full suffix is retained, including its terminal action.  It still must
+    contain one valid 10-step anchor; shorter suffixes cannot supervise this
+    action-chunk policy on their own.
     """
-    return bool(success and suffix.start is not None and suffix.action_count > 0)
+    return bool(success and suffix.start is not None and suffix.has_full_horizon)
 
 
 def should_latch_expert(
@@ -540,8 +546,7 @@ def main() -> None:
                 )
             elif successful_expert_target is not None:
                 admitted_steps = (
-                    suffix.action_count if args.preserve_terminal_suffix
-                    else suffix.trainable_chunks * CHUNK_LABEL_HORIZON
+                    suffix.action_count
                     if is_successful_expert_trajectory(suffix, success=bool(row["success"]))
                     else 0
                 )
