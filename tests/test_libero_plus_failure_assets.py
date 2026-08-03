@@ -58,3 +58,14 @@ def test_conformal_thresholds_use_finite_sample_order_statistic() -> None:
     value = result["thresholds"]["bridge_llmd"]
     assert value["threshold"] == pytest.approx(0.5)
     assert value["order_statistic_rank"] == 5
+
+
+def test_resident_reference_scorer_matches_stateless_scores() -> None:
+    cache = _cache()
+    assets = MODULE.fit_reference_assets(cache, knn_k=3)
+    features = {
+        "bridge": cache["features"]["bridge"][1],
+        "action_expert_final": cache["features"]["action_expert_final"][1],
+    }
+    resident = MODULE.ReferenceScorer(assets, device="cpu")
+    assert resident.score_features(features) == pytest.approx(MODULE.score_features(features, assets))

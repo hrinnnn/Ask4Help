@@ -17,8 +17,6 @@ import numpy as np
 import pyarrow.parquet as pq
 import torch
 from PIL import Image
-from openpi_client import image_tools
-from openpi_client.websocket_client_policy import WebsocketClientPolicy
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -66,6 +64,11 @@ def decode_image(value: dict[str, Any]) -> np.ndarray:
 
 
 def make_observation(row: dict[str, Any], prompt: str) -> dict[str, Any]:
+    # Keep metadata selection and its unit tests independent from the server
+    # client environment.  The image helper is needed only by actual feature
+    # extraction.
+    from openpi_client import image_tools
+
     base = image_tools.convert_to_uint8(image_tools.resize_with_pad(decode_image(row["image"]), 224, 224))
     wrist = image_tools.convert_to_uint8(image_tools.resize_with_pad(decode_image(row["wrist_image"]), 224, 224))
     return {
@@ -128,6 +131,8 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=False)
     selection_path = args.output_dir / "expert_selection_manifest.json"
     selection_path.write_text(json.dumps({"format": "libero_plus_expert_selection_v1", "seed": args.seed, "rows": selected}, indent=2) + "\n", encoding="utf-8")
+    from openpi_client.websocket_client_policy import WebsocketClientPolicy
+
     client = WebsocketClientPolicy(args.host, args.port)
     bridge, final, actions = [], [], []
     for index, selected_anchor in enumerate(selected):

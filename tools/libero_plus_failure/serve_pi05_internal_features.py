@@ -57,7 +57,10 @@ class ProbeSpec:
     # to the model's native 32-dimensional Action Expert input.
     action_dim: int = 32
     feature_seed: int = 20260731
-    flow_timestep: float = 1.0
+    # VLA-FAIL evaluates pi0.5 representations at the fixed flow prior
+    # (t=0).  Keep this explicit in every feature manifest so assets made with
+    # the former t=1 exploratory probe cannot be mixed into the main table.
+    flow_timestep: float = 0.0
 
 
 def _model_probe_features(
@@ -112,6 +115,7 @@ class InternalFeaturePolicy(_policy.Policy):
         # transforms. The policy action sent to the environment still follows
         # the exact one-sample upstream path below.
         variance_samples = int(obs.pop("failure_probe/action_variance_samples", 0))
+        feature_only = bool(obs.pop("failure_probe/feature_only", False))
         if variance_samples < 0:
             raise ValueError("failure_probe/action_variance_samples must be nonnegative")
         inputs = jax.tree.map(lambda x: x, obs)
@@ -124,9 +128,12 @@ class InternalFeaturePolicy(_policy.Policy):
             sample_kwargs["noise"] = noise_array[None, ...] if noise_array.ndim == 2 else noise_array
         observation = _model.Observation.from_dict(inputs)
 
-        start = time.monotonic()
-        actions = self._sample_actions(sample_rng, observation, **sample_kwargs)
-        action_ms = (time.monotonic() - start) * 1000.0
+        actions = None
+        action_ms = 0.0
+        if not feature_only:
+            start = time.monotonic()
+            actions = self._sample_actions(sample_rng, observation, **sample_kwargs)
+            action_ms = (time.monotonic() - start) * 1000.0
         probe_start = time.monotonic()
         features = self._probe_features(observation, self._fixed_prior, jnp.asarray(self._probe_spec.flow_timestep))
         probe_ms = (time.monotonic() - probe_start) * 1000.0
@@ -137,7 +144,9 @@ class InternalFeaturePolicy(_policy.Policy):
             )
             return np.asarray(self._output_transform(payload)["actions"], dtype=np.float32)
 
-        outputs = {"state": np.asarray(inputs["state"][0, ...]), "actions": output_actions(actions)}
+        outputs = {"state": np.asarray(inputs["state"][0, ...])}
+        if actions is not None:
+            outputs["actions"] = output_actions(actions)
         outputs["failure_features"] = jax.tree.map(lambda x: np.asarray(x[0, ...], dtype=np.float32), features)
         outputs["failure_probe"] = {
             "format": "pi05_libero_internal_feature_probe_v1",
@@ -150,6 +159,8 @@ class InternalFeaturePolicy(_policy.Policy):
             "feature_ms": probe_ms,
         }
         if variance_samples:
+            if actions is None:
+                raise ValueError("action variance cannot be requested from a feature-only probe")
             variance_start = time.monotonic()
             candidates = [outputs["actions"]]
             if variance_samples > 1:

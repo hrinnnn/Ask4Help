@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
 import torch
 import pytest
+import numpy as np
 
 
 ROOT = Path(__file__).parents[1]
@@ -98,3 +100,30 @@ def test_joint_bootstrap_matches_individual_metric_bootstraps() -> None:
 
         expected = MODULE.PROTOCOL.bootstrap_interval(rows, metric, seed=9, samples=25)
         assert intervals[key] == pytest.approx(expected)
+
+
+def test_score_one_uses_resident_scorer_once_per_decision(tmp_path: Path) -> None:
+    rollout = tmp_path / "episode"
+    rollout.mkdir()
+    (rollout / "episode.json").write_text(json.dumps({
+        "format": "libero_plus_failure_raw_rollout_v1", "feature_file": "features.npz", "success": False,
+        "suite": "libero_10", "source": "libero_plus", "category": "Camera Viewpoints", "configuration_id": 1,
+        "task_index": 0, "seed": 3, "timeline": [
+            {"env_step": 10, "policy_ms": 1.0, "feature_ms": 2.0, "acc": None, "stac_single": None},
+            {"env_step": 15, "policy_ms": 1.0, "feature_ms": 2.0, "acc": 0.4, "stac_single": 0.3},
+        ],
+    }), encoding="utf-8")
+    np.savez(rollout / "features.npz", bridge=np.zeros((2, 1, 4), dtype=np.float32), action_expert_final=np.zeros((2, 10, 4), dtype=np.float32))
+
+    class Scorer:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def score_features(self, _features):
+            self.calls += 1
+            return {name: float(self.calls) for name in MODULE.ASSETS.DETECTOR_NAMES}
+
+    scorer = Scorer()
+    row = MODULE.score_one(rollout, scorer)
+    assert scorer.calls == 2
+    assert row["scores"]["bridge_llmd"] == [1.0, 2.0]

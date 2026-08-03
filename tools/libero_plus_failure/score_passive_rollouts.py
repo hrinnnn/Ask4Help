@@ -89,13 +89,13 @@ def _optional_trace(timeline: list[Mapping[str, Any]], key: str) -> list[float]:
     return [float(value) for value in values]
 
 
-def score_one(path: Path, assets: Mapping[str, Any]) -> dict[str, Any]:
+def score_one(path: Path, scorer: Any) -> dict[str, Any]:
     episode, features = read_rollout(path)
     timeline = list(episode["timeline"])
     values: dict[str, list[float]] = {name: [] for name in ASSETS.DETECTOR_NAMES}
     for index in range(len(timeline)):
-        scores = ASSETS.score_features(
-            {"bridge": features["bridge"][index], "action_expert_final": features["action_expert_final"][index]}, assets
+        scores = scorer.score_features(
+            {"bridge": features["bridge"][index], "action_expert_final": features["action_expert_final"][index]}
         )
         for name, value in scores.items():
             values[name].append(float(value))
@@ -292,12 +292,14 @@ def main() -> None:
     parser.add_argument("--thresholds", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--required-successes", type=int, default=100)
+    parser.add_argument("--device", default="cpu", help="device holding immutable detector assets during scoring")
     args = parser.parse_args()
     if args.output_dir.exists():
         raise FileExistsError("refusing to overwrite " + str(args.output_dir))
     assets = load_reference_assets(args.assets)
     asset_sha = sha256(args.assets)
-    records = [score_one(path, assets) for path in raw_rollout_dirs(args.raw_root)]
+    scorer = ASSETS.ReferenceScorer(assets, device=args.device)
+    records = [score_one(path, scorer) for path in raw_rollout_dirs(args.raw_root)]
     args.output_dir.mkdir(parents=True, exist_ok=False)
     if args.mode == "calibrate":
         thresholds = calibrate(records, asset_sha, args.required_successes)

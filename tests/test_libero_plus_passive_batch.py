@@ -40,3 +40,14 @@ def test_completed_rollout_requires_all_immutable_artifacts(tmp_path: Path) -> N
     (target / "features.npz").write_bytes(b"features")
     (target / "rollout.mp4").write_bytes(b"video")
     assert MODULE.completed_rollout(target)
+
+
+def test_task_balanced_calibration_can_count_successes_independently(tmp_path: Path) -> None:
+    rows = MODULE.calibration_schedule(task_count=2, max_attempts=4, seed_base=1)
+    for row in rows[:2]:
+        path = MODULE.episode_dir(tmp_path, row)
+        path.mkdir(parents=True)
+        (path / "episode.json").write_text(json.dumps({"success": True, "timeline": [{}]}), encoding="utf-8")
+        (path / "features.npz").write_bytes(b"x")
+        (path / "rollout.mp4").write_bytes(b"x")
+    assert MODULE.completed_successes_by_task(rows, tmp_path) == {0: 1, 1: 1}

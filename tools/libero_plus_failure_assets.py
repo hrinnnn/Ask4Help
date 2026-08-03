@@ -148,7 +148,10 @@ def _load_statistics(spec: Mapping[str, Any]) -> LLMDStatistics | KNNStatistics 
 
 def score_features(features: Mapping[str, Any], assets: Mapping[str, Any]) -> dict[str, float]:
     """Score one stored policy decision without re-running the model."""
-    if assets.get("format") != "libero_plus_failure_reference_assets_v1":
+    if assets.get("format") not in {
+        "libero_plus_failure_reference_assets_v1",
+        "libero10_all_observation_reference_assets_v1",
+    }:
         raise ValueError("not a LIBERO-Plus reference asset")
     scores: dict[str, float] = {}
     for name in DETECTOR_NAMES:
@@ -167,6 +170,49 @@ def score_features(features: Mapping[str, Any], assets: Mapping[str, Any]) -> di
             score = pca_residual_score(values, statistics)  # type: ignore[arg-type]
         scores[name] = float(score.item())
     return scores
+
+
+class ReferenceScorer:
+    """Keep immutable detector statistics, especially the kNN bank, resident.
+
+    The small exploratory bank was inexpensive to reload for every score.  A
+    full 100k-observation bridge bank is not.  This wrapper constructs each
+    statistic once and keeps its tensors on the requested device for a whole
+    scoring run.
+    """
+
+    def __init__(self, assets: Mapping[str, Any], *, device: torch.device | str = "cpu") -> None:
+        if assets.get("format") not in {
+            "libero_plus_failure_reference_assets_v1",
+            "libero10_all_observation_reference_assets_v1",
+        }:
+            raise ValueError("not a supported LIBERO reference asset")
+        self._assets = assets
+        self._device = torch.device(device)
+        self._statistics = {name: _load_statistics(assets["detectors"][name]) for name in DETECTOR_NAMES}
+        for statistics in self._statistics.values():
+            for value in vars(statistics).values():
+                if isinstance(value, torch.Tensor):
+                    value.data = value.to(self._device)
+
+    def score_features(self, features: Mapping[str, Any]) -> dict[str, float]:
+        scores: dict[str, float] = {}
+        for name in DETECTOR_NAMES:
+            spec = self._assets["detectors"][name]
+            values = torch.as_tensor(features[spec["feature_key"]], dtype=torch.float32, device=self._device)
+            if values.ndim == 2:
+                values = values.unsqueeze(0)
+            if values.ndim != 3 or values.shape[0] != 1:
+                raise ValueError("feature %s must represent one [tokens, dim] decision" % spec["feature_key"])
+            statistics = self._statistics[name]
+            if spec["kind"] == "llmd":
+                score = llmd_score(values, statistics)  # type: ignore[arg-type]
+            elif spec["kind"] == "knn":
+                score = knn_score(values, statistics)  # type: ignore[arg-type]
+            else:
+                score = pca_residual_score(values, statistics)  # type: ignore[arg-type]
+            scores[name] = float(score.item())
+        return scores
 
 
 def conformal_thresholds(
