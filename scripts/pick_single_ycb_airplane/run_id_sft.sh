@@ -9,7 +9,7 @@ GPU_ID=${GPU_ID:-0}
 SEED=${SEED:-4100}
 ID_DATASET=${ID_DATASET:?Set ID_DATASET to the 128-demo ID-only LeRobot dataset}
 BASE_CHECKPOINT=${BASE_CHECKPOINT:?Set BASE_CHECKPOINT to the pretrained pi0.5 base directory}
-NORM_STATS=${NORM_STATS:?Set NORM_STATS to frozen ID-only norm stats}
+NORM_STATS=${NORM_STATS:?Set NORM_STATS to the frozen ID-only norm-stats asset directory}
 OUTPUT_DIR=${OUTPUT_DIR:?Set OUTPUT_DIR}
 MAX_STEPS=${MAX_STEPS:-2000}
 SAVE_INTERVAL=${SAVE_INTERVAL:-500}
@@ -23,6 +23,10 @@ if (( GLOBAL_BATCH_SIZE <= 0 || MICRO_BATCH_SIZE <= 0 || GLOBAL_BATCH_SIZE % MIC
 fi
 if [[ -e "${OUTPUT_DIR}" ]]; then
   echo "refusing to overwrite existing output: ${OUTPUT_DIR}" >&2
+  exit 2
+fi
+if [[ ! -f "${NORM_STATS}/norm_stats.json" ]]; then
+  echo "NORM_STATS must be an OpenPI asset directory containing norm_stats.json: ${NORM_STATS}" >&2
   exit 2
 fi
 resume_args=()
