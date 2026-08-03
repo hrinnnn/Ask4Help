@@ -105,3 +105,7 @@ def test_asset_linalg_backend_matches_torch_reference() -> None:
         FIT._linalg(covariance, operation="eigh", backend="torch"),
         torch.linalg.eigh(covariance)[1],
     )
+
+
+def test_full_bank_fit_uses_the_shared_vim_dimension_rule() -> None:
+    assert FIT.ASSETS.vim_default_principal_dim(2048) == 1000

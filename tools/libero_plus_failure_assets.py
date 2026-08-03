@@ -37,6 +37,7 @@ fit_pca_residual_statistics = _VLA_FAIL.fit_pca_residual_statistics
 knn_score = _VLA_FAIL.knn_score
 llmd_score = _VLA_FAIL.llmd_score
 pca_residual_score = _VLA_FAIL.pca_residual_score
+vim_default_principal_dim = _VLA_FAIL.vim_default_principal_dim
 
 
 FEATURE_KEYS = ("bridge", "action_expert_final")
