@@ -78,17 +78,57 @@ class StreamingMoments:
         return self.m2 / self.count + ridge * torch.eye(dim, dtype=torch.float64).expand(self.mean.shape[0], -1, -1)
 
 
-def _llmd_from_moments(moments: StreamingMoments, *, ridge: float, device: str) -> Any:
-    covariance = moments.covariance(ridge).to(device)
-    precision = torch.linalg.inv(covariance).cpu()
+def _jax_linalg(tensor: torch.Tensor, operation: str) -> torch.Tensor:
+    """Run the small covariance factorizations on the JAX CUDA runtime.
+
+    The pi0.5 serving stack already uses JAX on Ada/Blackwell GPUs.  This
+    keeps the reference statistic numerics unchanged while avoiding a PyTorch
+    wheel that may not include a kernel for the available accelerator.
+    """
+    import jax
+
+    jax.config.update("jax_enable_x64", True)
+    import jax.numpy as jnp
+
+    value = jnp.asarray(tensor.detach().cpu().numpy(), dtype=jnp.float64)
+    if operation == "inverse":
+        result = jnp.linalg.inv(value)
+    elif operation == "eigh":
+        result = jnp.linalg.eigh(value)[1]
+    else:
+        raise ValueError("unsupported JAX linalg operation: %s" % operation)
+    result.block_until_ready()
+    return torch.from_numpy(np.asarray(result)).to(dtype=tensor.dtype)
+
+
+def _linalg(tensor: torch.Tensor, *, operation: str, backend: str) -> torch.Tensor:
+    if backend == "torch":
+        if operation == "inverse":
+            return torch.linalg.inv(tensor)
+        if operation == "eigh":
+            return torch.linalg.eigh(tensor)[1]
+    elif backend == "jax":
+        return _jax_linalg(tensor, operation)
+    raise ValueError("unsupported linalg backend: %s" % backend)
+
+
+def _llmd_from_moments(moments: StreamingMoments, *, ridge: float, device: str, linalg_backend: str) -> Any:
+    covariance = moments.covariance(ridge)
+    if linalg_backend == "torch":
+        covariance = covariance.to(device)
+    precision = _linalg(covariance, operation="inverse", backend=linalg_backend).cpu()
     result = ASSETS.LLMDStatistics(moments.mean.cpu(), precision, ridge, moments.count)
     result.validate()
     return result
 
 
-def _pca_from_moments(moments: StreamingMoments, *, principal_dim: int, device: str) -> Any:
-    covariance = moments.covariance(0.0).to(device)
-    _values, vectors = torch.linalg.eigh(covariance)
+def _pca_from_moments(
+    moments: StreamingMoments, *, principal_dim: int, device: str, linalg_backend: str
+) -> Any:
+    covariance = moments.covariance(0.0)
+    if linalg_backend == "torch":
+        covariance = covariance.to(device)
+    vectors = _linalg(covariance, operation="eigh", backend=linalg_backend)
     components = vectors[:, :, -principal_dim:].cpu().to(dtype=torch.float32)
     result = ASSETS.PCAResidualStatistics(
         moments.mean.cpu().to(dtype=torch.float32), components, principal_dim, moments.count
@@ -102,6 +142,7 @@ def main() -> None:
     parser.add_argument("--bank-root", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--linalg-backend", choices=("torch", "jax"), default="torch")
     parser.add_argument("--knn-k", type=int, default=10)
     parser.add_argument("--ridge", type=float, default=1e-6)
     args = parser.parse_args()
@@ -131,10 +172,16 @@ def main() -> None:
     if cursor != expected or bridge_moments.count != expected or final_moments.count != expected:
         raise RuntimeError("streaming fit consumed the wrong number of features")
     bridge_bank.flush()
-    bridge_llmd = _llmd_from_moments(bridge_moments, ridge=args.ridge, device=args.device)
-    final_llmd = _llmd_from_moments(final_moments, ridge=args.ridge, device=args.device)
+    bridge_llmd = _llmd_from_moments(
+        bridge_moments, ridge=args.ridge, device=args.device, linalg_backend=args.linalg_backend
+    )
+    final_llmd = _llmd_from_moments(
+        final_moments, ridge=args.ridge, device=args.device, linalg_backend=args.linalg_backend
+    )
     principal_dim = ASSETS.vim_default_principal_dim(BRIDGE_SHAPE[-1])
-    bridge_pca = _pca_from_moments(bridge_moments, principal_dim=principal_dim, device=args.device)
+    bridge_pca = _pca_from_moments(
+        bridge_moments, principal_dim=principal_dim, device=args.device, linalg_backend=args.linalg_backend
+    )
     # Exact normalized kNN bank; this copy becomes part of the immutable asset.
     tensor_bank = torch.from_numpy(np.asarray(bridge_bank)).to(dtype=torch.float32)
     bridge_knn = ASSETS.fit_knn_statistics(tensor_bank, k=args.knn_k)
@@ -144,6 +191,7 @@ def main() -> None:
             "all_observations": True, "num_reference_anchors": expected, "action_horizon": 10,
             "flow_timestep": 0.0, "fixed_prior": True, "tail_frames_included": True,
             "knn_k": args.knn_k, "pca_principal_dim": principal_dim, "llmd_ridge": args.ridge,
+            "linalg_backend": args.linalg_backend,
         },
         "bank_validation_sha256": sha256(validation_path),
         "bank_request_sha256": sha256(args.bank_root / "reference_bank_request.json"),

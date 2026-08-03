@@ -93,3 +93,15 @@ def test_sha256_is_stable_for_checkpoint_directories(tmp_path: Path) -> None:
 
     (checkpoint / "params" / "weights").write_bytes(b"updated")
     assert expected != BANK.sha256(checkpoint)
+
+
+def test_asset_linalg_backend_matches_torch_reference() -> None:
+    covariance = torch.tensor([[3.0, 1.0], [1.0, 2.0]], dtype=torch.float64)
+    torch.testing.assert_close(
+        FIT._linalg(covariance, operation="inverse", backend="torch"),
+        torch.linalg.inv(covariance),
+    )
+    torch.testing.assert_close(
+        FIT._linalg(covariance, operation="eigh", backend="torch"),
+        torch.linalg.eigh(covariance)[1],
+    )
