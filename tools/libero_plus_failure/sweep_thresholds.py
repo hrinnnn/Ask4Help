@@ -80,7 +80,8 @@ def best_under_fpr(candidates: Iterable[dict[str, Any]], budget: float) -> dict[
         key=lambda row: (
             float(row["recall"] if row["recall"] is not None else -1.0),
             float(row["balanced_accuracy"] if row["balanced_accuracy"] is not None else -1.0),
-            float(row["threshold"]),
+            float(row.get("threshold", row.get("final_threshold", 0.0))),
+            float(row.get("acc_threshold", 0.0)),
         ),
     )
 
@@ -118,6 +119,99 @@ def scan_method(
     }
 
 
+def _or_gate_trace(record: Mapping[str, Any], *, final_threshold: float, acc_threshold: float) -> list[float]:
+    """Rebuild VLA-FAIL's temporal OR gate at a candidate threshold pair.
+
+    ACC is defined between adjacent chunks, so it is aligned to the following
+    final-feature decision exactly as in ``score_passive_rollouts._union_score``.
+    A binary trace lets the shared metric protocol preserve the first-alert
+    timing rather than reducing an episode to its maximum score.
+    """
+
+    final = [float(value) for value in record["scores"].get("final_llmd", [])]
+    acc = [float(value) for value in record["scores"].get("acc", [])]
+    if not final:
+        raise ValueError(f"episode {record.get('episode_id', '<unknown>')} has no final LLMD trace")
+    return [
+        float(
+            value >= final_threshold
+            or (index > 0 and index - 1 < len(acc) and acc[index - 1] >= acc_threshold)
+        )
+        for index, value in enumerate(final)
+    ]
+
+
+def scan_vla_fail_or_gate(
+    records: Sequence[Mapping[str, Any]], *, final_threshold: float, acc_threshold: float
+) -> dict[str, Any]:
+    """Exhaustively scan observable VLA-FAIL OR-gate operating points.
+
+    This is deliberately a post-hoc diagnostic.  Every unique trajectory
+    maximum through the deployed threshold is a possible alert-set boundary;
+    scanning their Cartesian product finds the best same-evaluation upper
+    bound without inventing an arbitrary coarse grid.
+    """
+
+    if final_threshold < 0.0 or acc_threshold < 0.0:
+        raise ValueError("VLA-FAIL thresholds must be non-negative")
+    usable = [record for record in records if record["scores"].get("final_llmd")]
+    if not usable:
+        raise ValueError("no usable VLA-FAIL records")
+    final_candidates = {0.0, float(final_threshold)}
+    acc_candidates = {0.0, float(acc_threshold)}
+    for record in usable:
+        final_candidates.update(
+            value for value in map(float, record["scores"]["final_llmd"]) if 0.0 <= value <= final_threshold
+        )
+        acc_candidates.update(
+            value for value in map(float, record["scores"].get("acc", [])) if 0.0 <= value <= acc_threshold
+        )
+
+    candidate_rows: list[dict[str, Any]] = []
+    for candidate_final in sorted(final_candidates):
+        for candidate_acc in sorted(acc_candidates):
+            rows = [
+                {
+                    "episode_id": str(record["episode_id"]),
+                    "success": bool(record["success"]),
+                    "scores": _or_gate_trace(
+                        record, final_threshold=candidate_final, acc_threshold=candidate_acc
+                    ),
+                }
+                for record in usable
+            ]
+            candidate_rows.append(
+                {
+                    "final_threshold": candidate_final,
+                    "acc_threshold": candidate_acc,
+                    **PROTOCOL.fixed_threshold_metrics(PROTOCOL.evaluate_fixed_threshold(rows, threshold=1.0)),
+                }
+            )
+
+    def choose(rows: Iterable[dict[str, Any]], *, metric: str) -> dict[str, Any]:
+        usable_rows = [row for row in rows if row.get(metric) is not None]
+        return max(
+            usable_rows,
+            key=lambda row: (
+                float(row[metric]),
+                -float(row["fpr"] if row["fpr"] is not None else 1.0),
+                float(row["final_threshold"]),
+                float(row["acc_threshold"]),
+            ),
+        )
+
+    return {
+        "final_calibrated_threshold": final_threshold,
+        "acc_calibrated_threshold": acc_threshold,
+        "exact_candidate_count": len(candidate_rows),
+        "best_balanced_accuracy": choose(candidate_rows, metric="balanced_accuracy"),
+        "best_f1": choose(candidate_rows, metric="f1"),
+        "best_recall_at_fpr": {
+            str(budget): best_under_fpr(candidate_rows, budget) for budget in (0.05, 0.10, 0.20)
+        },
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--scored-episodes", required=True, type=Path)
@@ -149,6 +243,17 @@ def main() -> None:
         "methods": {},
     }
     for method in args.methods:
+        if method == "vla_fail_final_or_acc":
+            final_spec = thresholds["thresholds"].get("final_llmd")
+            acc_spec = thresholds["thresholds"].get("acc")
+            if not isinstance(final_spec, Mapping) or not isinstance(acc_spec, Mapping):
+                raise ValueError("VLA-FAIL sweep requires final_llmd and acc calibrated thresholds")
+            result["methods"][method] = scan_vla_fail_or_gate(
+                records,
+                final_threshold=float(final_spec["threshold"]),
+                acc_threshold=float(acc_spec["threshold"]),
+            )
+            continue
         spec = thresholds["thresholds"].get(method)
         if not isinstance(spec, Mapping):
             raise ValueError(f"threshold file has no base threshold for {method}")

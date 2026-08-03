@@ -34,3 +34,16 @@ def test_sweep_only_scans_the_requested_nonnegative_interval() -> None:
     result = MODULE.scan_method(records, method="bridge_llmd", calibrated_threshold=1.0, fractions=(0.0, 1.0))
     assert result["exact_candidate_count"] == 2
     assert result["best_balanced_accuracy"]["threshold"] == 1.0
+
+
+def test_vla_fail_or_gate_sweeps_two_thresholds_and_preserves_alignment() -> None:
+    records = [
+        {"episode_id": "success", "success": True, "scores": {"final_llmd": [0.1, 0.1], "acc": [0.1]}},
+        {"episode_id": "failure", "success": False, "scores": {"final_llmd": [0.1, 0.1], "acc": [0.9]}},
+    ]
+    result = MODULE.scan_vla_fail_or_gate(records, final_threshold=1.0, acc_threshold=1.0)
+    best = result["best_balanced_accuracy"]
+    assert result["exact_candidate_count"] >= 4
+    assert best["balanced_accuracy"] == 1.0
+    assert best["final_threshold"] > 0.1
+    assert best["acc_threshold"] == 0.9
