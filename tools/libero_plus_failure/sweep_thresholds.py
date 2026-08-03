@@ -146,10 +146,13 @@ def scan_vla_fail_or_gate(
 ) -> dict[str, Any]:
     """Exhaustively scan observable VLA-FAIL OR-gate operating points.
 
-    This is deliberately a post-hoc diagnostic.  Every unique trajectory
-    maximum through the deployed threshold is a possible alert-set boundary;
-    scanning their Cartesian product finds the best same-evaluation upper
-    bound without inventing an arbitrary coarse grid.
+    This is deliberately a post-hoc diagnostic.  Every unique *trajectory*
+    maximum through the deployed threshold is a possible alert-set boundary:
+    for a fixed threshold, a trajectory alarms iff its maximum crosses it.
+    Scanning their Cartesian product therefore finds the exact fixed-alert
+    upper bound without enumerating every time-step score.  We still rebuild
+    the temporal trace for each retained pair so first-alert timing remains
+    correct in the reported row.
     """
 
     if final_threshold < 0.0 or acc_threshold < 0.0:
@@ -160,12 +163,14 @@ def scan_vla_fail_or_gate(
     final_candidates = {0.0, float(final_threshold)}
     acc_candidates = {0.0, float(acc_threshold)}
     for record in usable:
-        final_candidates.update(
-            value for value in map(float, record["scores"]["final_llmd"]) if 0.0 <= value <= final_threshold
-        )
-        acc_candidates.update(
-            value for value in map(float, record["scores"].get("acc", [])) if 0.0 <= value <= acc_threshold
-        )
+        final_maximum = max(map(float, record["scores"]["final_llmd"]))
+        if 0.0 <= final_maximum <= final_threshold:
+            final_candidates.add(final_maximum)
+        acc_trace = record["scores"].get("acc", [])
+        if acc_trace:
+            acc_maximum = max(map(float, acc_trace))
+            if 0.0 <= acc_maximum <= acc_threshold:
+                acc_candidates.add(acc_maximum)
 
     candidate_rows: list[dict[str, Any]] = []
     for candidate_final in sorted(final_candidates):
