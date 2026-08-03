@@ -80,3 +80,16 @@ def test_streaming_moments_match_monolithic_population_statistics() -> None:
     assert moments.count == 5
     torch.testing.assert_close(moments.mean, expected_mean)
     torch.testing.assert_close(moments.m2, expected_m2)
+
+
+def test_sha256_is_stable_for_checkpoint_directories(tmp_path: Path) -> None:
+    checkpoint = tmp_path / "checkpoint"
+    (checkpoint / "params").mkdir(parents=True)
+    (checkpoint / "params" / "weights").write_bytes(b"weights")
+    (checkpoint / "config.json").write_text("{}", encoding="utf-8")
+
+    expected = BANK.sha256(checkpoint)
+    assert expected == BANK.sha256(checkpoint)
+
+    (checkpoint / "params" / "weights").write_bytes(b"updated")
+    assert expected != BANK.sha256(checkpoint)

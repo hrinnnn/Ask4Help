@@ -17,10 +17,23 @@ FORMAT = "libero10_all_observation_feature_bank_v1"
 
 
 def sha256(path: Path) -> str:
+    """Return a deterministic digest for either a file or an Orbax directory."""
     digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(1024 * 1024):
-            digest.update(chunk)
+    if path.is_file():
+        paths = [path]
+        root = path.parent
+    elif path.is_dir():
+        paths = sorted(candidate for candidate in path.rglob("*") if candidate.is_file())
+        root = path
+    else:
+        raise FileNotFoundError(path)
+
+    for candidate in paths:
+        digest.update(candidate.relative_to(root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        with candidate.open("rb") as handle:
+            while chunk := handle.read(1024 * 1024):
+                digest.update(chunk)
     return digest.hexdigest()
 
 
