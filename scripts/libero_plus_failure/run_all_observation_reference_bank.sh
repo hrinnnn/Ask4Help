@@ -26,11 +26,12 @@ mkdir -p "${TMPDIR}" "${HF_HOME}" "${OUTPUT_ROOT}/logs"
 # A listed compute PID means the card belongs to another workload. Driver-only
 # memory does not appear here and is safe.
 for gpu in "${GPU_A}" "${GPU_B}"; do
-  if nvidia-smi --query-compute-apps=pid,gpu_uuid --format=csv,noheader | while IFS=, read -r pid uuid; do
-       [[ -z "${pid// }" ]] && continue
-       mapped="$(nvidia-smi --query-gpu=index,uuid --format=csv,noheader | awk -F, -v want="${uuid// /}" '$2 ~ want {gsub(/ /, "", $1); print $1}')"
-       [[ "${mapped}" == "${gpu}" ]] && exit 1
-     done; then :; else
+  uuid="$(nvidia-smi --query-gpu=index,uuid --format=csv,noheader | awk -F, -v wanted="${gpu}" '$1 ~ "^" wanted " *$" {gsub(/ /, "", $2); print $2}')"
+  if [[ -z "${uuid}" ]]; then
+    echo "GPU ${gpu} does not exist" >&2
+    exit 3
+  fi
+  if nvidia-smi --query-compute-apps=pid,gpu_uuid --format=csv,noheader | grep -Fq "${uuid}"; then
     echo "GPU ${gpu} has an existing compute process; refusing to interfere" >&2
     exit 3
   fi
