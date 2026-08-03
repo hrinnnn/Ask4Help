@@ -52,10 +52,21 @@ launch_policy() {
 }
 launch_policy 0 "${GPU_A}" "${PORT_A}"
 launch_policy 1 "${GPU_B}" "${PORT_B}"
-sleep 20
 for worker in 0 1; do
   log="${OUTPUT_ROOT}/logs/policy_worker_${worker}.log"
-  if ! grep -q "Serving pi05 internal probes" "${log}"; then
+  ready=0
+  for _ in $(seq 1 60); do
+    if grep -q "Serving pi05 internal probes" "${log}"; then
+      ready=1
+      break
+    fi
+    pid="$(cat "${OUTPUT_ROOT}/policy_worker_${worker}.pid")"
+    if ! kill -0 "${pid}" 2>/dev/null; then
+      break
+    fi
+    sleep 5
+  done
+  if [[ "${ready}" != 1 ]]; then
     echo "policy worker ${worker} failed to start; inspect ${log}" >&2
     exit 5
   fi
