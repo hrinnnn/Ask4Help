@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import numpy as np
+
 
 PATH = Path(__file__).resolve().parents[1] / "tools" / "collect_pick_single_ycb_airplane_gated_dagger.py"
 SPEC = importlib.util.spec_from_file_location("airplane_gated", PATH)
@@ -33,3 +35,20 @@ def test_failed_or_empty_suffix_is_not_admitted():
 
 def test_zero_action_raw_attempt_remains_a_rejected_training_example():
     assert MODULE.admitted_expert_suffix(success=False, expert_start=0, action_count=0) is None
+
+
+def test_delta_servo_requires_all_arm_joints_within_tolerance():
+    target = np.zeros(8, dtype=np.float32)
+    current = np.zeros(9, dtype=np.float32)
+    assert MODULE.delta_servo_complete(current, target, tolerance=0.012)
+    current[3] = 0.011
+    assert MODULE.delta_servo_complete(current, target, tolerance=0.012)
+    current[3] = 0.013
+    assert not MODULE.delta_servo_complete(current, target, tolerance=0.012)
+
+
+def test_delta_servo_ignores_gripper_target_for_arm_completion():
+    target = np.zeros(8, dtype=np.float32)
+    target[7] = 1.0
+    current = np.zeros(9, dtype=np.float32)
+    assert MODULE.delta_servo_complete(current, target, tolerance=0.012)

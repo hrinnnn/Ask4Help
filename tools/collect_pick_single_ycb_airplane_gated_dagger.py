@@ -50,6 +50,8 @@ from tools.pick_single_ycb_airplane_eval_common import clip_action_chunk  # noqa
 EXECUTE_HORIZON = 5
 POLICY_HORIZON = 50
 TASK_HORIZON = 250
+DELTA_SERVO_TOLERANCE = 0.012
+DELTA_SERVO_MAX_SUBSTEPS = 4
 
 
 def alternating_split(attempt_index: int) -> str:
@@ -67,6 +69,15 @@ def admitted_expert_suffix(*, success: bool, expert_start: int | None, action_co
     if not success or expert_start is None or expert_start >= action_count:
         return None
     return expert_start, action_count
+
+
+def delta_servo_complete(curr_qpos: np.ndarray, solver_action: np.ndarray, *, tolerance: float) -> bool:
+    """Whether the seven arm joints have reached an absolute planner target."""
+    curr = np.asarray(curr_qpos, dtype=np.float32).reshape(-1)
+    target = np.asarray(solver_action, dtype=np.float32).reshape(-1)
+    if curr.size < 7 or target.size < 7:
+        raise ValueError("delta servo requires at least seven arm joints")
+    return bool(np.max(np.abs(target[:7] - curr[:7])) <= tolerance)
 
 
 def _bool(value: Any) -> bool:
@@ -156,12 +167,26 @@ def _plan_and_execute_expert(
         candidate_actions: list[np.ndarray] = []
         original_step = policy_env.step
 
+        servo_substeps = 0
+        servo_saturated_steps = 0
+
         def step_hook(solver_action, *step_args, **step_kwargs):
-            qpos = policy_env.unwrapped.agent.robot.get_qpos()[0].detach().cpu().numpy()
-            action = _convert_solver_action_to_joint_delta(qpos, solver_action, lower, upper)
-            result = original_step(action, *step_args, **step_kwargs)
-            candidate_actions.append(action)
-            candidate_records.append(_extract_record(result[0]))
+            nonlocal servo_substeps, servo_saturated_steps
+            result = None
+            for _ in range(DELTA_SERVO_MAX_SUBSTEPS):
+                qpos = policy_env.unwrapped.agent.robot.get_qpos()[0].detach().cpu().numpy()
+                if result is not None and delta_servo_complete(
+                    qpos, solver_action, tolerance=DELTA_SERVO_TOLERANCE
+                ):
+                    break
+                action = _convert_solver_action_to_joint_delta(qpos, solver_action, lower, upper)
+                if np.any(np.abs(action[:7]) >= 1.0 - 1e-6):
+                    servo_saturated_steps += 1
+                result = original_step(action, *step_args, **step_kwargs)
+                candidate_actions.append(action)
+                candidate_records.append(_extract_record(result[0]))
+                servo_substeps += 1
+            assert result is not None
             return result
 
         policy_env.step = step_hook  # type: ignore[method-assign]
@@ -179,6 +204,8 @@ def _plan_and_execute_expert(
             )
         finally:
             policy_env.step = original_step  # type: ignore[method-assign]
+        result["delta_servo_substeps"] = servo_substeps
+        result["delta_servo_saturated_steps"] = servo_saturated_steps
         attempts.append(result)
         if result["accepted"] and candidate_actions:
             return candidate_records, candidate_actions, {
