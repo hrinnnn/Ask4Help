@@ -122,6 +122,20 @@ def test_aucpdt_penalizes_missed_failure_and_uses_episode_horizon() -> None:
     assert late_metrics["mean_normalized_detection_time"] == pytest.approx(0.875)
 
 
+def test_aucpdt_keeps_nonmaximum_temporal_thresholds_for_earlier_alerts() -> None:
+    episodes = [
+        {"episode_id": "success", "success": True, "scores": [0.4, 0.95]},
+        {"episode_id": "failure", "success": False, "scores": [0.5, 0.9]},
+    ]
+
+    # Threshold 0.5 is not a trajectory maximum, but it preserves the same
+    # trajectory classifier as 0.9 while detecting the failure at t=0.
+    curve = PROTOCOL.penalized_detection_time_curve(episodes)
+    early = next(point for point in curve if point["threshold"] == pytest.approx(0.5))
+    assert early["precision"] == pytest.approx(0.5)
+    assert early["pdt"] == pytest.approx(0.0)
+
+
 def test_bootstrap_confidence_interval_is_deterministic() -> None:
     values = [{"success": index % 2 == 0, "scores": [float(index)]} for index in range(12)]
     first = PROTOCOL.bootstrap_interval(values, lambda rows: float(sum(row["success"] for row in rows) / len(rows)), seed=3, samples=100)

@@ -313,9 +313,17 @@ def average_precision(labels: Sequence[bool], scores: Sequence[float]) -> float 
 
 
 def _threshold_points(episodes: Sequence[Mapping[str, Any]]) -> list[dict[str, float]]:
-    maxima = sorted({float(max(episode["scores"])) for episode in episodes})
-    sentinel = np.nextafter(maxima[-1], np.inf)
-    return [_threshold_point(episodes, threshold) for threshold in [*maxima, float(sentinel)]]
+    """Evaluate every score threshold relevant to first-alert timing.
+
+    Trajectory maxima suffice for ordinary trajectory classification, but not
+    for AUCPDT: a non-maximum score may yield the same alerted trajectories as
+    a larger threshold while triggering a failed rollout earlier.  VLA-FAIL's
+    PDT curve therefore has to retain every observed timestep score.
+    """
+
+    values = sorted({float(score) for episode in episodes for score in episode["scores"]})
+    sentinel = np.nextafter(values[-1], np.inf)
+    return [_threshold_point(episodes, threshold) for threshold in [*values, float(sentinel)]]
 
 
 def _threshold_point(episodes: Sequence[Mapping[str, Any]], threshold: float) -> dict[str, float]:
