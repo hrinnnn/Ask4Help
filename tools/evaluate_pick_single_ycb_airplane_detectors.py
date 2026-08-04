@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -61,6 +63,18 @@ def bool_scalar(value: Any) -> bool:
     if isinstance(value, torch.Tensor):
         return bool(value.detach().cpu().reshape(-1)[0].item())
     return bool(np.asarray(value).reshape(-1)[0])
+
+
+def save_npz_durably(path: Path, **arrays: np.ndarray) -> None:
+    """Build seek-heavy NPZ locally, then stream the finished file to OSSFS."""
+
+    with tempfile.TemporaryDirectory(prefix="airplane-detector-") as directory:
+        local = Path(directory) / path.name
+        np.savez_compressed(local, **arrays)
+        with np.load(local) as payload:
+            if set(payload.files) != set(arrays):
+                raise RuntimeError("local feature archive failed its key audit")
+        shutil.copyfile(local, path)
 
 
 def parse_args() -> argparse.Namespace:
@@ -220,7 +234,7 @@ def main() -> None:
             actions_path = actions_dir / f"episode_{episode_index:06d}_seed_{seed:06d}.npy"
             feature_path = features_dir / f"episode_{episode_index:06d}_seed_{seed:06d}.npz"
             np.save(actions_path, np.asarray(executed, dtype=np.float32))
-            np.savez_compressed(
+            save_npz_durably(
                 feature_path,
                 bridge=np.asarray(bridge_features, dtype=np.float32),
                 action_expert_final=np.asarray(final_features, dtype=np.float32),
