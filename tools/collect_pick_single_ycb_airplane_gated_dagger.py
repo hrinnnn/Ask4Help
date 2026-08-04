@@ -175,6 +175,7 @@ def _plan_and_execute_expert(
                 complete_task=True,
                 reset_before_attempt=False,
                 force_planner_pd_joint_pos=True,
+                closing_sign=-1.0 if name.endswith("_flip") else 1.0,
             )
         finally:
             policy_env.step = original_step  # type: ignore[method-assign]
