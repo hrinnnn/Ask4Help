@@ -361,6 +361,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--repo-id", required=True)
     parser.add_argument("--target-expert-trajectories", type=int, default=100)
+    parser.add_argument(
+        "--only-split",
+        choices=("id", "ood"),
+        help="Diagnostic mode: draw every raw attempt from exactly one split.",
+    )
     parser.add_argument("--offline-per-split", type=int, default=50)
     parser.add_argument("--offline-id-target", type=int)
     parser.add_argument("--offline-ood-target", type=int)
@@ -430,7 +435,7 @@ def main() -> None:
                     break
             elif len(train_rows) >= args.target_expert_trajectories:
                 break
-            split = alternating_split(attempt_index)
+            split = args.only_split or alternating_split(attempt_index)
             if args.method == "offline_oracle" and accepted[split] >= offline_targets[split]:
                 continue
             seed = next_seed[split]
