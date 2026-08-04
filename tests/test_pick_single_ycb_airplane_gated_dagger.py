@@ -29,3 +29,7 @@ def test_failed_or_empty_suffix_is_not_admitted():
     assert MODULE.admitted_expert_suffix(success=False, expert_start=50, action_count=60) is None
     assert MODULE.admitted_expert_suffix(success=True, expert_start=None, action_count=60) is None
     assert MODULE.admitted_expert_suffix(success=True, expert_start=60, action_count=60) is None
+
+
+def test_zero_action_raw_attempt_remains_a_rejected_training_example():
+    assert MODULE.admitted_expert_suffix(success=False, expert_start=0, action_count=0) is None

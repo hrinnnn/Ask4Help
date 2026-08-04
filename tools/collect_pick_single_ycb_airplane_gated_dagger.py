@@ -214,9 +214,17 @@ def _save_raw_attempt(
     sources: list[str],
     control_freq: int,
 ) -> str:
+    video_records = records
+    video_actions = actions
+    if not actions:
+        # A motion-planning attempt can fail before producing any command.
+        # Preserve an honest empty action sidecar while encoding one static
+        # diagnostic frame for the raw archive.
+        video_records = [records[0], records[0]]
+        video_actions = [np.zeros(8, dtype=np.float32)]
     frames = _build_frames(
-        records=records,
-        actions=actions,
+        records=video_records,
+        actions=video_actions,
         task=PICK_SINGLE_YCB_AIRPLANE_TASK,
         main_camera=_select_camera(records[0].obs, "", ("base_camera",) + MAIN_CAMERA_CANDIDATES, "main"),
         wrist_camera=_select_camera(records[0].obs, "", ("hand_camera",) + WRIST_CAMERA_CANDIDATES, "wrist"),
