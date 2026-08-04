@@ -171,7 +171,7 @@ def _plan_and_execute_expert(
                 seed=seed,
                 name=name,
                 local_point=local_point,
-                close_steps=45,
+                close_steps=60,
                 complete_task=True,
                 reset_before_attempt=False,
                 force_planner_pd_joint_pos=True,
@@ -362,6 +362,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-id", required=True)
     parser.add_argument("--target-expert-trajectories", type=int, default=100)
     parser.add_argument("--offline-per-split", type=int, default=50)
+    parser.add_argument("--offline-id-target", type=int)
+    parser.add_argument("--offline-ood-target", type=int)
     parser.add_argument("--id-seed", type=int, default=70000)
     parser.add_argument("--ood-seed", type=int, default=80000)
     parser.add_argument("--max-attempts", type=int, default=5000)
@@ -416,16 +418,20 @@ def main() -> None:
     rows: list[dict[str, Any]] = []
     train_rows: list[dict[str, Any]] = []
     accepted = {"id": 0, "ood": 0}
+    offline_targets = {
+        "id": args.offline_per_split if args.offline_id_target is None else args.offline_id_target,
+        "ood": args.offline_per_split if args.offline_ood_target is None else args.offline_ood_target,
+    }
     next_seed = {"id": args.id_seed, "ood": args.ood_seed}
     try:
         for attempt_index in range(args.max_attempts):
             if args.method == "offline_oracle":
-                if accepted == {"id": args.offline_per_split, "ood": args.offline_per_split}:
+                if accepted == offline_targets:
                     break
             elif len(train_rows) >= args.target_expert_trajectories:
                 break
             split = alternating_split(attempt_index)
-            if args.method == "offline_oracle" and accepted[split] >= args.offline_per_split:
+            if args.method == "offline_oracle" and accepted[split] >= offline_targets[split]:
                 continue
             seed = next_seed[split]
             next_seed[split] += 1
@@ -500,7 +506,7 @@ def main() -> None:
             del model
             torch.cuda.empty_cache()
 
-    expected = 2 * args.offline_per_split if args.method == "offline_oracle" else args.target_expert_trajectories
+    expected = sum(offline_targets.values()) if args.method == "offline_oracle" else args.target_expert_trajectories
     if dataset is None or len(train_rows) != expected:
         raise RuntimeError(f"collected {len(train_rows)}/{expected} accepted expert trajectories")
     _write_json(args.output_dir / "summary.json", {
