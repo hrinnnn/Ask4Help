@@ -136,6 +136,24 @@ def test_aucpdt_keeps_nonmaximum_temporal_thresholds_for_earlier_alerts() -> Non
     assert early["pdt"] == pytest.approx(0.0)
 
 
+def test_incremental_threshold_sweep_matches_brute_force() -> None:
+    episodes = [
+        {"episode_id": "s0", "success": True, "scores": [0.2, 0.8, 0.4]},
+        {"episode_id": "f0", "success": False, "scores": [0.5, 0.9, 0.1]},
+        {"episode_id": "f1", "success": False, "scores": [0.3, 0.6, 0.7]},
+    ]
+    thresholds = sorted({score for row in episodes for score in row["scores"]})
+    thresholds.append(float(np.nextafter(max(thresholds), np.inf)))
+    expected = {threshold: PROTOCOL._threshold_point(episodes, threshold) for threshold in thresholds}
+    actual = {row["threshold"]: row for row in PROTOCOL._threshold_points(episodes)}
+
+    assert set(actual) == set(expected)
+    for threshold in thresholds:
+        assert actual[threshold]["precision"] == pytest.approx(expected[threshold]["precision"])
+        assert actual[threshold]["recall"] == pytest.approx(expected[threshold]["recall"])
+        assert actual[threshold]["pdt"] == pytest.approx(expected[threshold]["pdt"])
+
+
 def test_bootstrap_confidence_interval_is_deterministic() -> None:
     values = [{"success": index % 2 == 0, "scores": [float(index)]} for index in range(12)]
     first = PROTOCOL.bootstrap_interval(values, lambda rows: float(sum(row["success"] for row in rows) / len(rows)), seed=3, samples=100)

@@ -321,9 +321,62 @@ def _threshold_points(episodes: Sequence[Mapping[str, Any]]) -> list[dict[str, f
     PDT curve therefore has to retain every observed timestep score.
     """
 
-    values = sorted({float(score) for episode in episodes for score in episode["scores"]})
-    sentinel = np.nextafter(values[-1], np.inf)
-    return [_threshold_point(episodes, threshold) for threshold in [*values, float(sentinel)]]
+    events = sorted(
+        (
+            (float(score), episode_index, time_index)
+            for episode_index, episode in enumerate(episodes)
+            for time_index, score in enumerate(episode["scores"])
+        ),
+        reverse=True,
+    )
+    if not events:
+        raise ValueError("at least one detector score is required")
+
+    failures = [not bool(episode["success"]) for episode in episodes]
+    horizons = [len(episode["scores"]) for episode in episodes]
+    failure_count = sum(failures)
+    first_alerts: list[int | None] = [None] * len(episodes)
+    tp = fp = 0
+    pdt_sum = float(failure_count)  # Every failure initially counts as a horizon miss.
+    points = [
+        {
+            "threshold": float(np.nextafter(events[0][0], np.inf)),
+            "precision": 1.0,
+            "recall": 0.0,
+            "pdt": 1.0 if failure_count else 1.0,
+        }
+    ]
+
+    cursor = 0
+    while cursor < len(events):
+        threshold = events[cursor][0]
+        end = cursor + 1
+        while end < len(events) and events[end][0] == threshold:
+            end += 1
+        for _score, episode_index, time_index in events[cursor:end]:
+            current = first_alerts[episode_index]
+            if current is None:
+                first_alerts[episode_index] = time_index
+                if failures[episode_index]:
+                    tp += 1
+                    pdt_sum += time_index / horizons[episode_index] - 1.0
+                else:
+                    fp += 1
+            elif time_index < current:
+                first_alerts[episode_index] = time_index
+                if failures[episode_index]:
+                    pdt_sum += (time_index - current) / horizons[episode_index]
+        predicted_failure = tp + fp
+        points.append(
+            {
+                "threshold": threshold,
+                "precision": 1.0 if predicted_failure == 0 else tp / predicted_failure,
+                "recall": 0.0 if failure_count == 0 else tp / failure_count,
+                "pdt": 1.0 if failure_count == 0 else pdt_sum / failure_count,
+            }
+        )
+        cursor = end
+    return points
 
 
 def _threshold_point(episodes: Sequence[Mapping[str, Any]], threshold: float) -> dict[str, float]:
