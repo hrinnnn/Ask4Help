@@ -32,6 +32,7 @@ from libero_plus_failure_protocol import (
 
 
 METHODS = ("llmd", "acc", "vla_fail_rank_or")
+FIXED_THRESHOLD_METHODS = ("llmd", "acc")
 
 
 def sha256(path: Path) -> str:
@@ -134,13 +135,21 @@ def _fixed(records: list[dict[str, Any]], method: str, threshold: float) -> dict
 
 
 def _source_metrics(records: list[dict[str, Any]], thresholds: Mapping[str, float]) -> dict[str, Any]:
-    return {
+    metrics = {
         method: {
             "fixed_threshold": _fixed(records, method, float(thresholds[method])),
             "threshold_independent": threshold_independent(method_episodes(records, method)),
         }
-        for method in METHODS
+        for method in FIXED_THRESHOLD_METHODS
     }
+    # This is the VLA-FAIL paper's rank-based fusion for threshold-independent
+    # metrics.  Its deployed operating point is the separately reported
+    # calibrated raw-score OR gate, not an arbitrary threshold on fused ranks.
+    metrics["vla_fail_rank_or"] = {
+        "fixed_threshold": None,
+        "threshold_independent": threshold_independent(method_episodes(records, "vla_fail_rank_or")),
+    }
+    return metrics
 
 
 def build_summary(
@@ -241,6 +250,8 @@ def render_markdown(summary: Mapping[str, Any]) -> str:
     for method, metrics in summary["overall"].items():
         fixed, ti = metrics["fixed_threshold"], metrics["threshold_independent"]
         fmt = lambda value: "NA" if value is None else f"{value:.4f}"
+        if fixed is None:
+            fixed = {"recall": None, "fpr": None, "precision": None, "balanced_accuracy": None}
         lines.append(
             f"| {method} | {fmt(ti['roc_auc'])} | {fmt(ti['aucpr'])} | {fmt(ti['aucpdt'])} | {fmt(fixed['recall'])} | {fmt(fixed['fpr'])} | {fmt(fixed['precision'])} | {fmt(fixed['balanced_accuracy'])} |"
         )
