@@ -80,6 +80,36 @@ def delta_servo_complete(curr_qpos: np.ndarray, solver_action: np.ndarray, *, to
     return bool(np.max(np.abs(target[:7] - curr[:7])) <= tolerance)
 
 
+def patience_gate_episode_score(scores: list[float], *, patience: int) -> float:
+    """Reduce a score sequence to the threshold needed to trigger its gate."""
+    values = np.asarray(scores, dtype=np.float64).reshape(-1)
+    if patience < 1:
+        raise ValueError("patience must be at least one")
+    if values.size < patience:
+        return float("-inf")
+    if not np.isfinite(values).all():
+        raise ValueError("gate calibration scores must be finite")
+    # A patience-length window triggers only when every score exceeds the
+    # threshold.  Its limiting score is therefore the minimum in the window.
+    return float(max(np.min(values[index : index + patience]) for index in range(values.size - patience + 1)))
+
+
+def calibrate_patience_gate_threshold(
+    score_sequences: list[list[float]], *, alpha: float, patience: int
+) -> tuple[float, list[float]]:
+    """Calibrate the complete temporal gate on successful ID trajectories."""
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError("alpha must be in [0, 1]")
+    episode_scores = [
+        patience_gate_episode_score(sequence, patience=patience)
+        for sequence in score_sequences
+    ]
+    finite_scores = [score for score in episode_scores if np.isfinite(score)]
+    if not finite_scores:
+        raise ValueError("no calibration trajectory is long enough for the patience gate")
+    return float(np.quantile(np.asarray(finite_scores), alpha)), episode_scores
+
+
 def _bool(value: Any) -> bool:
     if isinstance(value, torch.Tensor):
         return bool(value.detach().cpu().reshape(-1)[0].item())
@@ -383,6 +413,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--diff-calibration", type=Path)
     parser.add_argument("--diff-alpha", type=float, default=0.95)
     parser.add_argument("--diff-patience", type=int, default=2)
+    parser.add_argument(
+        "--diff-threshold",
+        type=float,
+        help="Optional threshold calibrated for the complete patience gate.",
+    )
     parser.add_argument("--diff-num-timesteps", type=int, default=16)
     parser.add_argument("--diff-num-noise-samples", type=int, default=1)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -428,6 +463,10 @@ def main() -> None:
             alpha=args.diff_alpha,
             patience=args.diff_patience,
         )
+        if args.diff_threshold is not None:
+            if not np.isfinite(args.diff_threshold):
+                raise ValueError("DiffDAgger threshold override must be finite")
+            diff_gate.threshold = float(args.diff_threshold)
 
     provenance = {
         "format": "pick_airplane_four_group_collection_v1",
@@ -436,6 +475,8 @@ def main() -> None:
         "checkpoint_sha256": None if args.checkpoint is None else _sha256(args.checkpoint / "actor/model_state_dict/full_weights.pt"),
         "norm_stats": None if args.norm_stats is None else str(args.norm_stats.resolve()),
         "bridge_pca_threshold": args.bridge_pca_threshold if args.method == "bridge_pca" else None,
+        "diff_threshold": args.diff_threshold if args.method == "diffdagger" else None,
+        "diff_patience": args.diff_patience if args.method == "diffdagger" else None,
         "split_schedule": "strict_id_ood_alternation",
         "admission": "strict_success_and_nonempty_expert_suffix",
         "training_labels": "all_real_expert_suffix_actions_temporal_masked",

@@ -52,3 +52,20 @@ def test_delta_servo_ignores_gripper_target_for_arm_completion():
     target[7] = 1.0
     current = np.zeros(9, dtype=np.float32)
     assert MODULE.delta_servo_complete(current, target, tolerance=0.012)
+
+
+def test_patience_gate_calibrates_the_same_temporal_event_used_online():
+    sequences = [
+        [0.1, 0.9, 0.2],  # isolated spike cannot pass patience=2
+        [0.1, 0.7, 0.6],  # limiting adjacent score is 0.6
+        [0.4, 0.5, 0.1],  # limiting adjacent score is 0.4
+    ]
+    threshold, episode_scores = MODULE.calibrate_patience_gate_threshold(
+        sequences, alpha=0.5, patience=2
+    )
+    assert episode_scores == [0.2, 0.6, 0.4]
+    assert threshold == 0.4
+
+
+def test_patience_gate_rejects_sequences_shorter_than_its_window():
+    assert MODULE.patience_gate_episode_score([0.9], patience=2) == float("-inf")
