@@ -147,61 +147,49 @@ def _plan_and_execute_expert(
     lower: np.ndarray,
     upper: np.ndarray,
 ) -> tuple[list[Any], list[np.ndarray], dict[str, Any]]:
-    """Plan on a twin env restored to the exact gate state, then replay in policy control mode."""
+    """Execute planner targets through delta control in the exact policy env."""
     state = policy_env.unwrapped.get_state_dict()
     attempts: list[dict[str, Any]] = []
-    selected_actions: list[np.ndarray] | None = None
-    selected_candidate: str | None = None
     for name, local_point in ORACLE_NECK_CANDIDATES:
-        solver_env.reset(seed=seed)
-        solver_env.unwrapped.set_state_dict(state)
-        solver_actions: list[np.ndarray] = []
-        original_step = solver_env.step
+        policy_env.unwrapped.set_state_dict(state)
+        candidate_records: list[Any] = []
+        candidate_actions: list[np.ndarray] = []
+        original_step = policy_env.step
 
-        def step_hook(action, *step_args, **step_kwargs):
-            solver_actions.append(_to_numpy(action).astype(np.float32).reshape(-1))
-            return original_step(action, *step_args, **step_kwargs)
+        def step_hook(solver_action, *step_args, **step_kwargs):
+            qpos = policy_env.unwrapped.agent.robot.get_qpos()[0].detach().cpu().numpy()
+            action = _convert_solver_action_to_joint_delta(qpos, solver_action, lower, upper)
+            result = original_step(action, *step_args, **step_kwargs)
+            candidate_actions.append(action)
+            candidate_records.append(_extract_record(result[0]))
+            return result
 
-        solver_env.step = step_hook  # type: ignore[method-assign]
+        policy_env.step = step_hook  # type: ignore[method-assign]
         try:
             result = try_candidate(
-                solver_env,
+                policy_env,
                 seed=seed,
                 name=name,
                 local_point=local_point,
                 close_steps=45,
                 complete_task=True,
                 reset_before_attempt=False,
+                force_planner_pd_joint_pos=True,
             )
         finally:
-            solver_env.step = original_step  # type: ignore[method-assign]
+            policy_env.step = original_step  # type: ignore[method-assign]
         attempts.append(result)
-        if result["accepted"] and solver_actions:
-            selected_actions = solver_actions
-            selected_candidate = name
-            break
-    if selected_actions is None:
-        return [], [], {"accepted": False, "attempts": attempts}
-
-    records: list[Any] = []
-    actions: list[np.ndarray] = []
-    obs = raw_obs
-    for solver_action in selected_actions:
-        qpos = obs["agent"]["qpos"].detach().cpu().numpy()[0]
-        action = _convert_solver_action_to_joint_delta(qpos, solver_action, lower, upper)
-        obs, _reward, terminated, truncated, info = policy_env.step(action)
-        actions.append(np.asarray(action, dtype=np.float32))
-        records.append(_extract_record(obs))
-        if _bool(info.get("success", False)) or _bool(terminated) or _bool(truncated):
-            break
-    success = _bool(policy_env.unwrapped.evaluate()["success"])
-    return records, actions, {
-        "accepted": success,
-        "selected_candidate": selected_candidate,
-        "attempts": attempts,
-        "planned_actions": len(selected_actions),
-        "executed_actions": len(actions),
-    }
+        if result["accepted"] and candidate_actions:
+            return candidate_records, candidate_actions, {
+                "accepted": True,
+                "selected_candidate": name,
+                "attempts": attempts,
+                "planned_actions": len(candidate_actions),
+                "executed_actions": len(candidate_actions),
+                "execution_mode": "same_env_absolute_target_to_delta",
+            }
+    policy_env.unwrapped.set_state_dict(state)
+    return [], [], {"accepted": False, "attempts": attempts, "execution_mode": "same_env_absolute_target_to_delta"}
 
 
 def _save_raw_attempt(
