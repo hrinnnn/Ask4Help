@@ -16,7 +16,10 @@ from rlinf.algorithms.vla_fail import (  # noqa: E402
     tokenwise_pca_z_scores,
     tokenwise_topk_mean,
 )
-from tools.pick_single_ycb_airplane_tokenwise_pca import token_source_masks  # noqa: E402
+from tools.pick_single_ycb_airplane_tokenwise_pca import (  # noqa: E402
+    lerobot_sample_to_policy_observation,
+    token_source_masks,
+)
 
 
 def test_independent_token_bases_keep_padding_out_and_standardize_per_position() -> None:
@@ -60,6 +63,19 @@ def test_topk_and_modality_masks_do_not_admit_padding_or_wrong_sources() -> None
     assert masks["base_camera"].tolist() == [True, True, False, False, False]
     assert masks["wrist_camera"].tolist() == [False, False, True, True, False]
     assert masks["language_state"].tolist() == [False, False, False, False, True]
+
+
+def test_id_lerobot_row_uses_the_same_two_view_policy_contract_as_rollouts() -> None:
+    sample = {
+        "image": torch.zeros((16, 20, 3), dtype=torch.uint8),
+        "wrist_image": torch.zeros((3, 16, 20), dtype=torch.uint8),
+        "state": torch.arange(9, dtype=torch.float32),
+    }
+    observation = lerobot_sample_to_policy_observation(sample, task_description="pick up the toy airplane")
+    assert observation["main_images"].shape == (1, 16, 20, 3)
+    assert observation["wrist_images"].shape == (1, 16, 20, 3)
+    assert observation["states"].shape == (1, 9)
+    assert observation["task_ids"].shape == (1,)
 
 
 def test_posthoc_scanner_uses_ever_grasped_not_distribution_split(tmp_path: Path) -> None:

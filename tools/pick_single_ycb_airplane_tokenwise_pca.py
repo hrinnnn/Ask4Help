@@ -88,6 +88,43 @@ def token_source_masks(source_ids: torch.Tensor, *, tokens: int) -> dict[str, to
     return {name: ids == index for index, name in enumerate(SOURCE_NAMES)}
 
 
+def lerobot_sample_to_policy_observation(
+    sample: Mapping[str, Any], *, task_description: str
+) -> dict[str, Any]:
+    """Convert one decoded LeRobot row to the two-view π0.5 input contract."""
+
+    def as_hwc_batch(value: Any) -> torch.Tensor:
+        image = torch.as_tensor(value)
+        if image.ndim == 3:
+            image = image.unsqueeze(0)
+        if image.ndim != 4:
+            raise ValueError(f"expected image [H,W,C] or [B,H,W,C], got {tuple(image.shape)}")
+        if image.shape[1] in (1, 3, 4) and image.shape[-1] not in (1, 3, 4):
+            image = image.permute(0, 2, 3, 1)
+        if image.shape[-1] not in (1, 3, 4):
+            raise ValueError(f"cannot identify image channel dimension in {tuple(image.shape)}")
+        return image.contiguous()
+
+    try:
+        main = as_hwc_batch(sample["image"])
+        wrist = as_hwc_batch(sample["wrist_image"])
+        state = torch.as_tensor(sample["state"])
+    except KeyError as error:
+        raise KeyError("airplane ID data must expose image, wrist_image, and state fields") from error
+    if state.ndim == 1:
+        state = state.unsqueeze(0)
+    if state.ndim != 2:
+        raise ValueError(f"expected state [D] or [B,D], got {tuple(state.shape)}")
+    return {
+        "main_images": main,
+        "wrist_images": wrist,
+        "extra_view_images": None,
+        "states": state,
+        "task_descriptions": [task_description] * state.shape[0],
+        "task_ids": torch.zeros(state.shape[0], dtype=torch.long),
+    }
+
+
 @dataclass(frozen=True)
 class TokenBlock:
     token_indices: torch.Tensor

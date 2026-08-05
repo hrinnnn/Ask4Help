@@ -18,9 +18,15 @@ RLINF_ROOT = ROOT / "RLinf"
 sys.path[:0] = [str(ROOT), str(RLINF_ROOT)]
 
 from rlinf.data.datasets.recap.utils import decode_image_struct_batch  # noqa: E402
-from tools.evaluate_pick_single_ycb_airplane_pi05 import model_observation  # noqa: E402
+from rlinf.envs.maniskill.pick_single_ycb_airplane_variants import PICK_SINGLE_YCB_AIRPLANE_TASK  # noqa: E402
 from tools.maniskill_pi05_vfd_online_awbc import _load_model  # noqa: E402
-from tools.pick_single_ycb_airplane_tokenwise_pca import FORMAT, SOURCE_NAMES, sha256, sha256_path  # noqa: E402
+from tools.pick_single_ycb_airplane_tokenwise_pca import (  # noqa: E402
+    FORMAT,
+    SOURCE_NAMES,
+    lerobot_sample_to_policy_observation,
+    sha256,
+    sha256_path,
+)
 
 
 def _load_dataset(dataset_root: Path):
@@ -79,7 +85,11 @@ def main() -> None:
             masks: list[torch.Tensor] = []
             for index in batch_indices:
                 with torch.inference_mode():
-                    probe = model.extract_prefix_probes_from_observation(model_observation(dataset[index]))
+                    probe = model.extract_prefix_probes_from_observation(
+                        lerobot_sample_to_policy_observation(
+                            dataset[index], task_description=PICK_SINGLE_YCB_AIRPLANE_TASK
+                        )
+                    )
                 current_ids = torch.as_tensor(probe["source_ids"], dtype=torch.int64).cpu()
                 current_names = tuple(probe["source_names"])
                 if source_ids is None:
