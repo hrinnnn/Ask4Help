@@ -17,7 +17,11 @@ ASSET_DIR=${ASSET_DIR:-"${RESULT_ROOT}/assets_independent_rank1000"}
 ROLLOUT_DIR=${ROLLOUT_DIR:-"${RESULT_ROOT}/rollouts_50id_50ood_h250"}
 SCAN_PATH=${SCAN_PATH:-"${RESULT_ROOT}/posthoc_threshold_scan.json"}
 RENDER_DIR=${RENDER_DIR:-"${RESULT_ROOT}/representative_score_videos"}
-STAGE=${1:?Usage: $0 {features|assets|evaluate|scan|render}}
+STAGE=${1:-}
+if [[ -z "${STAGE}" ]]; then
+  echo "Usage: $0 {features|assets|evaluate|scan|render}" >&2
+  exit 2
+fi
 
 export CUDA_VISIBLE_DEVICES="${GPU_ID}"
 export PYTHONPATH="${ASK4HELP_ROOT}:${RLINF_ROOT}:${PYTHONPATH:-}"
