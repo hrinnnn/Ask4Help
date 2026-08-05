@@ -57,3 +57,7 @@ post-hoc/oracle results, not calibrated deployment thresholds.
 Independent rank-1000 bases are large. The evaluator loads model plus both
 locations' assets on one GPU before the first rollout and writes `preflight.json`.
 If this fails, it terminates without substituting shared PCA or reducing rank.
+The asset stage streams feature shards and token blocks, uses FP64 for the
+per-token eigensolves, and defaults to an otherwise idle CUDA device. The saved
+statistics are FP32; this is deliberate so the complete independent asset can
+be resident next to the policy during the required preflight.

@@ -6,6 +6,7 @@ ASK4HELP_ROOT=${ASK4HELP_ROOT:-/root/Ask4Help}
 RLINF_ROOT=${RLINF_ROOT:-"${ASK4HELP_ROOT}/RLinf"}
 PYTHON=${PYTHON:-"${RLINF_ROOT}/.venv/bin/python"}
 GPU_ID=${GPU_ID:-0}
+PCA_COMPUTE_DEVICE=${PCA_COMPUTE_DEVICE:-cuda}
 PI05_BASE=${PI05_BASE:?Set PI05_BASE to the pi0.5 pretrained model directory}
 CHECKPOINT=${CHECKPOINT:-/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/id_sft_no180_modelonly_step2000_plus3000_v1/maniskill_stackcube_pi05_id_sft/checkpoints/global_step_3000}
 NORM_STATS=${NORM_STATS:-/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/assets/id_expert_norm_stats}
@@ -30,7 +31,8 @@ case "${STAGE}" in
   assets)
     exec "${PYTHON}" "${ASK4HELP_ROOT}/tools/build_pick_single_ycb_airplane_tokenwise_pca_assets.py" \
       --feature-dir "${FEATURE_DIR}" --output-dir "${ASSET_DIR}" \
-      --principal-dim 1000 --min-observations 1001 --token-block-size 8
+      --principal-dim 1000 --min-observations 1001 --token-block-size 8 \
+      --compute-device "${PCA_COMPUTE_DEVICE}"
     ;;
   evaluate)
     exec "${PYTHON}" "${ASK4HELP_ROOT}/tools/evaluate_pick_single_ycb_airplane_tokenwise_pca.py" \

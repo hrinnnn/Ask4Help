@@ -99,6 +99,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--principal-dim", type=int, default=1000)
     parser.add_argument("--min-observations", type=int, default=1001)
     parser.add_argument("--token-block-size", type=int, default=8)
+    parser.add_argument("--compute-device", default="cuda", help="CPU or an otherwise idle CUDA device for FP64 eigensolves")
     return parser.parse_args()
 
 
@@ -135,6 +136,7 @@ def main() -> None:
                 mask,
                 principal_dim=args.principal_dim,
                 min_observations=args.min_observations,
+                compute_device=args.compute_device,
             )
             payload = {"token_indices": indices, "statistics": statistics.state_dict()}
             path = block_dir / f"tokens_{start:04d}_{int(indices[-1]) + 1:04d}.pt"
@@ -167,6 +169,9 @@ def main() -> None:
         "principal_dim": args.principal_dim,
         "min_observations": args.min_observations,
         "token_block_size": args.token_block_size,
+        "token_pca_compute_device": args.compute_device,
+        "token_pca_fit_dtype": "float64",
+        "token_pca_storage_dtype": "float32",
         "locations": locations,
     }
     (args.output_dir / "assets_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
