@@ -12,6 +12,7 @@ ROOT = Path(__file__).parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / "RLinf"), str(ROOT / "tools")]
 from rlinf.algorithms.vla_fail import (  # noqa: E402
     fit_tokenwise_pca_residual_statistics,
+    compact_two_camera_prefix_probe_tokens,
     tokenwise_pca_residual_scores,
     tokenwise_pca_z_scores,
     tokenwise_topk_mean,
@@ -76,6 +77,26 @@ def test_id_lerobot_row_uses_the_same_two_view_policy_contract_as_rollouts() -> 
     assert observation["wrist_images"].shape == (1, 16, 20, 3)
     assert observation["states"].shape == (1, 9)
     assert observation["task_ids"].shape == (1,)
+
+
+def test_probe_compacts_only_the_fully_masked_extra_view_template() -> None:
+    prefix = torch.arange(968, dtype=torch.float32).reshape(1, 968, 1)
+    valid = torch.ones((1, 968), dtype=torch.bool)
+    valid[:, 512:768] = False
+    compact_input, compact_bridge, compact_mask, source_ids = compact_two_camera_prefix_probe_tokens(
+        num_images=3,
+        prefix_embs=prefix,
+        prefix_output=prefix + 1000,
+        prefix_valid_mask=valid,
+    )
+    assert compact_input.shape == compact_bridge.shape == (1, 712, 1)
+    assert compact_mask.shape == (1, 712)
+    assert compact_input[0, 512, 0].item() == 768.0
+    assert compact_bridge[0, 512, 0].item() == 1768.0
+    assert source_ids.shape == (712,)
+    assert source_ids[:256].eq(0).all()
+    assert source_ids[256:512].eq(1).all()
+    assert source_ids[512:].eq(2).all()
 
 
 def test_posthoc_scanner_uses_ever_grasped_not_distribution_split(tmp_path: Path) -> None:
