@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from pick_single_ycb_airplane_detector_protocol import summary_for_method
 from pick_single_ycb_airplane_tokenwise_pca import MAIN_METHODS, sha256
+from libero_plus_failure_protocol import aucpdt, penalized_detection_time_curve
 
 
 def _records(episodes: list[dict[str, Any]], method: str) -> list[dict[str, Any]]:
@@ -49,12 +50,25 @@ def _scan(records: list[dict[str, Any]], method: str) -> dict[str, Any]:
     candidates = sorted({max(row["scores"][method]) for row in records})
     rows = [{"threshold": float(value), **summary_for_method(records, method, float(value))} for value in candidates]
     maxima = [max(row["scores"][method]) for row in records]
+    pdt_records = [
+        {
+            "episode_id": row["episode_id"],
+            "success": row["success"],
+            "scores": row["scores"][method],
+        }
+        for row in records
+    ]
     return {
         "candidate_count": len(rows), "threshold_rows": rows,
         "best_balanced_accuracy": _choose(rows, "balanced_accuracy"),
         "best_f1": _choose(rows, "f1"),
         "auroc": summary_for_method(records, method, candidates[0])["auroc"],
         "auprc": summary_for_method(records, method, candidates[0])["auprc"],
+        # Unlike trajectory classification, PDT needs every raw timestep score:
+        # a non-maximum threshold can keep the same alerted episodes but alert
+        # a failing episode earlier.
+        "pdt_curve": penalized_detection_time_curve(pdt_records),
+        "aucpdt": aucpdt(pdt_records),
         "episode_maxima": {"min": min(maxima), "max": max(maxima)},
     }
 

@@ -75,6 +75,8 @@ def test_posthoc_scanner_uses_ever_grasped_not_distribution_split(tmp_path: Path
     records = module._records(episodes, "bridge_pooled_pca")
     scan = module._scan(records, "bridge_pooled_pca")
     assert scan["best_balanced_accuracy"]["balanced_accuracy"] == 1.0
+    assert scan["pdt_curve"]
+    assert scan["aucpdt"] is not None
     assert module._representatives(episodes)["ood_failure"] == 1
 
 
