@@ -41,6 +41,7 @@ from tools.pick_single_ycb_airplane_eval_common import clip_action_chunk  # noqa
 from tools.pick_single_ycb_airplane_tokenwise_pca import (  # noqa: E402
     MAIN_METHODS,
     TokenwisePCAScorer,
+    checkpoint_weights_path,
     sha256,
     sha256_path,
 )
@@ -217,7 +218,7 @@ def main() -> None:
         "format": "pick_single_ycb_airplane_tokenwise_pca_rollouts_v1",
         "task": "pick_single_ycb_airplane", "success_label": "ever_grasped",
         "checkpoint": str(args.checkpoint),
-        "checkpoint_sha256": sha256(args.checkpoint / "full_weights.pt"),
+        "checkpoint_sha256": sha256(checkpoint_weights_path(args.checkpoint)),
         "norm_stats": str(args.norm_stats), "norm_stats_sha256": sha256_path(args.norm_stats),
         "assets_dir": str(args.assets_dir), "assets_manifest_sha256": sha256(args.assets_dir / "assets_manifest.json"),
         "protocol": {"id_seeds": [args.id_seed, args.id_seed + 49], "ood_seeds": [args.ood_seed, args.ood_seed + 49],

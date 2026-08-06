@@ -58,6 +58,24 @@ def sha256_path(path: Path) -> str:
     return digest.hexdigest()
 
 
+def checkpoint_weights_path(checkpoint: Path) -> Path:
+    """Resolve either a direct weight file or an OpenPI checkpoint directory."""
+
+    if checkpoint.is_file():
+        return checkpoint
+    candidates = (
+        checkpoint / "full_weights.pt",
+        checkpoint / "actor" / "model_state_dict" / "full_weights.pt",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        f"No full_weights.pt below {checkpoint}; checked: "
+        + ", ".join(str(candidate) for candidate in candidates)
+    )
+
+
 def load_torch(path: Path) -> Any:
     try:
         return torch.load(path, map_location="cpu", weights_only=False)

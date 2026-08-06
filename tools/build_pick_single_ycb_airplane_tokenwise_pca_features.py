@@ -23,6 +23,7 @@ from tools.maniskill_pi05_vfd_online_awbc import _load_model  # noqa: E402
 from tools.pick_single_ycb_airplane_tokenwise_pca import (  # noqa: E402
     FORMAT,
     SOURCE_NAMES,
+    checkpoint_weights_path,
     lerobot_sample_to_policy_observation,
     sha256,
     sha256_path,
@@ -126,7 +127,7 @@ def main() -> None:
         "task": "pick_single_ycb_airplane",
         "detector_format": FORMAT,
         "checkpoint": str(args.checkpoint),
-        "checkpoint_sha256": sha256(args.checkpoint / "full_weights.pt") if (args.checkpoint / "full_weights.pt").is_file() else None,
+        "checkpoint_sha256": sha256(checkpoint_weights_path(args.checkpoint)),
         "pi05_base": str(args.pi05_base),
         "norm_stats": str(args.norm_stats),
         "norm_stats_sha256": sha256_path(args.norm_stats),

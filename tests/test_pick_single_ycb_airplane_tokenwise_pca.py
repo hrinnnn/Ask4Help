@@ -18,6 +18,7 @@ from rlinf.algorithms.vla_fail import (  # noqa: E402
     tokenwise_topk_mean,
 )
 from tools.pick_single_ycb_airplane_tokenwise_pca import (  # noqa: E402
+    checkpoint_weights_path,
     lerobot_sample_to_policy_observation,
     token_source_masks,
 )
@@ -97,6 +98,13 @@ def test_probe_compacts_only_the_fully_masked_extra_view_template() -> None:
     assert source_ids[:256].eq(0).all()
     assert source_ids[256:512].eq(1).all()
     assert source_ids[512:].eq(2).all()
+
+
+def test_checkpoint_weights_path_supports_openpi_actor_layout(tmp_path: Path) -> None:
+    weights = tmp_path / "global_step_3000" / "actor" / "model_state_dict" / "full_weights.pt"
+    weights.parent.mkdir(parents=True)
+    weights.write_bytes(b"weights")
+    assert checkpoint_weights_path(weights.parents[2]) == weights
 
 
 def test_posthoc_scanner_uses_ever_grasped_not_distribution_split(tmp_path: Path) -> None:
