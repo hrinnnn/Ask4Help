@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -112,23 +114,27 @@ def _render_one(
     ok, first = capture.read()
     if not ok:
         raise RuntimeError(f"source rollout video is empty: {episode['video']}")
-    writer = cv2.VideoWriter(str(output), cv2.VideoWriter_fourcc(*"mp4v"), fps, (first.shape[1], first.shape[0] + 250))
-    try:
-        writer.write(_draw_panel(first, episode, thresholds, focus_method=focus_method, env_step=0))
-        frame_index = 1
-        while True:
-            ok, frame = capture.read()
-            if not ok:
-                break
-            writer.write(_draw_panel(frame, episode, thresholds, focus_method=focus_method, env_step=frame_index))
-            frame_index += 1
-    finally:
-        writer.release()
-        capture.release()
-    if not output.is_file() or output.stat().st_size == 0:
-        raise RuntimeError(f"score-video rendering failed: {output}")
-    if h264:
-        _transcode_h264(output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="airplane-token-pca-video-") as temporary:
+        local_output = Path(temporary) / output.name
+        writer = cv2.VideoWriter(str(local_output), cv2.VideoWriter_fourcc(*"mp4v"), fps, (first.shape[1], first.shape[0] + 250))
+        try:
+            writer.write(_draw_panel(first, episode, thresholds, focus_method=focus_method, env_step=0))
+            frame_index = 1
+            while True:
+                ok, frame = capture.read()
+                if not ok:
+                    break
+                writer.write(_draw_panel(frame, episode, thresholds, focus_method=focus_method, env_step=frame_index))
+                frame_index += 1
+        finally:
+            writer.release()
+            capture.release()
+        if not local_output.is_file() or local_output.stat().st_size == 0:
+            raise RuntimeError(f"score-video rendering failed: {output}")
+        if h264:
+            _transcode_h264(local_output)
+        shutil.copyfile(local_output, output)
 
 
 def parse_args() -> argparse.Namespace:
