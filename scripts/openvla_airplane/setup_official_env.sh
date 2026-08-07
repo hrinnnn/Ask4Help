@@ -27,7 +27,7 @@ python -m pip install \
   accelerate==0.30.1 draccus==0.8.0 einops huggingface_hub json-numpy jsonlines \
   matplotlib peft==0.11.1 protobuf rich sentencepiece==0.1.99 \
   timm==0.9.10 tokenizers==0.19.1 transformers==4.40.1 wandb \
-  packaging ninja pyarrow pandas scikit-learn pytest pillow opencv-python-headless
+  packaging ninja numpy==1.26.4 pyarrow pandas scikit-learn pytest pillow opencv-python-headless
 python -m pip install -e "$OPENVLA_ROOT" --no-deps
 python -m pip install "flash-attn==2.5.5" --no-build-isolation
 
