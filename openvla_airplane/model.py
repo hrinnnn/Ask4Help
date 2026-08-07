@@ -66,5 +66,7 @@ def prepare_inference_inputs(model, processor, image: Image.Image, device: int =
 @torch.inference_mode()
 def predict_action(model, processor, image: Image.Image, device: int = 0) -> tuple:
     inputs = prepare_inference_inputs(model, processor, image, device)
-    action = model.predict_action(**inputs, do_sample=False)
+    # Torch 2.2's cached single-token linear path raises SIGFPE on H20. Greedy
+    # decoding without KV cache is numerically equivalent and remains stable.
+    action = model.predict_action(**inputs, do_sample=False, use_cache=False)
     return action, inputs
