@@ -149,16 +149,13 @@ def build_example(
 ) -> dict:
     normalized = normalize_action(sample["action"], action_stats)
     action_text = action_tokenizer(normalized)
-    tokenized_action = tokenizer(action_text, add_special_tokens=False).input_ids
-    if len(tokenized_action) != normalized.shape[0]:
-        raise ValueError(f"8D action did not round-trip to 8 tokens: {tokenized_action}")
 
     prompt_builder = prompt_builder_fn("openvla")
     prompt_builder.add_turn("human", f"What action should the robot take to {AIRPLANE_INSTRUCTION}?")
     prompt_builder.add_turn("gpt", action_text)
     input_ids = tokenizer(prompt_builder.get_prompt(), add_special_tokens=True).input_ids
     labels = list(input_ids)
-    labels[: -(len(tokenized_action) + 1)] = [IGNORE_INDEX] * (len(labels) - len(tokenized_action) - 1)
+    labels[: -(len(normalized) + 1)] = [IGNORE_INDEX] * (len(labels) - len(normalized) - 1)
     return {
         "pixel_values": image_transform(sample["image"]),
         "input_ids": torch.tensor(input_ids, dtype=torch.long),
@@ -174,6 +171,9 @@ def action_token_round_trip(action: Sequence[float], tokenizer, action_tokenizer
     original = np.asarray(action, dtype=np.float32)
     text = action_tokenizer(original)
     ids = tokenizer(text, add_special_tokens=False).input_ids
+    # Llama's SentencePiece tokenizer prepends its standalone-string whitespace token.
+    if len(ids) == len(original) + 1 and ids[0] == 29871:
+        ids = ids[1:]
     decoded = action_tokenizer.decode_token_ids_to_actions(np.asarray(ids, dtype=np.int64))
     if len(ids) != len(original):
         raise ValueError(f"Expected {len(original)} tokens, got {len(ids)}")
