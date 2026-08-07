@@ -34,7 +34,7 @@ from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     _select_camera,
 )
 
-from .model import load_openvla, prepare_inference_inputs
+from .model import load_openvla, predict_action
 from .dataset import AIRPLANE_INSTRUCTION
 from .runtime import DetectorBank
 
@@ -64,9 +64,7 @@ def _run_episode(env, model, processor, detector_bank, split: str, seed: int, ep
     for step in range(max_steps):
         image = _base_image(raw_obs)
         start = time.perf_counter()
-        inputs = prepare_inference_inputs(model, processor, image, device)
-        with torch.inference_mode():
-            action, _ = model.predict_action(**inputs, unnorm_key="airplane", do_sample=False)
+        action, inputs = predict_action(model, processor, image, device)
         torch.cuda.synchronize()
         latency_ms = (time.perf_counter() - start) * 1000.0
         scores = {} if detector_bank is None else detector_bank.score(model, inputs)
