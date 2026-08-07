@@ -119,7 +119,9 @@ def save_checkpoint(
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     adapter = checkpoint_dir / "adapter"
     unwrapped = model.module if hasattr(model, "module") else model
-    unwrapped.save_pretrained(adapter)
+    # OSSFS does not support the mmap-based safetensors writer. PEFT's PyTorch
+    # serialization preserves the same adapter state without requiring mmap.
+    unwrapped.save_pretrained(adapter, safe_serialization=False)
     processor.save_pretrained(checkpoint_dir / "processor")
     (checkpoint_dir / "action_stats.json").write_text(json.dumps(stats, indent=2))
     (checkpoint_dir / "train_config.json").write_text(json.dumps(config, indent=2, default=str))
