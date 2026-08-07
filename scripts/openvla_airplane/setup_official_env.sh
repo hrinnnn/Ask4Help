@@ -27,9 +27,13 @@ python -m pip install \
   accelerate==0.30.1 draccus==0.8.0 einops huggingface_hub json-numpy jsonlines \
   matplotlib peft==0.11.1 protobuf rich sentencepiece==0.1.99 \
   timm==0.9.10 tokenizers==0.19.1 transformers==4.40.1 wandb \
-  packaging ninja numpy==1.26.4 pyarrow pandas scikit-learn pytest pillow opencv-python-headless
+  packaging ninja numpy==1.26.4 pyarrow pandas scikit-learn pytest pillow opencv-python-headless==4.9.0.80
+python -m pip install \
+  tensorflow==2.15.0 tensorflow-datasets==4.9.3 tensorflow-graphics==2021.12.3 \
+  "dlimp @ git+https://github.com/moojink/dlimp_openvla"
 python -m pip install -e "$OPENVLA_ROOT" --no-deps
-python -m pip install "flash-attn==2.5.5" --no-build-isolation
+python -m pip install \
+  "https://github.com/Dao-AILab/flash-attention/releases/download/v2.5.5/flash_attn-2.5.5%2Bcu122torch2.2cxx11abiFALSE-cp310-cp310-linux_x86_64.whl"
 
 mkdir -p "$RESULT_ROOT/environment"
 python - <<'PY'
