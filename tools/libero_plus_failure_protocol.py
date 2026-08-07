@@ -398,16 +398,21 @@ def penalized_detection_time_curve(episodes: Sequence[Mapping[str, Any]]) -> lis
 
     _validate_episodes(episodes)
     points = _threshold_points(episodes)
+    # The direct all-pairs definition is quadratic in the number of timestep
+    # scores. Sweep precision from high to low while retaining the smallest PDT
+    # already available at a strictly greater precision. Equal duplicate points
+    # remain present, matching the mathematical dominance definition.
     pareto: list[dict[str, float]] = []
+    best_at_greater_precision = math.inf
+    groups: dict[float, list[dict[str, float]]] = {}
     for point in points:
-        dominated = any(
-            other["precision"] >= point["precision"]
-            and other["pdt"] <= point["pdt"]
-            and (other["precision"] > point["precision"] or other["pdt"] < point["pdt"])
-            for other in points
-        )
-        if not dominated:
-            pareto.append(point)
+        groups.setdefault(point["precision"], []).append(point)
+    for precision in sorted(groups, reverse=True):
+        group = groups[precision]
+        group_minimum = min(point["pdt"] for point in group)
+        if group_minimum < best_at_greater_precision:
+            pareto.extend(point for point in group if point["pdt"] == group_minimum)
+        best_at_greater_precision = min(best_at_greater_precision, group_minimum)
     return sorted(pareto, key=lambda point: (point["precision"], point["pdt"], point["threshold"]))
 
 
