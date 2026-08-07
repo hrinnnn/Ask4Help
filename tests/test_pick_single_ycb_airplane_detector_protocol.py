@@ -55,11 +55,15 @@ def test_threshold_free_summary_uses_trajectory_maximum() -> None:
 def test_threshold_free_summary_aucpdt_uses_full_temporal_trace() -> None:
     early = [
         {"episode_index": 0, "ever_grasped": True, "scores": {"m": [0.1, 0.9]}},
-        {"episode_index": 1, "ever_grasped": False, "scores": {"m": [0.8, 0.9]}},
+        {"episode_index": 1, "ever_grasped": True, "scores": {"m": [0.1, 0.2]}},
+        {"episode_index": 2, "ever_grasped": False, "scores": {"m": [0.8, 0.9]}},
+        {"episode_index": 3, "ever_grasped": False, "scores": {"m": [0.8, 0.9]}},
     ]
     late = [
         {"episode_index": 0, "ever_grasped": True, "scores": {"m": [0.1, 0.9]}},
-        {"episode_index": 1, "ever_grasped": False, "scores": {"m": [0.1, 0.9]}},
+        {"episode_index": 1, "ever_grasped": True, "scores": {"m": [0.1, 0.2]}},
+        {"episode_index": 2, "ever_grasped": False, "scores": {"m": [0.1, 0.9]}},
+        {"episode_index": 3, "ever_grasped": False, "scores": {"m": [0.1, 0.9]}},
     ]
 
     assert threshold_free_summary(early, "m")["aucpdt"] < threshold_free_summary(late, "m")["aucpdt"]
