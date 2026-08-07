@@ -65,10 +65,15 @@ def main() -> None:
         key=lambda row: (-1.0 if row["auprc"] is None else -float(row["auprc"]), row["method"]),
     )
     result = {
-        "format": "pick_single_ycb_airplane_detector_auprc_v1",
+        "format": "pick_single_ycb_airplane_detector_threshold_free_metrics_v2",
         "success_label": "ever_grasped",
         "failure_label": "not ever_grasped",
         "episode_score": "maximum detector score over the trajectory",
+        "aucpdt": {
+            "definition": "VLA-FAIL precision/PDT Pareto area over all unique timestep thresholds",
+            "missed_failure_penalty": "full episode horizon",
+            "direction": "lower_is_better",
+        },
         "episodes": len(episodes),
         "id_episodes": sum(row["split"] == "id" for row in episodes),
         "ood_episodes": sum(row["split"] == "ood" for row in episodes),

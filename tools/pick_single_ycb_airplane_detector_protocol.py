@@ -7,7 +7,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
-from libero_plus_failure_protocol import first_alert_index
+from libero_plus_failure_protocol import aucpdt, first_alert_index
 
 
 BASE_METHODS = (
@@ -135,13 +135,21 @@ def summary_for_method(episodes: Sequence[Mapping[str, Any]], method: str, thres
 
 
 def threshold_free_summary(episodes: Sequence[Mapping[str, Any]], method: str) -> dict[str, Any]:
-    """Report ranking metrics from one trajectory-level maximum per episode."""
+    """Report trajectory ranking and time-sensitive threshold-free metrics."""
 
     scored = [row for row in episodes if row.get("scores", {}).get(method)]
     if not scored:
-        return {"episodes": 0, "auprc": None, "auroc": None}
+        return {"episodes": 0, "auprc": None, "auroc": None, "aucpdt": None}
     labels = [_episode_label(row) for row in scored]
     maxima = [max(float(value) for value in row["scores"][method]) for row in scored]
+    temporal_episodes = [
+        {
+            "episode_id": str(row.get("episode_index", index)),
+            "success": not label,
+            "scores": [float(value) for value in row["scores"][method]],
+        }
+        for index, (row, label) in enumerate(zip(scored, labels))
+    ]
     return {
         "episodes": len(scored),
         "successes": labels.count(False),
@@ -149,6 +157,7 @@ def threshold_free_summary(episodes: Sequence[Mapping[str, Any]], method: str) -
         "trajectory_score": "maximum over valid decision scores",
         "auprc": _average_precision(labels, maxima),
         "auroc": _roc_auc(labels, maxima),
+        "aucpdt": aucpdt(temporal_episodes),
         "score_min": min(maxima),
         "score_max": max(maxima),
     }
