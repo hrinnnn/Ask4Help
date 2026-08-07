@@ -45,6 +45,27 @@ from tools.pick_single_ycb_airplane_tokenwise_pca import (  # noqa: E402
     sha256,
     sha256_path,
 )
+from rlinf.algorithms.vla_fail import LLMDStatistics, llmd_score  # noqa: E402
+
+
+class FinalLLMDProbe:
+    """Score the Action Expert's final tokens without altering policy actions."""
+
+    def __init__(self, assets_path: Path, *, device: torch.device | str) -> None:
+        payload = torch.load(assets_path, map_location="cpu", weights_only=False)
+        statistics = LLMDStatistics.from_state_dict(payload["statistics"]["final_llmd"])
+        target = torch.device(device)
+        self.statistics = LLMDStatistics(
+            mean=statistics.mean.to(target),
+            precision=statistics.precision.to(target),
+            ridge=statistics.ridge,
+            num_observations=statistics.num_observations,
+        )
+        self.fixed_prior = torch.as_tensor(payload["fixed_prior"], device=target)
+
+    def score(self, model: Any, env_obs: dict[str, Any]) -> float:
+        features = model.extract_llmd_action_features(env_obs, self.fixed_prior)
+        return float(llmd_score(features, self.statistics)[0].item())
 
 
 def _grasped(env: Any) -> bool:
@@ -65,7 +86,8 @@ def _summary(values: list[float]) -> dict[str, float | int | None]:
 
 
 def _run_episode(
-    *, env: Any, model: Any, scorer: TokenwisePCAScorer, split: str, seed: int,
+    *, env: Any, model: Any, scorer: TokenwisePCAScorer, final_llmd: FinalLLMDProbe | None,
+    split: str, seed: int,
     execute_horizon: int, max_episode_steps: int, episode_index: int, video_dir: Path,
 ) -> dict[str, Any]:
     raw_obs, _info = env.reset(seed=seed)
@@ -79,8 +101,9 @@ def _run_episode(
         torch.cuda.synchronize()
         policy_start = time.perf_counter()
         with torch.inference_mode():
+            env_obs = model_observation(raw_obs)
             predicted, result = model.predict_action_batch(
-                env_obs=model_observation(raw_obs), mode="eval", compute_values=False, return_prefix_probes=True
+                env_obs=env_obs, mode="eval", compute_values=False, return_prefix_probes=True
             )
         torch.cuda.synchronize()
         policy_ms = (time.perf_counter() - policy_start) * 1000.0
@@ -88,10 +111,17 @@ def _run_episode(
         scored = scorer.score_probe(result["prefix_probes"])
         torch.cuda.synchronize()
         pca_ms = (time.perf_counter() - pca_start) * 1000.0
+        final_llmd_ms = 0.0
+        if final_llmd is not None:
+            final_llmd_start = time.perf_counter()
+            scored["scores"]["final_llmd"] = final_llmd.score(model, env_obs)
+            torch.cuda.synchronize()
+            final_llmd_ms = (time.perf_counter() - final_llmd_start) * 1000.0
         chunk = clip_action_chunk(predicted.detach().float().cpu().numpy(), low, high, execute_horizon)
         timeline.append({
             "decision_index": len(timeline), "env_step": executed, "scores": scored["scores"],
-            "modalities": scored["modalities"], "topk": scored["topk"], "policy_ms": policy_ms, "pca_score_ms": pca_ms,
+            "modalities": scored["modalities"], "topk": scored["topk"], "policy_ms": policy_ms,
+            "pca_score_ms": pca_ms, "final_llmd_score_ms": final_llmd_ms,
         })
         for action in chunk:
             raw_obs, _reward, terminated, truncated, info = env.step(
@@ -122,7 +152,8 @@ def _run_episode(
 
 def _distributions(episodes: list[dict[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
-    for method in MAIN_METHODS:
+    methods = tuple(episodes[0]["timeline"][0]["scores"])
+    for method in methods:
         groups: dict[str, list[float]] = {}
         for episode in episodes:
             group = f"{episode['split']}_{'success' if episode['ever_grasped'] else 'failure'}"
@@ -137,7 +168,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pi05-base", type=Path, required=True)
     parser.add_argument("--norm-stats", type=Path, required=True)
     parser.add_argument("--assets-dir", type=Path, required=True)
+    parser.add_argument("--final-llmd-assets", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--split", choices=("both", "id", "ood"), default="both")
     parser.add_argument("--episodes-per-split", type=int, default=50)
     parser.add_argument("--id-seed", type=int, default=50000)
     parser.add_argument("--ood-seed", type=int, default=60000)
@@ -166,6 +199,11 @@ def main() -> None:
         # substitute a shared basis or a lower rank.
         preflight_start = time.perf_counter()
         scorer = TokenwisePCAScorer(args.assets_dir, device=args.device)
+        final_llmd = (
+            None
+            if args.final_llmd_assets is None
+            else FinalLLMDProbe(args.final_llmd_assets, device=args.device)
+        )
         torch.cuda.synchronize()
         preflight = {
             "passed": True,
@@ -187,9 +225,12 @@ def main() -> None:
         del model
         torch.cuda.empty_cache()
         raise RuntimeError("independent token PCA resident-memory preflight failed") from error
+    splits = (("id", args.id_seed), ("ood", args.ood_seed)) if args.split == "both" else (
+        (("id", args.id_seed),) if args.split == "id" else (("ood", args.ood_seed),)
+    )
     episodes: list[dict[str, Any]] = []
     try:
-        for split, first_seed in (("id", args.id_seed), ("ood", args.ood_seed)):
+        for split, first_seed in splits:
             env_args = argparse.Namespace(
                 split=split, image_size=args.image_size, control_freq=args.control_freq,
                 max_episode_steps=args.max_episode_steps, sim_backend=args.sim_backend,
@@ -198,7 +239,7 @@ def main() -> None:
             try:
                 for offset in range(args.episodes_per_split):
                     episode = _run_episode(
-                        env=env, model=model, scorer=scorer, split=split, seed=first_seed + offset,
+                        env=env, model=model, scorer=scorer, final_llmd=final_llmd, split=split, seed=first_seed + offset,
                         execute_horizon=args.execute_horizon, max_episode_steps=args.max_episode_steps,
                         episode_index=len(episodes), video_dir=args.output_dir / "videos",
                     )
@@ -221,12 +262,20 @@ def main() -> None:
         "checkpoint_sha256": sha256(checkpoint_weights_path(args.checkpoint)),
         "norm_stats": str(args.norm_stats), "norm_stats_sha256": sha256_path(args.norm_stats),
         "assets_dir": str(args.assets_dir), "assets_manifest_sha256": sha256(args.assets_dir / "assets_manifest.json"),
-        "protocol": {"id_seeds": [args.id_seed, args.id_seed + 49], "ood_seeds": [args.ood_seed, args.ood_seed + 49],
+        "protocol": {"requested_split": args.split, "id_seeds": [args.id_seed, args.id_seed + 49], "ood_seeds": [args.ood_seed, args.ood_seed + 49],
                      "execute_horizon": args.execute_horizon, "max_episode_steps": args.max_episode_steps,
                      "threshold_calibration": "none_posthoc_scan_only"},
         "runtime": {"resident_pca_asset_bytes": scorer.resident_asset_bytes(), "peak_cuda_bytes": peak_bytes},
-        "grasp_rates": {split: sum(row["ever_grasped"] for row in episodes if row["split"] == split) / 50.0 for split in ("id", "ood")},
-        "strict_success_rates": {split: sum(row["strict_success"] for row in episodes if row["split"] == split) / 50.0 for split in ("id", "ood")},
+        "grasp_rates": {
+            split: (sum(row["ever_grasped"] for row in episodes if row["split"] == split) / count if count else None)
+            for split in ("id", "ood")
+            for count in (sum(row["split"] == split for row in episodes),)
+        },
+        "strict_success_rates": {
+            split: (sum(row["strict_success"] for row in episodes if row["split"] == split) / count if count else None)
+            for split in ("id", "ood")
+            for count in (sum(row["split"] == split for row in episodes),)
+        },
         "score_distributions": _distributions(episodes), "episodes": episodes,
     }
     (args.output_dir / "episodes.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

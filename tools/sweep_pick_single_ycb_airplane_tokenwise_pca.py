@@ -86,6 +86,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--methods", nargs="+", default=None)
     return parser.parse_args()
 
 
@@ -97,11 +98,16 @@ def main() -> None:
     if payload.get("format") != "pick_single_ycb_airplane_tokenwise_pca_rollouts_v1":
         raise ValueError("not an airplane token-wise PCA rollout payload")
     episodes = list(payload["episodes"])
+    methods = tuple(args.methods or MAIN_METHODS)
+    available = set(episodes[0]["timeline"][0]["scores"])
+    missing = set(methods) - available
+    if missing:
+        raise ValueError(f"requested methods are absent from rollout scores: {sorted(missing)}")
     result = {
         "format": "pick_single_ycb_airplane_tokenwise_pca_posthoc_scan_v1",
         "warning": "Post-hoc/oracle threshold scan: this same evaluation split supplies outcome labels and candidate thresholds.",
         "episodes": str(args.episodes), "episodes_sha256": sha256(args.episodes), "success_label": "ever_grasped",
-        "methods": {method: _scan(_records(episodes, method), method) for method in MAIN_METHODS},
+        "methods": {method: _scan(_records(episodes, method), method) for method in methods},
         "representative_episode_indices": _representatives(episodes),
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)

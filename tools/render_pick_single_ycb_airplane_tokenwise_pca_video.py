@@ -21,6 +21,10 @@ COLORS = ((72, 175, 255), (86, 212, 129), (80, 120, 255), (230, 184, 54))
 ALERT_COLORS = ((55, 55, 235), (0, 165, 255), (180, 80, 190), (90, 210, 90))
 
 
+def _panel_height(methods: tuple[str, ...]) -> int:
+    return 58 + 92 * len(methods) + 34
+
+
 def _first_alert(episode: dict[str, Any], method: str, threshold: float) -> dict[str, Any] | None:
     return next((point for point in episode["timeline"] if float(point["scores"][method]) >= threshold), None)
 
@@ -31,23 +35,31 @@ def _draw_panel(
     thresholds: dict[str, float],
     *,
     focus_method: str,
+    methods: tuple[str, ...],
     alert_methods: tuple[str, ...],
     env_step: int,
 ) -> np.ndarray:
     height, width = frame.shape[:2]
-    panel_h = 250
+    panel_h = _panel_height(methods)
     panel = np.full((panel_h, width, 3), 22, dtype=np.uint8)
-    traces = {method: [float(point["scores"][method]) for point in episode["timeline"]] for method in MAIN_METHODS}
-    all_values = [value for trace in traces.values() for value in trace]
-    lo, hi = min(all_values), max(all_values)
-    if hi <= lo:
-        hi = lo + 1.0
+    traces = {method: [float(point["scores"][method]) for point in episode["timeline"]] for method in methods}
     cv2.putText(panel, f"{episode['split']} seed={episode['seed']} grasp={int(episode['ever_grasped'])}", (16, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (240, 240, 240), 1, cv2.LINE_AA)
-    left, right, top, bottom = 60, width - 20, 42, panel_h - 42
-    cv2.line(panel, (left, bottom), (right, bottom), (115, 115, 115), 1)
-    cv2.line(panel, (left, top), (left, bottom), (115, 115, 115), 1)
-    for method, color in zip(MAIN_METHODS, COLORS):
+    left, right = 60, width - 20
+    row_top = 38
+    row_h = 76
+    alert_positions: dict[str, int] = {}
+    for method, color in zip(methods, COLORS):
         values = traces[method]
+        index = methods.index(method)
+        top = row_top + index * 92
+        bottom = top + row_h
+        threshold = float(thresholds[method])
+        lo = min(min(values), threshold)
+        hi = max(max(values), threshold)
+        padding = max((hi - lo) * 0.10, 1e-8)
+        lo, hi = lo - padding, hi + padding
+        cv2.line(panel, (left, bottom), (right, bottom), (115, 115, 115), 1)
+        cv2.line(panel, (left, top), (left, bottom), (115, 115, 115), 1)
         points = []
         for index, value in enumerate(values):
             x = left + round((right - left) * index / max(1, len(values) - 1))
@@ -55,15 +67,10 @@ def _draw_panel(
             points.append((x, y))
         thickness = 3 if method == focus_method else 1
         cv2.polylines(panel, [np.asarray(points, dtype=np.int32)], False, color, thickness, cv2.LINE_AA)
-        label_y = 60 + 21 * list(MAIN_METHODS).index(method)
-        cv2.putText(panel, method, (left + 8, label_y), cv2.FONT_HERSHEY_SIMPLEX, 0.45, color, 1, cv2.LINE_AA)
-        if method in thresholds:
-            y = bottom - round((bottom - top) * (thresholds[method] - lo) / (hi - lo))
-            if top <= y <= bottom:
-                cv2.line(panel, (left, y), (right, y), color, 1, cv2.LINE_AA)
+        cv2.putText(panel, f"{method}: threshold={threshold:.4g}", (left + 8, top + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.42, color, 1, cv2.LINE_AA)
+        threshold_y = bottom - round((bottom - top) * (threshold - lo) / (hi - lo))
+        cv2.line(panel, (left, threshold_y), (right, threshold_y), color, 1, cv2.LINE_AA)
     decision = max((index for index, point in enumerate(episode["timeline"]) if point["env_step"] <= env_step), default=0)
-    current_x = left + round((right - left) * decision / max(1, len(episode["timeline"]) - 1))
-    cv2.line(panel, (current_x, top), (current_x, bottom), (225, 225, 225), 1, cv2.LINE_AA)
     alerts = {method: _first_alert(episode, method, thresholds[method]) for method in alert_methods}
     for method, color in zip(alert_methods, ALERT_COLORS):
         alert = alerts[method]
@@ -71,7 +78,15 @@ def _draw_panel(
             continue
         alert_index = episode["timeline"].index(alert)
         alert_x = left + round((right - left) * alert_index / max(1, len(episode["timeline"]) - 1))
-        cv2.line(panel, (alert_x, top), (alert_x, bottom), color, 2, cv2.LINE_AA)
+        alert_positions[method] = alert_x
+    for index, method in enumerate(methods):
+        top = row_top + index * 92
+        bottom = top + row_h
+        current_x = left + round((right - left) * decision / max(1, len(episode["timeline"]) - 1))
+        cv2.line(panel, (current_x, top), (current_x, bottom), (225, 225, 225), 1, cv2.LINE_AA)
+        for alert_method, color in zip(alert_methods, ALERT_COLORS):
+            if alert_method in alert_positions:
+                cv2.line(panel, (alert_positions[alert_method], top), (alert_positions[alert_method], bottom), color, 2, cv2.LINE_AA)
     current = episode["timeline"][decision]
     current_score = float(current["scores"][focus_method])
     state = "ALERT" if current_score >= thresholds[focus_method] else "policy"
@@ -83,16 +98,13 @@ def _draw_panel(
     cv2.putText(
         panel,
         f"{focus_method}: {current_score:.4g} / th={thresholds[focus_method]:.4g} | {state} | first: {alert_text}",
-        (16, panel_h - 35),
+        (16, panel_h - 19),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.48,
         (55, 55, 235) if state == "ALERT" else (215, 215, 215),
         1,
         cv2.LINE_AA,
     )
-    latest = episode["timeline"][-1].get("topk", {}).get("bridge", {}).get("source_fraction", {})
-    modal = "TopK16 bridge: " + " ".join(f"{name}={latest.get(name, 0.0):.2f}" for name in ("base_camera", "wrist_camera", "language_state"))
-    cv2.putText(panel, modal, (16, panel_h - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.47, (215, 215, 215), 1, cv2.LINE_AA)
     return np.concatenate((frame, panel), axis=0)
 
 
@@ -114,7 +126,7 @@ def _transcode_h264(output: Path) -> None:
 
 def _render_one(
     episode: dict[str, Any], output: Path, thresholds: dict[str, float], focus_method: str,
-    alert_methods: tuple[str, ...], h264: bool,
+    methods: tuple[str, ...], alert_methods: tuple[str, ...], h264: bool,
 ) -> None:
     capture = cv2.VideoCapture(str(episode["video"]))
     if not capture.isOpened():
@@ -126,15 +138,18 @@ def _render_one(
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="airplane-token-pca-video-") as temporary:
         local_output = Path(temporary) / output.name
-        writer = cv2.VideoWriter(str(local_output), cv2.VideoWriter_fourcc(*"mp4v"), fps, (first.shape[1], first.shape[0] + 250))
+        writer = cv2.VideoWriter(
+            str(local_output), cv2.VideoWriter_fourcc(*"mp4v"), fps,
+            (first.shape[1], first.shape[0] + _panel_height(methods)),
+        )
         try:
-            writer.write(_draw_panel(first, episode, thresholds, focus_method=focus_method, alert_methods=alert_methods, env_step=0))
+            writer.write(_draw_panel(first, episode, thresholds, focus_method=focus_method, methods=methods, alert_methods=alert_methods, env_step=0))
             frame_index = 1
             while True:
                 ok, frame = capture.read()
                 if not ok:
                     break
-                writer.write(_draw_panel(frame, episode, thresholds, focus_method=focus_method, alert_methods=alert_methods, env_step=frame_index))
+                writer.write(_draw_panel(frame, episode, thresholds, focus_method=focus_method, methods=methods, alert_methods=alert_methods, env_step=frame_index))
                 frame_index += 1
         finally:
             writer.release()
@@ -151,8 +166,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--episodes", type=Path, required=True)
     parser.add_argument("--scan", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--focus-method", choices=MAIN_METHODS, default="vlm_input_pooled_pca")
-    parser.add_argument("--alert-methods", nargs="+", choices=MAIN_METHODS, default=None)
+    parser.add_argument("--methods", nargs="+", default=None)
+    parser.add_argument("--focus-method", default="vlm_input_pooled_pca")
+    parser.add_argument("--alert-methods", nargs="+", default=None)
     parser.add_argument("--h264", action="store_true", help="transcode outputs to browser-playable H.264/yuv420p")
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument(
@@ -172,6 +188,11 @@ def main() -> None:
     scan = json.loads(args.scan.read_text(encoding="utf-8"))
     mapping = {int(row["episode_index"]): row for row in episodes["episodes"]}
     thresholds = {method: float(spec["best_balanced_accuracy"]["threshold"]) for method, spec in scan["methods"].items()}
+    methods = tuple(args.methods or MAIN_METHODS)
+    if args.focus_method not in methods or not set(args.alert_methods or [args.focus_method]).issubset(methods):
+        raise ValueError("focus and alert methods must be selected for rendering")
+    if set(methods) - set(thresholds):
+        raise ValueError("every rendered method needs a threshold in --scan")
     alert_methods = tuple(args.alert_methods or [args.focus_method])
     args.output_dir.mkdir(parents=True)
     if args.all_alerted_failures or args.all_failures:
@@ -190,7 +211,7 @@ def main() -> None:
                 for method, alert in alerts.items()
             )
             filename = f"{episode['split']}_failure_seed_{episode['seed']}_{label}.mp4"
-            _render_one(episode, args.output_dir / filename, thresholds, args.focus_method, alert_methods, args.h264)
+            _render_one(episode, args.output_dir / filename, thresholds, args.focus_method, methods, alert_methods, args.h264)
             index.append(
                 {
                     "split": episode["split"],
@@ -212,7 +233,7 @@ def main() -> None:
                 continue
             _render_one(
                 mapping[int(episode_index)], args.output_dir / f"{label}.mp4", thresholds,
-                args.focus_method, alert_methods, args.h264,
+                args.focus_method, methods, alert_methods, args.h264,
             )
     print(args.output_dir)
 
