@@ -160,13 +160,20 @@ def main() -> None:
                         inputs, encoding, steps=args.flow_steps
                     )
                     internal_scores = scorer.score(features)
-                    diff_score = policy.diffdagger_score(
-                        inputs,
-                        encoding,
-                        generated.float().cpu().numpy(),
-                        num_timesteps=args.diff_timesteps,
-                        num_noise_samples=args.diff_noise_samples,
-                    )
+                    # DiffDAgger samples extra noise. Preserve both CPU and CUDA
+                    # RNG so enabling this passive detector cannot alter future
+                    # policy action chunks in the same rollout.
+                    cuda_index = device.index
+                    if cuda_index is None:
+                        cuda_index = torch.cuda.current_device()
+                    with torch.random.fork_rng(devices=[cuda_index]):
+                        diff_score = policy.diffdagger_score(
+                            inputs,
+                            encoding,
+                            generated.float().cpu().numpy(),
+                            num_timesteps=args.diff_timesteps,
+                            num_noise_samples=args.diff_noise_samples,
+                        )
                     base_image = _chw_float_image(
                         raw_obs["sensor_data"]["base_camera"]["rgb"]
                     )
