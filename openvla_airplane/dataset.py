@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import json
+from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
@@ -87,11 +88,12 @@ def compute_action_stats(data_dir: Path) -> dict:
     """Compute the official q01/q99 action bounds from ID expert actions only."""
     import pyarrow.parquet as pq
 
-    actions = []
-    for ref in index_lerobot_episodes(data_dir):
-        table = pq.read_table(ref.path, columns=["actions"])
-        actions.append(np.asarray(table["actions"][ref.row].as_py(), dtype=np.float32))
-    array = np.stack(actions)
+    paths = dict.fromkeys(ref.path for ref in index_lerobot_episodes(data_dir))
+    episode_actions = []
+    for path in paths:
+        table = pq.read_table(path, columns=["actions"])
+        episode_actions.append(np.asarray(table["actions"].to_pylist(), dtype=np.float32))
+    array = np.concatenate(episode_actions, axis=0)
     q01, q99 = np.quantile(array, [0.01, 0.99], axis=0)
     return {
         "q01": q01.astype(np.float32).tolist(),
@@ -115,22 +117,23 @@ class AirplaneDataset(Dataset):
         self.data_dir = Path(data_dir)
         validate_lerobot_dataset(self.data_dir)
         self.refs = index_lerobot_episodes(self.data_dir)
-        self._cached_path: Path | None = None
-        self._cached_table = None
+
+    @staticmethod
+    @lru_cache(maxsize=98)
+    def _read_episode(path: Path):
+        import pyarrow.parquet as pq
+
+        return pq.read_table(path, columns=["image", "actions"])
 
     def __len__(self) -> int:
         return len(self.refs)
 
     def __getitem__(self, index: int) -> dict:
-        import pyarrow.parquet as pq
-
         ref = self.refs[index]
-        if self._cached_path != ref.path:
-            self._cached_table = pq.read_table(ref.path, columns=["image", "actions"])
-            self._cached_path = ref.path
+        table = self._read_episode(ref.path)
         return {
-            "image": _decode_image(self._cached_table["image"][ref.row].as_py()),
-            "action": np.asarray(self._cached_table["actions"][ref.row].as_py(), dtype=np.float32),
+            "image": _decode_image(table["image"][ref.row].as_py()),
+            "action": np.asarray(table["actions"][ref.row].as_py(), dtype=np.float32),
             "episode_index": ref.episode_index,
             "frame_index": ref.frame_index,
         }

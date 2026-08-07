@@ -15,6 +15,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
+from torchvision.transforms import ColorJitter, Compose, RandomResizedCrop
+from torchvision.transforms.functional import InterpolationMode
 from transformers import AutoModelForVision2Seq, AutoProcessor
 
 from prismatic.models.backbones.llm.prompting import PurePromptBuilder, VicunaV15ChatPromptBuilder
@@ -59,6 +61,21 @@ class AirplaneCollator:
         self.action_tokenizer = action_tokenizer
         self.stats = stats
         self.image_aug = image_aug
+        self.augmentation = (
+            Compose(
+                [
+                    RandomResizedCrop(
+                        384,
+                        scale=(0.9, 0.9),
+                        ratio=(1.0, 1.0),
+                        interpolation=InterpolationMode.BILINEAR,
+                    ),
+                    ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),
+                ]
+            )
+            if image_aug
+            else None
+        )
         self.base_collator = PaddedCollatorForActionPrediction(
             processor.tokenizer.model_max_length,
             processor.tokenizer.pad_token_id,
@@ -69,17 +86,22 @@ class AirplaneCollator:
         )
 
     def __call__(self, batch: list[dict]) -> dict:
-        examples = [
-            build_example(
-                sample,
-                self.processor.tokenizer,
-                self.action_tokenizer,
-                self.processor.image_processor.apply_transform,
-                self.stats,
-                self.prompt_builder_fn,
+        examples = []
+        for sample in batch:
+            transformed_sample = sample
+            if self.augmentation is not None:
+                transformed_sample = dict(sample)
+                transformed_sample["image"] = self.augmentation(sample["image"])
+            examples.append(
+                build_example(
+                    transformed_sample,
+                    self.processor.tokenizer,
+                    self.action_tokenizer,
+                    self.processor.image_processor.apply_transform,
+                    self.stats,
+                    self.prompt_builder_fn,
+                )
             )
-            for sample in batch
-        ]
         return self.base_collator(examples)
 
 
@@ -96,7 +118,8 @@ def save_checkpoint(
     checkpoint_dir = run_dir / f"checkpoint_{step:06d}"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     adapter = checkpoint_dir / "adapter"
-    model.module.save_pretrained(adapter)
+    unwrapped = model.module if hasattr(model, "module") else model
+    unwrapped.save_pretrained(adapter)
     processor.save_pretrained(checkpoint_dir / "processor")
     (checkpoint_dir / "action_stats.json").write_text(json.dumps(stats, indent=2))
     (checkpoint_dir / "train_config.json").write_text(json.dumps(config, indent=2, default=str))
@@ -162,7 +185,6 @@ def main() -> None:
     step = 0
     epoch = 0
     patch_count = None
-    iterator = iter(loader)
     model.train()
     while step < args.max_steps:
         if sampler is not None:
@@ -197,10 +219,18 @@ def main() -> None:
             action_tokenizer = ActionTokenizer(processor.tokenizer)
             mask = action_gt > action_tokenizer.action_token_begin_idx
             token_accuracy = float(((action_logits.argmax(-1) == action_gt) & mask).sum() / mask.sum().clamp_min(1))
+            action_preds = action_logits.argmax(-1)
+            predicted_continuous = torch.as_tensor(
+                action_tokenizer.decode_token_ids_to_actions(action_preds[mask].detach().cpu().numpy())
+            )
+            target_continuous = torch.as_tensor(
+                action_tokenizer.decode_token_ids_to_actions(action_gt[mask].detach().cpu().numpy())
+            )
             metrics = {
                 "step": step,
                 "loss": float(loss.item()),
                 "token_accuracy": token_accuracy,
+                "action_l1": float(torch.nn.functional.l1_loss(predicted_continuous, target_continuous).item()),
                 "epoch": epoch,
                 "time": time.time(),
             }

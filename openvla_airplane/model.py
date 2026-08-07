@@ -17,7 +17,8 @@ from .utils import move_pixel_values
 
 
 def load_openvla(base_path: str, checkpoint: Path | None, device: int = 0):
-    processor = AutoProcessor.from_pretrained(checkpoint or base_path, trust_remote_code=True)
+    processor_path = checkpoint / "processor" if checkpoint is not None else base_path
+    processor = AutoProcessor.from_pretrained(processor_path, trust_remote_code=True)
     base = AutoModelForVision2Seq.from_pretrained(
         base_path,
         torch_dtype=torch.bfloat16,
@@ -34,7 +35,9 @@ def load_openvla(base_path: str, checkpoint: Path | None, device: int = 0):
     model = model.to(device).eval()
     if checkpoint is not None and (checkpoint / "action_stats.json").exists():
         stats = json.loads((checkpoint / "action_stats.json").read_text())
-        model.norm_stats = {"airplane": {"action": {"q01": stats["q01"], "q99": stats["q99"]}}}
+        norm_stats = {"airplane": {"action": {"q01": stats["q01"], "q99": stats["q99"]}}}
+        model.norm_stats = norm_stats
+        model.get_base_model().norm_stats = norm_stats
     else:
         raise FileNotFoundError("A checkpoint action_stats.json is required for 8D action decoding")
     return model, processor

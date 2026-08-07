@@ -104,8 +104,8 @@ def extract(data_dir: Path, checkpoint: Path, base_path: str, output: Path, batc
             core_features = core.vision_backbone(pixel_values)
             if core.vision_backbone.use_fused_vision_backbone:
                 if isinstance(pixel_values, dict):
-                    dino_input = pixel_values.get("dino") or pixel_values.get("image")
-                    siglip_input = pixel_values.get("siglip") or pixel_values.get("image")
+                    dino_input = pixel_values.get("dino", pixel_values.get("image"))
+                    siglip_input = pixel_values.get("siglip", pixel_values.get("image"))
                 else:
                     dino_input, siglip_input = torch.split(pixel_values, [3, 3], dim=1)
                 dino = core.vision_backbone.featurizer(dino_input)
