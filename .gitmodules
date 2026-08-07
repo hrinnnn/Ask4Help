@@ -1,3 +1,6 @@
 [submodule "RLinf"]
 	path = RLinf
 	url = https://github.com/hrinnnn/RLinf.git
+[submodule "external/FIDeL"]
+	path = external/FIDeL
+	url = https://github.com/CEA-LIST/FIDeL.git

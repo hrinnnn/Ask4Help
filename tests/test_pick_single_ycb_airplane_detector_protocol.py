@@ -4,7 +4,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "tools"))
-from pick_single_ycb_airplane_detector_protocol import summary_for_method, threshold_from_success_maxima, union_trace
+from pick_single_ycb_airplane_detector_protocol import (
+    summary_for_method,
+    threshold_free_summary,
+    threshold_from_success_maxima,
+    union_trace,
+)
 
 
 def test_conformal_threshold_uses_trajectory_maxima():
@@ -23,3 +28,24 @@ def test_failure_metrics_use_final_task_outcome_not_split():
     summary = summary_for_method(rows, "m", 0.5)
     assert summary["success_conditioned_false_alarm_rate"] == 0.0
     assert summary["failure_recall"] == 1.0
+
+
+def test_airplane_metrics_prefer_ever_grasped_over_strict_goal_success():
+    rows = [
+        {"success": False, "ever_grasped": True, "scores": {"m": [0.1]}},
+        {"success": False, "ever_grasped": False, "scores": {"m": [0.9]}},
+    ]
+    summary = summary_for_method(rows, "m", 0.5)
+    assert summary["successes"] == 1
+    assert summary["failures"] == 1
+    assert summary["auprc"] == 1.0
+
+
+def test_threshold_free_summary_uses_trajectory_maximum() -> None:
+    rows = [
+        {"ever_grasped": True, "scores": {"m": [0.9, 0.1]}},
+        {"ever_grasped": False, "scores": {"m": [0.2, 1.0]}},
+    ]
+    summary = threshold_free_summary(rows, "m")
+    assert summary["auprc"] == 1.0
+    assert summary["auroc"] == 1.0

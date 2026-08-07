@@ -11,7 +11,19 @@ from libero_plus_failure_protocol import first_alert_index
 
 
 BASE_METHODS = (
-    "bridge_deep_knn", "bridge_llmd", "bridge_pca_residual", "final_llmd", "acc", "stac_single",
+    "bridge_deep_knn",
+    "bridge_llmd",
+    "bridge_pca_residual",
+    "final_llmd",
+    "acc",
+    "stac_single",
+    "vlm_input_pooled_pca",
+    "vlm_50_pca",
+    "action_expert_50_pca",
+    "action_expert_final_pca",
+    "fidel_official",
+    "crsail_observable_state_k5",
+    "crsail_vision_k5",
 )
 ALL_METHODS = BASE_METHODS + ("final_llmd_or_acc",)
 
@@ -80,6 +92,10 @@ def union_trace(final_llmd: Sequence[float], acc: Sequence[float], *, final_thre
 
 
 def _episode_label(row: Mapping[str, Any]) -> bool:
+    """Use the registered airplane benchmark outcome: failure means no grasp."""
+
+    if "ever_grasped" in row:
+        return not bool(row["ever_grasped"])
     return not bool(row["success"])
 
 
@@ -115,4 +131,24 @@ def summary_for_method(episodes: Sequence[Mapping[str, Any]], method: str, thres
             "count": len(lead), "mean": None if not lead else float(np.mean(lead)),
             "median": None if not lead else float(np.median(lead)),
         },
+    }
+
+
+def threshold_free_summary(episodes: Sequence[Mapping[str, Any]], method: str) -> dict[str, Any]:
+    """Report ranking metrics from one trajectory-level maximum per episode."""
+
+    scored = [row for row in episodes if row.get("scores", {}).get(method)]
+    if not scored:
+        return {"episodes": 0, "auprc": None, "auroc": None}
+    labels = [_episode_label(row) for row in scored]
+    maxima = [max(float(value) for value in row["scores"][method]) for row in scored]
+    return {
+        "episodes": len(scored),
+        "successes": labels.count(False),
+        "failures": labels.count(True),
+        "trajectory_score": "maximum over valid decision scores",
+        "auprc": _average_precision(labels, maxima),
+        "auroc": _roc_auc(labels, maxima),
+        "score_min": min(maxima),
+        "score_max": max(maxima),
     }
