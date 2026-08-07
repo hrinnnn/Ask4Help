@@ -128,8 +128,13 @@ def main() -> None:
         )
         status = process.wait()
         handle.close()
-        if status:
+        if status and not completed(calibration_rollouts):
             raise RuntimeError(f"calibration rollout exited with status {status}")
+        if status:
+            print(
+                f"[pipeline] calibration exited with status {status} after writing a complete summary; continuing",
+                flush=True,
+            )
     calibration_summary = json.loads((calibration_rollouts / "summary.json").read_text())
     if int(calibration_summary["ever_grasped_successes"]) < 20:
         raise RuntimeError("fewer than 20 independent successful ID calibration trajectories")
@@ -176,8 +181,14 @@ def main() -> None:
     for split, process, handle in jobs:
         status = process.wait()
         handle.close()
-        if status:
+        output = args.result_root / f"eval_{split}_100"
+        if status and not completed(output):
             raise RuntimeError(f"{split} evaluation exited with status {status}")
+        if status:
+            print(
+                f"[pipeline] {split} evaluation exited with status {status} after writing a complete summary; continuing",
+                flush=True,
+            )
 
     metrics = args.result_root / "metrics"
     if not (metrics / "metrics.json").exists():
