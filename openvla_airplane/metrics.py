@@ -122,26 +122,38 @@ def summarize(id_summary: Path, ood_summary: Path, thresholds: Path | None = Non
         scores = np.asarray([max([float(point["scores"][method]) for point in row["timeline"] if method in point.get("scores", {})], default=float("nan")) for row in rows])
         valid = np.isfinite(scores)
         labels, scores = labels[valid], scores[valid]
-        if threshold_payload is None or method not in threshold_payload["methods"]:
-            raise ValueError(f"missing independent calibration threshold for {method}")
-        fixed = float(threshold_payload["methods"][method]["threshold"])
-        predicted = scores >= fixed
-        precision, recall, f1, _ = precision_recall_fscore_support(labels, predicted, average="binary", zero_division=0)
+        fixed = None
+        if threshold_payload is not None and method in threshold_payload["methods"]:
+            fixed = float(threshold_payload["methods"][method]["threshold"])
+        if fixed is None:
+            precision = recall = f1 = None
+            balanced_accuracy = None
+            false_alarm_rate_id = None
+            timing = {
+                "failure_first_alarm_normalized_mean": None,
+                "failure_first_alarm_normalized_median": None,
+                "success_conditioned_false_alarm_rate": None,
+            }
+        else:
+            predicted = scores >= fixed
+            precision, recall, f1, _ = precision_recall_fscore_support(labels, predicted, average="binary", zero_division=0)
+            balanced_accuracy = float(balanced_accuracy_score(labels, predicted))
+            false_alarm_rate_id = float(np.mean([max([float(point["scores"][method]) for point in row["timeline"] if method in point.get("scores", {})], default=-np.inf) >= fixed for row in _rows(id_summary)]))
+            timing = _fixed_alarm_timing(rows, method, fixed)
         oracle_balanced_accuracy, oracle_threshold = _best_balanced_accuracy(labels, scores)
-        timing = _fixed_alarm_timing(rows, method, fixed)
         table.append({
             "method": method,
             "auprc": float(average_precision_score(labels, scores)) if labels.any() else None,
             "auroc": float(roc_auc_score(labels, scores)) if labels.any() and (~labels).any() else None,
             "aucpdt": _pdt_auc(rows, method),
             "threshold": fixed,
-            "balanced_accuracy": float(balanced_accuracy_score(labels, predicted)),
-            "precision": float(precision),
-            "recall": float(recall),
-            "f1": float(f1),
+            "balanced_accuracy": balanced_accuracy,
+            "precision": None if precision is None else float(precision),
+            "recall": None if recall is None else float(recall),
+            "f1": None if f1 is None else float(f1),
             "oracle_best_balanced_accuracy": oracle_balanced_accuracy,
             "oracle_best_threshold": oracle_threshold,
-            "false_alarm_rate_id": float(np.mean([max([float(point["scores"][method]) for point in row["timeline"] if method in point.get("scores", {})], default=-np.inf) >= fixed for row in _rows(id_summary)])),
+            "false_alarm_rate_id": false_alarm_rate_id,
             "mean_detector_latency_ms": _mean_latency(rows, method),
             "episodes": int(len(scores)),
             **timing,

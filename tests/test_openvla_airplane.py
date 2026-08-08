@@ -64,12 +64,16 @@ def test_metrics_uses_trajectory_max_and_separates_id_false_alarm(tmp_path):
     assert row["oracle_best_balanced_accuracy"] == 1.0
 
 
-def test_metrics_rejects_test_derived_thresholds(tmp_path):
+def test_metrics_without_calibration_reports_only_threshold_free_and_oracle_metrics(tmp_path):
     id_path, ood_path = tmp_path / "id.json", tmp_path / "ood.json"
     _summary(id_path, "id", [0.1], [True])
     _summary(ood_path, "ood", [0.9], [False])
-    with pytest.raises(ValueError, match="independent calibration"):
-        summarize(id_path, ood_path)
+    row = summarize(id_path, ood_path)["methods"][0]
+    assert row["auprc"] == 1.0
+    assert row["auroc"] == 1.0
+    assert row["oracle_best_balanced_accuracy"] == 1.0
+    assert row["threshold"] is None
+    assert row["balanced_accuracy"] is None
 
 
 def test_representative_llama_blocks_are_uniformly_spaced():
