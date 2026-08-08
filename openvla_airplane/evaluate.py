@@ -41,7 +41,6 @@ from .model import (
     predict_action_rlinf,
 )
 from .dataset import AIRPLANE_INSTRUCTION
-from .runtime import DetectorBank
 
 
 def _base_image(raw_obs: dict) -> Image.Image:
@@ -128,7 +127,12 @@ def main() -> None:
     else:
         model, processor = load_openvla(args.base_path, args.checkpoint, args.device)
         predictor = predict_action
-    detector_bank = None if args.detector_assets is None else DetectorBank(args.detector_assets, args.device)
+    if args.detector_assets is None:
+        detector_bank = None
+    else:
+        from .runtime import DetectorBank
+
+        detector_bank = DetectorBank(args.detector_assets, args.device)
     env_args = argparse.Namespace(split=args.split, image_size=384, control_freq=10, max_episode_steps=args.max_episode_steps, sim_backend="physx_cpu")
     env = _build_env(env_args, control_mode="pd_joint_delta_pos")
     rows = []
