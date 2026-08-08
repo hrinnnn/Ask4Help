@@ -13,8 +13,11 @@ from pathlib import Path
 METHODS = ("vlm_pool_pca", "offline_oracle", "failure_recovery", "diffdagger")
 ROOT = Path("/data/zhaozhixuan/Ask4Help-airplane-event-close-v2")
 RESULT = Path(
-    "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_airplane_v1/"
-    "ood_dagger_id_ood_alternating_event_close_v2"
+    os.environ.get(
+        "XVLA_EVENT_CLOSE_RESULT_ROOT",
+        "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_airplane_v1/"
+        "ood_dagger_id_ood_alternating_event_close_v2",
+    )
 )
 XVLA = Path("/data/zhaozhixuan/X-VLA")
 ENV = Path("/data/zhaozhixuan/envs/xvla_official_5090")
