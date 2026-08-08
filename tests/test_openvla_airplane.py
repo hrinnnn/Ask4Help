@@ -2,8 +2,10 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from openvla_airplane.dataset import action_token_round_trip, normalize_action
+from openvla_airplane.layers import SELECTED_LLAMA_BLOCKS, validate_selected_blocks
 from openvla_airplane.metrics import summarize
 
 
@@ -51,10 +53,27 @@ def test_action_normalization_uses_fixed_id_bounds():
 
 
 def test_metrics_uses_trajectory_max_and_separates_id_false_alarm(tmp_path):
-    id_path, ood_path = tmp_path / "id.json", tmp_path / "ood.json"
+    id_path, ood_path, thresholds = tmp_path / "id.json", tmp_path / "ood.json", tmp_path / "thresholds.json"
     _summary(id_path, "id", [0.1, 0.2], [True, True])
     _summary(ood_path, "ood", [0.3, 0.9], [False, False])
-    payload = summarize(id_path, ood_path)
+    thresholds.write_text(json.dumps({"methods": {"detector": {"threshold": 0.25}}}))
+    payload = summarize(id_path, ood_path, thresholds)
     row = payload["methods"][0]
     assert row["auroc"] == 1.0
     assert row["false_alarm_rate_id"] == 0.0
+    assert row["oracle_best_balanced_accuracy"] == 1.0
+
+
+def test_metrics_rejects_test_derived_thresholds(tmp_path):
+    id_path, ood_path = tmp_path / "id.json", tmp_path / "ood.json"
+    _summary(id_path, "id", [0.1], [True])
+    _summary(ood_path, "ood", [0.9], [False])
+    with pytest.raises(ValueError, match="independent calibration"):
+        summarize(id_path, ood_path)
+
+
+def test_representative_llama_blocks_are_uniformly_spaced():
+    assert SELECTED_LLAMA_BLOCKS == (8, 16, 24, 32)
+    assert validate_selected_blocks(32) == SELECTED_LLAMA_BLOCKS
+    with pytest.raises(ValueError, match="block 32"):
+        validate_selected_blocks(31)

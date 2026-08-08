@@ -53,7 +53,11 @@ def fit_detector_assets(feature_dir: Path, output: Path, pca_rank: int = 1000, k
     projector = np.load(feature_dir / "projector_pooled.npy", mmap_mode="r").astype(np.float32)
     visual = np.load(feature_dir / "llama_visual_pooled.npy", mmap_mode="r").astype(np.float32)
     action = np.load(feature_dir / "llama_action_pooled.npy", mmap_mode="r").astype(np.float32)
+    prompt = np.load(feature_dir / "prompt_decision.npy", mmap_mode="r").astype(np.float32)
     manifest = json.loads((feature_dir / "manifest.json").read_text())
+    selected_blocks = tuple(int(value) for value in manifest["selected_blocks"])
+    if visual.shape[1] != len(selected_blocks) or action.shape[1] != len(selected_blocks) or prompt.shape[1] != len(selected_blocks):
+        raise ValueError("feature arrays do not match selected_blocks in the manifest")
     trained = {}
 
     def save_method(name: str, kind: str, asset: dict) -> None:
@@ -80,21 +84,23 @@ def fit_detector_assets(feature_dir: Path, output: Path, pca_rank: int = 1000, k
         "pca_kmeans",
         {"pca_mean": reduced_pca.mean_.astype(np.float32), "centers": kmeans.cluster_centers_.astype(np.float32), "pca_components": reduced_pca.components_.astype(np.float32)},
     )
-    save_method("dino_pooled_residual_pca", "residual_pca", _fit_pca(np.load(feature_dir / "dino_pooled.npy", mmap_mode="r"), pca_rank))
-    save_method("siglip_pooled_residual_pca", "residual_pca", _fit_pca(np.load(feature_dir / "siglip_pooled.npy", mmap_mode="r"), pca_rank))
-    for layer in range(visual.shape[1]):
-        save_method(f"llama_layer_{layer + 1:02d}_residual_pca", "residual_pca", _fit_pca(visual[:, layer], pca_rank))
-        save_method(f"llama_layer_{layer + 1:02d}_llmd", "mahalanobis", _fit_mahalanobis(visual[:, layer]))
-    for layer in range(action.shape[1]):
-        save_method(f"action_layer_{layer + 1:02d}_residual_pca", "residual_pca", _fit_pca(action[:, layer], pca_rank))
-    for name in ("action_logprob", "action_entropy"):
+    for stem in ("dino_pooled", "siglip_pooled"):
+        values = np.load(feature_dir / f"{stem}.npy", mmap_mode="r").astype(np.float32)
+        save_method(f"{stem}_residual_pca", "residual_pca", _fit_pca(values, pca_rank))
+        save_method(f"{stem}_llmd", "mahalanobis", _fit_mahalanobis(values))
+    for slot, block in enumerate(selected_blocks):
+        for stem, values in (("llama_visual", visual), ("action", action), ("prompt", prompt)):
+            save_method(f"{stem}_layer_{block:02d}_residual_pca", "residual_pca", _fit_pca(values[:, slot], pca_rank))
+            save_method(f"{stem}_layer_{block:02d}_llmd", "mahalanobis", _fit_mahalanobis(values[:, slot]))
+    for name, direction in (("action_logprob", -1.0), ("action_entropy", 1.0)):
         values = np.load(feature_dir / f"{name}.npy").astype(np.float32)
-        save_method(name, "scalar", {"mean": np.asarray([values.mean()], dtype=np.float32), "std": np.asarray([values.std() + 1e-6], dtype=np.float32)})
+        save_method(name, "scalar", {"direction": direction})
     asset_manifest = {
         "source_feature_manifest": manifest,
         "id_observations": int(projector.shape[0]),
         "pca_rank_requested": pca_rank,
         "knn_k": knn_k,
+        "selected_blocks": list(selected_blocks),
         "methods": trained,
         "fit_split": "ID expert only",
         "threshold_policy": "calibration scores are stored separately and never used to fit representations",
@@ -120,7 +126,7 @@ def score_method(values: np.ndarray, method_dir: Path) -> np.ndarray:
         distances = NearestNeighbors(n_neighbors=int(asset["k"])).fit(asset["reference"]).kneighbors(values, return_distance=True)[0]
         return distances.mean(axis=1)
     if kind == "scalar":
-        return np.abs(values.reshape(-1) - float(asset["mean"][0])) / float(asset["std"][0])
+        return values.reshape(-1) * float(asset["direction"])
     if kind == "pca_kmeans":
         centered = values.astype(np.float32) - asset["pca_mean"]
         embedding = centered @ asset["pca_components"].T

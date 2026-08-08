@@ -72,11 +72,14 @@ def _run_episode(env, model, processor, predictor, detector_bank, split: str, se
         action, inputs = predictor(model, processor, image, device)
         torch.cuda.synchronize()
         latency_ms = (time.perf_counter() - start) * 1000.0
-        scores = {} if detector_bank is None else detector_bank.score(model, inputs)
+        if detector_bank is None:
+            scores, detector_latency = {}, {}
+        else:
+            scores, detector_latency = detector_bank.score(model, inputs, image, sample_seed=seed * 1000 + step)
         action = np.clip(np.asarray(action, dtype=np.float32).reshape(-1), low, high)
         if action.size != 8:
             raise ValueError(f"OpenVLA returned {action.size} actions; expected 8D pd_joint_delta_pos")
-        timeline.append({"step": step, "policy_latency_ms": latency_ms, "action": action.tolist(), "scores": scores})
+        timeline.append({"step": step, "policy_latency_ms": latency_ms, "detector_latency_ms": detector_latency, "action": action.tolist(), "scores": scores})
         raw_obs, _reward, terminated, truncated, info = env.step(
             torch.as_tensor(action, device=env.unwrapped.device).unsqueeze(0)
         )
@@ -126,6 +129,10 @@ def main() -> None:
     parser.add_argument("--max-episode-steps", type=int, default=250)
     parser.add_argument("--device", type=int, default=0)
     parser.add_argument("--detector-assets", type=Path)
+    parser.add_argument("--external-detector-assets", type=Path)
+    parser.add_argument("--action-samples", type=int, default=1)
+    parser.add_argument("--target-successes", type=int)
+    parser.add_argument("--max-attempts", type=int)
     parser.add_argument("--rlinf-native", action="store_true")
     parser.add_argument(
         "--attn-implementation",
@@ -156,15 +163,18 @@ def main() -> None:
     else:
         from .runtime import DetectorBank
 
-        detector_bank = DetectorBank(args.detector_assets, args.device)
+        detector_bank = DetectorBank(args.detector_assets, args.device, args.external_detector_assets, args.action_samples)
     env_args = argparse.Namespace(split=args.split, image_size=384, control_freq=10, max_episode_steps=args.max_episode_steps, sim_backend="physx_cpu")
     env = _build_env(env_args, control_mode="pd_joint_delta_pos")
     rows = []
     try:
-        for index in range(args.episodes):
+        attempts = args.episodes if args.target_successes is None else (args.max_attempts or max(args.episodes, args.target_successes * 5))
+        for index in range(attempts):
             row = _run_episode(env, model, processor, predictor, detector_bank, args.split, args.seed + index, index, args.output, args.device, args.max_episode_steps)
             rows.append(row)
-            print(f"[rollout] {args.split} {index + 1}/{args.episodes} seed={row['seed']} ever_grasped={int(row['ever_grasped'])}", flush=True)
+            print(f"[rollout] {args.split} {index + 1}/{attempts} seed={row['seed']} ever_grasped={int(row['ever_grasped'])}", flush=True)
+            if args.target_successes is not None and sum(item["ever_grasped"] for item in rows) >= args.target_successes:
+                break
     finally:
         env.close()
     summary = {
@@ -178,6 +188,8 @@ def main() -> None:
         "failure_definition": "not ever_grasped",
         "attn_implementation": args.attn_implementation,
         "use_cache": args.use_cache,
+        "action_samples": args.action_samples,
+        "target_successes": args.target_successes,
         "rows": rows,
     }
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2))

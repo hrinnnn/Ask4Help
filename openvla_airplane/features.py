@@ -15,6 +15,7 @@ from prismatic.vla.action_tokenizer import ActionTokenizer
 from prismatic.models.backbones.llm.prompting import PurePromptBuilder
 
 from .dataset import AirplaneDataset, build_example, compute_action_stats
+from .layers import validate_selected_blocks
 from .model import load_openvla
 from .utils import move_pixel_values
 
@@ -68,15 +69,16 @@ def extract(data_dir: Path, checkpoint: Path, base_path: str, output: Path, batc
     core = _core(model)
     hidden_dim = int(core.config.text_config.hidden_size)
     layer_count = int(core.config.text_config.num_hidden_layers)
+    selected_blocks = validate_selected_blocks(layer_count)
     output.mkdir(parents=True, exist_ok=True)
     n = len(dataset)
     arrays = {
         "dino_pooled": _allocate(output / "dino_pooled.npy", (n, int(core.vision_backbone.featurizer.embed_dim))),
         "siglip_pooled": _allocate(output / "siglip_pooled.npy", (n, int(core.vision_backbone.fused_featurizer.embed_dim) if core.vision_backbone.use_fused_vision_backbone else int(core.vision_backbone.featurizer.embed_dim))),
         "projector_pooled": _allocate(output / "projector_pooled.npy", (n, hidden_dim)),
-        "llama_visual_pooled": _allocate(output / "llama_visual_pooled.npy", (n, layer_count, hidden_dim)),
-        "llama_action_pooled": _allocate(output / "llama_action_pooled.npy", (n, layer_count, hidden_dim)),
-        "prompt_decision": _allocate(output / "prompt_decision.npy", (n, layer_count, hidden_dim)),
+        "llama_visual_pooled": _allocate(output / "llama_visual_pooled.npy", (n, len(selected_blocks), hidden_dim)),
+        "llama_action_pooled": _allocate(output / "llama_action_pooled.npy", (n, len(selected_blocks), hidden_dim)),
+        "prompt_decision": _allocate(output / "prompt_decision.npy", (n, len(selected_blocks), hidden_dim)),
         "action_logprob": _allocate(output / "action_logprob.npy", (n,)),
         "action_entropy": _allocate(output / "action_entropy.npy", (n,)),
     }
@@ -120,12 +122,12 @@ def extract(data_dir: Path, checkpoint: Path, base_path: str, output: Path, batc
                 action_start = patch_count + length - 8
                 visual_slice = slice(1, 1 + patch_count)
                 action_slice = slice(action_start, action_start + 8)
-                prompt_index = min(patch_count + 1, hidden_states[0].shape[1] - 1)
-                for layer in range(layer_count):
-                    state = hidden_states[layer + 1][local]
-                    arrays["llama_visual_pooled"][cursor + local, layer] = _pool(state[visual_slice].unsqueeze(0))[0].cpu().numpy()
-                    arrays["llama_action_pooled"][cursor + local, layer] = _pool(state[action_slice].unsqueeze(0))[0].cpu().numpy()
-                    arrays["prompt_decision"][cursor + local, layer] = state[prompt_index].float().cpu().numpy()
+                prompt_index = action_start - 1
+                for slot, block in enumerate(selected_blocks):
+                    state = hidden_states[block][local]
+                    arrays["llama_visual_pooled"][cursor + local, slot] = _pool(state[visual_slice].unsqueeze(0))[0].cpu().numpy()
+                    arrays["llama_action_pooled"][cursor + local, slot] = _pool(state[action_slice].unsqueeze(0))[0].cpu().numpy()
+                    arrays["prompt_decision"][cursor + local, slot] = state[prompt_index].float().cpu().numpy()
                 arrays["dino_pooled"][cursor + local] = _pool(dino[local].unsqueeze(0))[0].cpu().numpy()
                 arrays["siglip_pooled"][cursor + local] = _pool(siglip[local].unsqueeze(0))[0].cpu().numpy()
                 arrays["projector_pooled"][cursor + local] = _pool(projector[local].unsqueeze(0))[0].cpu().numpy()
@@ -146,7 +148,8 @@ def extract(data_dir: Path, checkpoint: Path, base_path: str, output: Path, batc
         "source": str(data_dir),
         "checkpoint": str(checkpoint),
         "observations": n,
-        "layers": layer_count,
+        "model_layers": layer_count,
+        "selected_blocks": list(selected_blocks),
         "hidden_dim": hidden_dim,
         "projector_tokens": patch_count,
         "action_dim": 8,
