@@ -87,7 +87,13 @@ def _run_episode(env, model, processor, predictor, detector_bank, split: str, se
             break
     main_camera = _select_camera(records[0].obs, "", ("base_camera",) + MAIN_CAMERA_CANDIDATES, "main")
     wrist_camera = _select_camera(records[0].obs, "", ("hand_camera",) + WRIST_CAMERA_CANDIDATES, "wrist")
-    frames = _build_frames(records, actions, PICK_SINGLE_YCB_AIRPLANE_TASK, main_camera, wrist_camera)
+    frames = _build_frames(
+        records=records,
+        actions=actions,
+        task=PICK_SINGLE_YCB_AIRPLANE_TASK,
+        main_camera=main_camera,
+        wrist_camera=wrist_camera,
+    )
     video = write_episode_video_durably(frames, output / "videos", episode_index, seed, fps=10)
     return {
         "episode_index": episode_index,
