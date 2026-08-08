@@ -143,7 +143,7 @@ def predict_action_rlinf(
     use_cache: bool = True,
 ) -> tuple:
     """Run one decision through RLinf's native environment-observation API."""
-    image_tensor = torch.as_tensor(np.asarray(image), device=device).unsqueeze(0)
+    image_tensor = torch.as_tensor(np.array(image, copy=True), device=device).unsqueeze(0)
     actions, result = model.predict_action_batch(
         env_obs={
             "main_images": image_tensor,

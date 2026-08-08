@@ -98,7 +98,10 @@ class DetectorBank:
                 values = list(inputs["pixel_values"].values())
                 dino_input, siglip_input = values[0], values[-1]
             else:
-                dino_input, siglip_input = torch.split(inputs["pixel_values"], [3, 3], dim=1)
+                pixel_values = inputs["pixel_values"]
+                if pixel_values.ndim == 5 and pixel_values.shape[1] == 1:
+                    pixel_values = pixel_values[:, 0]
+                dino_input, siglip_input = torch.split(pixel_values, [3, 3], dim=1)
             dino_values = core.vision_backbone.featurizer(dino_input)[0].float().mean(dim=0).cpu().numpy()
             siglip_values = core.vision_backbone.fused_featurizer(siglip_input)[0].float().mean(dim=0).cpu().numpy()
         else:
