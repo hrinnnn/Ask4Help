@@ -179,13 +179,32 @@ def launch_training_wave(
     return outputs
 
 
+def forward_smoke_succeeded(output: Path, returncode: int) -> bool:
+    if returncode not in (0, -6):
+        return False
+    summary_path = output / "summary.json"
+    if not summary_path.exists():
+        return False
+    try:
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        summary.get("episodes") == 1
+        and len(list(output.rglob("*.npy"))) == 1
+        and len(list(output.rglob("*.mp4"))) == 1
+    )
+
+
 def forward_smoke(outputs: dict[str, Path]) -> None:
     processes: dict[str, subprocess.Popen] = {}
+    smoke_outputs: dict[str, Path] = {}
     for gpu, method in enumerate(METHODS):
         checkpoint = outputs[method] / "ckpt-2"
         if not (checkpoint / "model.safetensors").exists():
             raise RuntimeError(f"missing smoke checkpoint for {method}")
         output = RUN / "smoke_forward" / method
+        smoke_outputs[method] = output
         log_path = RUN / "logs" / f"smoke_forward_{method}.log"
         log = log_path.open("w", encoding="utf-8")
         command = [
@@ -220,9 +239,21 @@ def forward_smoke(outputs: dict[str, Path]) -> None:
             stdout=log,
             stderr=subprocess.STDOUT,
         )
-    failures = {method: process.wait() for method, process in processes.items()}
-    if any(code != 0 for code in failures.values()):
+    returncodes = {method: process.wait() for method, process in processes.items()}
+    failures = {
+        method: code
+        for method, code in returncodes.items()
+        if not forward_smoke_succeeded(smoke_outputs[method], code)
+    }
+    if failures:
         raise RuntimeError(f"forward smoke failed: {failures}")
+    teardown_aborts = [method for method, code in returncodes.items() if code == -6]
+    if teardown_aborts:
+        print(
+            "[event-close-training] accepted simulator teardown SIGABRT after complete "
+            f"forward artifacts: {teardown_aborts}",
+            flush=True,
+        )
 
 
 def main() -> None:

@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from tools.run_xvla_airplane_event_close_training import child_env, training_command
+import json
+
+from tools.run_xvla_airplane_event_close_training import (
+    child_env,
+    forward_smoke_succeeded,
+    training_command,
+)
 
 
 def test_single_gpu_command_preserves_effective_batch_32() -> None:
@@ -18,3 +24,18 @@ def test_single_gpu_environment_initializes_one_process_group_per_job() -> None:
     assert environment["WORLD_SIZE"] == "1"
     assert environment["RANK"] == "0"
     assert environment["MASTER_PORT"] == "29623"
+
+
+def test_forward_smoke_accepts_teardown_abort_only_with_complete_artifacts(tmp_path: Path) -> None:
+    output = tmp_path / "forward"
+    output.mkdir()
+    (output / "summary.json").write_text(json.dumps({"episodes": 1}), encoding="utf-8")
+    (output / "episode.npy").write_bytes(b"actions")
+    (output / "episode.mp4").write_bytes(b"video")
+
+    assert forward_smoke_succeeded(output, 0)
+    assert forward_smoke_succeeded(output, -6)
+    assert not forward_smoke_succeeded(output, 1)
+
+    (output / "episode.mp4").unlink()
+    assert not forward_smoke_succeeded(output, -6)
