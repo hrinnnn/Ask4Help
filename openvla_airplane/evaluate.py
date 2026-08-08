@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 import time
+from functools import partial
 from pathlib import Path
 
 import numpy as np
@@ -126,6 +127,14 @@ def main() -> None:
     parser.add_argument("--device", type=int, default=0)
     parser.add_argument("--detector-assets", type=Path)
     parser.add_argument("--rlinf-native", action="store_true")
+    parser.add_argument(
+        "--attn-implementation",
+        choices=("eager", "sdpa", "flash_attention_2"),
+        default="eager",
+    )
+    parser.add_argument(
+        "--use-cache", action=argparse.BooleanOptionalAction, default=False
+    )
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(f"Refusing to overwrite {args.output}")
@@ -133,9 +142,12 @@ def main() -> None:
     register_controlled_pick_single_ycb_airplane_variants()
     if args.rlinf_native:
         model, processor = load_rlinf_openvla(
-            args.base_path, args.checkpoint, args.device
+            args.base_path,
+            args.checkpoint,
+            args.device,
+            attn_implementation=args.attn_implementation,
         )
-        predictor = predict_action_rlinf
+        predictor = partial(predict_action_rlinf, use_cache=args.use_cache)
     else:
         model, processor = load_openvla(args.base_path, args.checkpoint, args.device)
         predictor = predict_action
@@ -164,6 +176,8 @@ def main() -> None:
         "ever_grasped_rate": float(np.mean([row["ever_grasped"] for row in rows])),
         "max_episode_steps": args.max_episode_steps,
         "failure_definition": "not ever_grasped",
+        "attn_implementation": args.attn_implementation,
+        "use_cache": args.use_cache,
         "rows": rows,
     }
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2))

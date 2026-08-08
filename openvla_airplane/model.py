@@ -44,7 +44,12 @@ def load_openvla(base_path: str, checkpoint: Path | None, device: int = 0):
     return model, processor
 
 
-def load_rlinf_openvla(base_path: str, checkpoint: Path, device: int = 0):
+def load_rlinf_openvla(
+    base_path: str,
+    checkpoint: Path,
+    device: int = 0,
+    attn_implementation: str = "eager",
+):
     """Load the LoRA policy through RLinf's native OpenVLA action wrapper."""
     from omegaconf import OmegaConf
     from prismatic.extern.hf.configuration_prismatic import OpenVLAConfig
@@ -84,7 +89,7 @@ def load_rlinf_openvla(base_path: str, checkpoint: Path, device: int = 0):
         max_prompt_length=30,
         action_dim=8,
         num_action_chunks=1,
-        attn_implementation="eager",
+        attn_implementation=attn_implementation,
         low_cpu_mem_usage=True,
         trust_remote_code=True,
     )
@@ -130,7 +135,12 @@ def predict_action(model, processor, image: Image.Image, device: int = 0) -> tup
 
 @torch.inference_mode()
 def predict_action_rlinf(
-    model, processor, image: Image.Image, device: int = 0
+    model,
+    processor,
+    image: Image.Image,
+    device: int = 0,
+    *,
+    use_cache: bool = False,
 ) -> tuple:
     """Run one decision through RLinf's native environment-observation API."""
     image_tensor = torch.as_tensor(np.asarray(image), device=device).unsqueeze(0)
@@ -143,7 +153,7 @@ def predict_action_rlinf(
         calculate_values=False,
         do_sample=False,
         max_new_tokens=8,
-        use_cache=False,
+        use_cache=use_cache,
     )
     action = actions[0, 0].detach().cpu().numpy()
     return action, result["forward_inputs"]
