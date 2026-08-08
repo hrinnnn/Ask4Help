@@ -133,7 +133,7 @@ def main() -> None:
         default="eager",
     )
     parser.add_argument(
-        "--use-cache", action=argparse.BooleanOptionalAction, default=False
+        "--use-cache", action=argparse.BooleanOptionalAction, default=True
     )
     args = parser.parse_args()
     if args.output.exists():

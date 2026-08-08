@@ -140,7 +140,7 @@ def predict_action_rlinf(
     image: Image.Image,
     device: int = 0,
     *,
-    use_cache: bool = False,
+    use_cache: bool = True,
 ) -> tuple:
     """Run one decision through RLinf's native environment-observation API."""
     image_tensor = torch.as_tensor(np.asarray(image), device=device).unsqueeze(0)
