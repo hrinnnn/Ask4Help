@@ -94,7 +94,13 @@ def _run_episode(env, model, processor, predictor, detector_bank, split: str, se
         main_camera=main_camera,
         wrist_camera=wrist_camera,
     )
-    video = write_episode_video_durably(frames, output / "videos", episode_index, seed, fps=10)
+    video = write_episode_video_durably(
+        frames,
+        video_dir=output / "videos",
+        episode_index=episode_index,
+        seed=seed,
+        fps=10,
+    )
     return {
         "episode_index": episode_index,
         "seed": seed,
