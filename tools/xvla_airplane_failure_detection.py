@@ -26,6 +26,16 @@ def first_tensor(value: Any) -> torch.Tensor:
     raise TypeError(f"Hook output does not contain a tensor: {type(value)!r}")
 
 
+def masked_token_mean(tokens: torch.Tensor, mask: torch.Tensor | None) -> torch.Tensor:
+    """Pool valid sequence tokens without letting padding affect the feature."""
+
+    if mask is None:
+        return tokens.float().mean(dim=1)
+    valid = mask.to(device=tokens.device, dtype=tokens.dtype).unsqueeze(-1)
+    denominator = valid.sum(dim=1).clamp_min(1)
+    return (tokens * valid).sum(dim=1).float() / denominator.float()
+
+
 class XVLAMultilayerProbe:
     """Capture all Florence encoder and action-transformer block outputs.
 
@@ -47,7 +57,12 @@ class XVLAMultilayerProbe:
         action_layers = model.transformer.blocks
         self.vlm_layer_count = len(vlm_layers)
         self.action_layer_count = len(action_layers)
+        self.encoder_inputs: torch.Tensor | None = None
+        self.encoder_attention_mask: torch.Tensor | None = None
         self.handles = []
+        self.handles.append(
+            encoder.register_forward_pre_hook(self._encoder_input_hook, with_kwargs=True)
+        )
         for index, layer in enumerate(vlm_layers, start=1):
             self.handles.append(layer.register_forward_hook(self._hook(f"vlm_encoder_{index:02d}")))
         for index, layer in enumerate(action_layers, start=1):
@@ -68,6 +83,23 @@ class XVLAMultilayerProbe:
 
         return capture
 
+    def _encoder_input_hook(
+        self,
+        _module: torch.nn.Module,
+        args: tuple[Any, ...],
+        kwargs: dict[str, Any],
+    ) -> None:
+        inputs = kwargs.get("inputs_embeds")
+        if inputs is None and args:
+            inputs = first_tensor(args)
+        if not isinstance(inputs, torch.Tensor):
+            raise TypeError("Florence encoder pre-hook did not receive inputs_embeds")
+        self.encoder_inputs = inputs
+        attention_mask = kwargs.get("attention_mask")
+        self.encoder_attention_mask = (
+            attention_mask if isinstance(attention_mask, torch.Tensor) else None
+        )
+
     def close(self) -> None:
         for handle in self.handles:
             handle.remove()
@@ -79,10 +111,17 @@ class XVLAMultilayerProbe:
         """Return one pooled feature per registered model location."""
 
         self.captured.clear()
+        self.encoder_inputs = None
+        self.encoder_attention_mask = None
         encoding = self.model.forward_vlm(
             inputs["input_ids"], inputs["image_input"], inputs["image_mask"]
         )
+        if self.encoder_inputs is None:
+            raise RuntimeError("Florence encoder input hook did not run")
         features: dict[str, torch.Tensor] = {}
+        features["vlm_input_pool"] = masked_token_mean(
+            self.encoder_inputs, self.encoder_attention_mask
+        )
         for index in range(1, self.vlm_layer_count + 1):
             name = f"vlm_encoder_{index:02d}"
             features[name] = self.captured[name].float().mean(dim=1)
@@ -121,7 +160,8 @@ class XVLAMultilayerProbe:
 
 def layer_names(vlm_layers: int, action_layers: int) -> list[str]:
     return (
-        [f"vlm_encoder_{index:02d}" for index in range(1, vlm_layers + 1)]
+        ["vlm_input_pool"]
+        + [f"vlm_encoder_{index:02d}" for index in range(1, vlm_layers + 1)]
         + ["vlm_action_bridge"]
         + [f"action_block_{index:02d}" for index in range(1, action_layers + 1)]
     )

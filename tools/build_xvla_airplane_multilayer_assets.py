@@ -108,6 +108,7 @@ def main() -> None:
         "metadata": str(args.metadata.resolve()),
         "fit_split": "ID expert anchors only",
         "feature_definition": {
+            "vlm_input_pool": "attention-mask pooled Florence2 merged image-language embeddings before encoder block 1",
             "vlm": "mean pooled output of every Florence2 language encoder block",
             "bridge": "mean(concat(vlm_features, aux_visual_inputs))",
             "action": "mean of action tokens after every block under fixed flow probe",

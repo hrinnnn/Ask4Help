@@ -9,6 +9,7 @@ from tools.xvla_airplane_failure_detection import (
     first_tensor,
     fit_layer_asset,
     layer_names,
+    masked_token_mean,
     trajectory_score_rows,
 )
 
@@ -20,6 +21,7 @@ def test_first_tensor_accepts_transformer_tuple() -> None:
 
 def test_layer_names_cover_every_vlm_bridge_and_action_block() -> None:
     assert layer_names(2, 3) == [
+        "vlm_input_pool",
         "vlm_encoder_01",
         "vlm_encoder_02",
         "vlm_action_bridge",
@@ -27,6 +29,12 @@ def test_layer_names_cover_every_vlm_bridge_and_action_block() -> None:
         "action_block_02",
         "action_block_03",
     ]
+
+
+def test_input_pool_ignores_padding_tokens() -> None:
+    tokens = torch.tensor([[[1.0, 3.0], [3.0, 5.0], [100.0, 100.0]]])
+    mask = torch.tensor([[1, 1, 0]])
+    torch.testing.assert_close(masked_token_mean(tokens, mask), torch.tensor([[2.0, 4.0]]))
 
 
 def test_all_three_scores_rank_an_outlier_above_training_point(tmp_path: Path) -> None:
