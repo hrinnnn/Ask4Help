@@ -26,7 +26,7 @@ ID_META = Path(
     "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_airplane_v1/"
     "manifests/panda_airplane_id.json"
 )
-RUN = RESULT / "training_v1_5000"
+RUN = Path(os.environ.get("XVLA_EVENT_CLOSE_TRAIN_RUN", RESULT / "training_v1_5000"))
 
 
 def read_json(path: Path) -> dict:
@@ -71,14 +71,6 @@ def build_training_meta(method: str) -> Path:
 def training_command(meta: Path, output: Path, *, steps: int, save_interval: int) -> list[str]:
     return [
         str(ENV / "bin/python"),
-        "-m",
-        "accelerate.commands.launch",
-        "--num_processes",
-        "1",
-        "--mixed_precision",
-        "bf16",
-        "--gpu_ids",
-        "0",
         "train.py",
         "--models",
         str(START),
@@ -140,6 +132,7 @@ def child_env(gpu: int) -> dict[str, str]:
             "HF_HUB_OFFLINE": "1",
             "TRANSFORMERS_OFFLINE": "1",
             "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
+            "ACCELERATE_MIXED_PRECISION": "bf16",
         }
     )
     return env
