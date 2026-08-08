@@ -1,4 +1,9 @@
-from tools.run_xvla_airplane_centered_oracle_pipeline import centered_oracle_validation
+import pytest
+
+from tools import run_xvla_airplane_centered_oracle_pipeline as pipeline
+
+
+centered_oracle_validation = pipeline.centered_oracle_validation
 
 
 def _row(accepted: bool, *, centered: bool = True, shift: float = 0.002) -> dict:
@@ -32,3 +37,18 @@ def test_centered_oracle_validation_counts_only_accepted_rows() -> None:
 def test_centered_oracle_validation_rejects_offset_candidate() -> None:
     report = centered_oracle_validation([_row(True, centered=False)])
     assert not report["all_centered"]
+
+
+@pytest.mark.parametrize("returncode,accepted_abort", [(0, False), (-6, True)])
+def test_collection_exit_accepts_complete_artifacts(
+    monkeypatch: pytest.MonkeyPatch, returncode: int, accepted_abort: bool
+) -> None:
+    monkeypatch.setattr(pipeline, "validate_collection", lambda method: {"method": method})
+    report = pipeline.validate_collection_exit("failure_recovery", returncode)
+    assert report["accepted_teardown_abort"] is accepted_abort
+
+
+def test_collection_exit_rejects_other_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pipeline, "validate_collection", lambda method: {"method": method})
+    with pytest.raises(RuntimeError, match="returncode=1"):
+        pipeline.validate_collection_exit("failure_recovery", 1)

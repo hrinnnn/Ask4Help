@@ -134,6 +134,16 @@ def validate_collection(method: str) -> dict[str, Any]:
     }
 
 
+def validate_collection_exit(method: str, returncode: int) -> dict[str, Any]:
+    """Accept a known native teardown abort only after artifacts fully validate."""
+    report = validate_collection(method)
+    if returncode not in (0, -6):
+        raise RuntimeError(f"collection failed for {method}: returncode={returncode}")
+    report["returncode"] = returncode
+    report["accepted_teardown_abort"] = returncode == -6
+    return report
+
+
 def run_validation() -> None:
     output = RESULT / "oracle_validation_20/collection"
     dataset = RESULT / "oracle_validation_20/dataset"
@@ -170,9 +180,11 @@ def run_collections() -> None:
         )
         write_json(RESULT / f"pids/collection_{method}.json", {"pid": processes[method].pid})
     returncodes = {method: process.wait() for method, process in processes.items()}
-    if any(code != 0 for code in returncodes.values()):
-        raise RuntimeError(f"collection failed: {returncodes}")
-    write_json(RESULT / "collection_report.json", {method: validate_collection(method) for method in METHODS})
+    reports = {
+        method: validate_collection_exit(method, returncodes[method])
+        for method in METHODS
+    }
+    write_json(RESULT / "collection_report.json", reports)
 
 
 def run_training() -> Path:
@@ -232,6 +244,19 @@ def run_evaluation(training_run: Path) -> None:
 
 
 def main() -> None:
+    resume_stage = os.environ.get("XVLA_CENTERED_PIPELINE_RESUME_STAGE")
+    if resume_stage == "post_collection":
+        reports = {method: validate_collection(method) for method in METHODS}
+        write_json(RESULT / "collection_report.json", reports)
+        write_json(RESULT / "pipeline_state.json", {"stage": "training", "resumed": True})
+        training_run = run_training()
+        write_json(RESULT / "pipeline_state.json", {"stage": "evaluation", "resumed": True})
+        run_evaluation(training_run)
+        write_json(RESULT / "pipeline_state.json", {"stage": "complete", "resumed": True})
+        (RESULT / "PIPELINE_COMPLETE").write_text("complete\n", encoding="utf-8")
+        return
+    if resume_stage is not None:
+        raise ValueError(f"unsupported resume stage: {resume_stage}")
     if RESULT.exists():
         raise FileExistsError(RESULT)
     RESULT.mkdir(parents=True)
