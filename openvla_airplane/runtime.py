@@ -8,10 +8,7 @@ from time import perf_counter
 
 import numpy as np
 import torch
-from sklearn.neighbors import NearestNeighbors
-
 from .dataset import AIRPLANE_INSTRUCTION
-from .detectors import mahalanobis_score, residual_score
 
 
 class DetectorBank:
@@ -19,36 +16,49 @@ class DetectorBank:
         manifest = json.loads((assets_dir / "manifest.json").read_text())
         self.assets_dir = assets_dir
         self.methods = {}
-        self.knn = {}
         self.external = None
         self.device = device
+        self.score_device = torch.device(f"cuda:{device}")
+        torch.backends.cuda.matmul.allow_tf32 = True
         self.action_samples = int(action_samples)
         if self.action_samples < 1:
             raise ValueError("action_samples must be positive")
         for name in manifest["methods"]:
             method_dir = assets_dir / name
             meta = json.loads((method_dir / "asset.json").read_text())
-            asset = {key: np.load(method_dir / value) if isinstance(value, str) and value.endswith(".npy") else value for key, value in meta.items()}
+            asset = {
+                key: torch.as_tensor(np.load(method_dir / value), device=self.score_device)
+                if isinstance(value, str) and value.endswith(".npy")
+                else value
+                for key, value in meta.items()
+            }
             self.methods[name] = (meta["kind"], asset)
-            if meta["kind"] == "knn":
-                self.knn[name] = NearestNeighbors(n_neighbors=int(asset["k"])).fit(asset["reference"])
         if external_assets is not None:
             self.external = ExternalVisualDetectors(external_assets, device)
 
     def _score(self, name: str, values: np.ndarray) -> float:
         kind, asset = self.methods[name]
+        row = torch.as_tensor(values, device=self.score_device, dtype=torch.float32).reshape(-1)
         if kind == "residual_pca":
-            return float(residual_score(values[None], asset)[0])
+            centered = row - asset["mean"]
+            projection = asset["components"] @ centered
+            reconstruction = asset["components"].T @ projection
+            return float(torch.linalg.vector_norm(centered - reconstruction).item())
         if kind == "mahalanobis":
-            return float(mahalanobis_score(values[None], asset)[0])
+            whitened = (row - asset["scale_mean"]) / asset["scale_scale"].clamp_min(1e-12)
+            centered = whitened - asset["mean"]
+            squared = centered @ asset["precision"] @ centered
+            return float(torch.sqrt(squared.clamp_min(0.0)).item())
         if kind == "knn":
-            return float(self.knn[name].kneighbors(values[None], return_distance=True)[0].mean())
+            distances = torch.linalg.vector_norm(asset["reference"] - row, dim=1)
+            return float(distances.topk(int(asset["k"]), largest=False).values.mean().item())
         if kind == "pca_kmeans":
-            centered = values.astype(np.float32) - asset["pca_mean"]
-            embedding = centered @ asset["pca_components"].T
-            return float(np.linalg.norm(embedding[None] - asset["centers"], axis=1).min())
+            centered = row - asset["pca_mean"]
+            embedding = asset["pca_components"] @ centered
+            distances = torch.linalg.vector_norm(asset["centers"] - embedding, dim=1)
+            return float(distances.min().item())
         if kind == "scalar":
-            return float(values.reshape(-1)[0] * float(asset["direction"]))
+            return float(row[0].item() * float(asset["direction"]))
         raise ValueError(f"Online scoring is not implemented for {name}: {kind}")
 
     @torch.inference_mode()
@@ -182,7 +192,7 @@ class ExternalVisualDetectors:
         from tools.pick_single_ycb_airplane_external_detectors import crsail_score, official_fidel_euclidean_score
 
         started = perf_counter()
-        values = torch.as_tensor(np.asarray(image), device=self.device)
+        values = torch.as_tensor(np.array(image, copy=True), device=self.device)
         values = values.permute(2, 0, 1).float().div(255.0).unsqueeze(0)
         features = self.encoder(self.preprocess(values))
         encoded_ms = (perf_counter() - started) * 1000.0
