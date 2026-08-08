@@ -34,7 +34,12 @@ from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     _select_camera,
 )
 
-from .model import load_openvla, predict_action
+from .model import (
+    load_openvla,
+    load_rlinf_openvla,
+    predict_action,
+    predict_action_rlinf,
+)
 from .dataset import AIRPLANE_INSTRUCTION
 from .runtime import DetectorBank
 
@@ -53,7 +58,7 @@ def _grasped(env) -> bool:
     return _bool_scalar(env.unwrapped.agent.is_grasping(env.unwrapped.obj))
 
 
-def _run_episode(env, model, processor, detector_bank, split: str, seed: int, episode_index: int, output: Path, device: int, max_steps: int):
+def _run_episode(env, model, processor, predictor, detector_bank, split: str, seed: int, episode_index: int, output: Path, device: int, max_steps: int):
     raw_obs, _ = env.reset(seed=seed)
     metadata = reset_metadata(env, split=split)
     low = np.asarray(env.action_space.low, dtype=np.float32).reshape(-1)
@@ -64,7 +69,7 @@ def _run_episode(env, model, processor, detector_bank, split: str, seed: int, ep
     for step in range(max_steps):
         image = _base_image(raw_obs)
         start = time.perf_counter()
-        action, inputs = predict_action(model, processor, image, device)
+        action, inputs = predictor(model, processor, image, device)
         torch.cuda.synchronize()
         latency_ms = (time.perf_counter() - start) * 1000.0
         scores = {} if detector_bank is None else detector_bank.score(model, inputs)
@@ -109,19 +114,27 @@ def main() -> None:
     parser.add_argument("--max-episode-steps", type=int, default=250)
     parser.add_argument("--device", type=int, default=0)
     parser.add_argument("--detector-assets", type=Path)
+    parser.add_argument("--rlinf-native", action="store_true")
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(f"Refusing to overwrite {args.output}")
     args.output.mkdir(parents=True)
     register_controlled_pick_single_ycb_airplane_variants()
-    model, processor = load_openvla(args.base_path, args.checkpoint, args.device)
+    if args.rlinf_native:
+        model, processor = load_rlinf_openvla(
+            args.base_path, args.checkpoint, args.device
+        )
+        predictor = predict_action_rlinf
+    else:
+        model, processor = load_openvla(args.base_path, args.checkpoint, args.device)
+        predictor = predict_action
     detector_bank = None if args.detector_assets is None else DetectorBank(args.detector_assets, args.device)
     env_args = argparse.Namespace(split=args.split, image_size=384, control_freq=10, max_episode_steps=args.max_episode_steps, sim_backend="physx_cpu")
     env = _build_env(env_args, control_mode="pd_joint_delta_pos")
     rows = []
     try:
         for index in range(args.episodes):
-            row = _run_episode(env, model, processor, detector_bank, args.split, args.seed + index, index, args.output, args.device, args.max_episode_steps)
+            row = _run_episode(env, model, processor, predictor, detector_bank, args.split, args.seed + index, index, args.output, args.device, args.max_episode_steps)
             rows.append(row)
             print(f"[rollout] {args.split} {index + 1}/{args.episodes} seed={row['seed']} ever_grasped={int(row['ever_grasped'])}", flush=True)
     finally:
