@@ -133,6 +133,12 @@ def child_env(gpu: int) -> dict[str, str]:
             "TRANSFORMERS_OFFLINE": "1",
             "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
             "ACCELERATE_MIXED_PRECISION": "bf16",
+            "MASTER_ADDR": "127.0.0.1",
+            "MASTER_PORT": str(29620 + gpu),
+            "RANK": "0",
+            "LOCAL_RANK": "0",
+            "WORLD_SIZE": "1",
+            "LOCAL_WORLD_SIZE": "1",
         }
     )
     return env
@@ -230,6 +236,7 @@ def main() -> None:
             "initial_checkpoint": str(START),
             "methods": list(METHODS),
             "source_sampling": "equal probability per sample: original ID replay vs group new expert",
+            "original_id_trajectories": 128,
             "per_device_batch": 8,
             "world_size_per_group": 1,
             "gradient_accumulation_steps": 4,
