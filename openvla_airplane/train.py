@@ -34,6 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--new-data-dir", type=Path)
     parser.add_argument("--action-stats", type=Path)
     parser.add_argument("--init-checkpoint", type=Path)
+    parser.add_argument("--resume-checkpoint", type=Path)
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--max-steps", type=int, default=10_000)
@@ -165,6 +166,8 @@ def save_checkpoint(
 
 def main() -> None:
     args = parse_args()
+    if args.init_checkpoint is not None and args.resume_checkpoint is not None:
+        raise ValueError("init-checkpoint and resume-checkpoint are mutually exclusive")
     rank, local_rank, distributed = setup_distributed()
     is_main = rank == 0
     torch.manual_seed(args.seed + rank)
@@ -185,9 +188,10 @@ def main() -> None:
         dist.barrier()
         stats = json.loads((args.run_dir / "action_stats.json").read_text())
 
+    checkpoint_source = args.resume_checkpoint or args.init_checkpoint
     processor_source = (
-        args.init_checkpoint / "processor"
-        if args.init_checkpoint is not None and (args.init_checkpoint / "processor").exists()
+        checkpoint_source / "processor"
+        if checkpoint_source is not None and (checkpoint_source / "processor").exists()
         else args.vla_path
     )
     processor = AutoProcessor.from_pretrained(processor_source, trust_remote_code=True)
@@ -197,7 +201,7 @@ def main() -> None:
         low_cpu_mem_usage=True,
         trust_remote_code=True,
     )
-    if args.init_checkpoint is None:
+    if checkpoint_source is None:
         lora = LoraConfig(
             r=args.lora_rank,
             lora_alpha=args.lora_alpha,
@@ -207,7 +211,7 @@ def main() -> None:
         )
         model = get_peft_model(base_model, lora)
     else:
-        model = PeftModel.from_pretrained(base_model, args.init_checkpoint / "adapter", is_trainable=True)
+        model = PeftModel.from_pretrained(base_model, checkpoint_source / "adapter", is_trainable=True)
     model = model.to(local_rank)
     if is_main:
         model.print_trainable_parameters()
@@ -215,6 +219,11 @@ def main() -> None:
 
     trainable = [parameter for parameter in model.parameters() if parameter.requires_grad]
     optimizer = AdamW(trainable, lr=args.learning_rate)
+    initial_step = 0
+    if args.resume_checkpoint is not None:
+        optimizer_payload = torch.load(args.resume_checkpoint / "optimizer.pt", map_location="cpu", weights_only=False)
+        optimizer.load_state_dict(optimizer_payload["optimizer"])
+        initial_step = int(optimizer_payload["step"])
     id_dataset = AirplaneDataset(args.data_dir)
     if args.new_data_dir is None:
         dataset = id_dataset
@@ -247,13 +256,15 @@ def main() -> None:
         * args.gradient_accumulation_steps
     )
     config["source_mix"] = "1:1 ID replay:new expert" if args.new_data_dir is not None else "ID only"
-    config["optimizer_state"] = "reset"
+    config["optimizer_state"] = (
+        f"resumed from {args.resume_checkpoint}" if args.resume_checkpoint is not None else "reset"
+    )
     config["trainable_scope"] = "LoRA all-linear; OpenVLA vision backbone and base weights frozen"
     config["action_dim"] = 8
     config["camera_input"] = "base camera only"
     config["quantization"] = False
     log_path = args.run_dir / "train_metrics.jsonl"
-    step = 0
+    step = initial_step
     micro_step = 0
     epoch = 0
     patch_count = None
