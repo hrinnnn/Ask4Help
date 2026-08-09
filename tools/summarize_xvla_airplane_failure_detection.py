@@ -30,8 +30,18 @@ def method_names(rows: list[dict[str, Any]]) -> list[str]:
     return sorted({name for row in rows for name in row.get("scores", {})})
 
 
+def policy_success(row: dict[str, Any]) -> bool:
+    """Use the benchmark's registered task outcome without split labels."""
+
+    if "ever_grasped" in row:
+        return bool(row["ever_grasped"])
+    if "success" in row:
+        return bool(row["success"])
+    raise KeyError("rollout row has neither ever_grasped nor success")
+
+
 def calibrate(summary: Path, output: Path, q: float) -> dict[str, Any]:
-    rows = [row for row in load_rows(summary) if row.get("ever_grasped")]
+    rows = [row for row in load_rows(summary) if policy_success(row)]
     if not rows:
         raise ValueError("calibration needs successful ID policy rollouts")
     methods: dict[str, Any] = {}
@@ -41,7 +51,9 @@ def calibrate(summary: Path, output: Path, q: float) -> dict[str, Any]:
     payload = {
         "format": "xvla_airplane_failure_calibration_v1",
         "source": str(summary.resolve()),
-        "success_definition": "ever_grasped",
+        "success_definition": (
+            "ever_grasped" if all("ever_grasped" in row for row in rows) else "task_success"
+        ),
         "successful_id_trajectories": len(rows),
         "q": q,
         "methods": methods,
@@ -78,6 +90,7 @@ def summarize(
     id_summary: Path, ood_summary: Path, calibration_path: Path, output_dir: Path
 ) -> dict[str, Any]:
     rows = load_rows(id_summary) + load_rows(ood_summary)
+    airplane = all("ever_grasped" in row for row in rows)
     calibration = json.loads(calibration_path.read_text())
     add_union(rows, calibration)
     table = []
@@ -106,8 +119,12 @@ def summarize(
     table.sort(key=lambda row: (-1 if row["auprc"] is None else -row["auprc"], row["method"]))
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = {
-        "format": "xvla_airplane_failure_metrics_v1",
-        "failure_definition": "not ever_grasped",
+        "format": (
+            "xvla_airplane_failure_metrics_v1"
+            if airplane
+            else "xvla_stackcube_failure_metrics_v1"
+        ),
+        "failure_definition": "not ever_grasped" if airplane else "not task_success",
         "trajectory_score": "maximum over decision scores",
         "id_summary": str(id_summary.resolve()),
         "ood_summary": str(ood_summary.resolve()),
