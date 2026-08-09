@@ -1,0 +1,151 @@
+--- a/datasets/domain_handler/panda_airplane.py
++++ b/datasets/domain_handler/panda_airplane.py
+@@ -31,7 +31,7 @@
+         )
+         data = read_parquet(f"{self.meta['root_path']}/{data_path}")
+         total = len(data["actions"])
+-        indices = list(range(0, total - num_actions + 1))
++        indices = list(range(total))
+         if training:
+             random.shuffle(indices)
+         instruction = item["tasks"][0]
+@@ -47,10 +47,16 @@
+             # are the real Panda joint-delta action/state used by this task.
+             proprio = np.zeros(20, dtype=np.float32)
+             proprio[:9] = np.asarray(data["state"][index], dtype=np.float32)
+-            action = np.zeros((num_actions, 20), dtype=np.float32)
+-            action[:, :8] = np.asarray(
++            real_actions = np.asarray(
+                 data["actions"][index:index + num_actions], dtype=np.float32
+             )
++            valid_steps = len(real_actions)
++            action = np.zeros((num_actions, 20), dtype=np.float32)
++            action[:valid_steps, :8] = real_actions
++            if valid_steps < num_actions:
++                action[valid_steps:, :8] = np.asarray(
++                    data["actions"][-1], dtype=np.float32
++                )
+             abs_trajectory = torch.from_numpy(
+                 np.concatenate([proprio[None], action], axis=0)
+             )
+@@ -59,6 +65,7 @@
+                 "image_input": image_input,
+                 "image_mask": torch.ones(2, dtype=torch.bool),
+                 "abs_trajectory": abs_trajectory,
++                "action_valid_mask": torch.arange(num_actions) < valid_steps,
+                 "idx_for_delta": [],
+                 "idx_for_mask_proprio": [],
+             }
+--- a/models/action_hub.py
++++ b/models/action_hub.py
+@@ -309,7 +309,12 @@
+         """Trim model output max_dim → real_dim."""
+         return x[..., : self.real_dim]
+ 
+-    def compute_loss(self, pred: torch.Tensor, target: torch.Tensor) -> dict[str, torch.Tensor]:
++    def compute_loss(
++        self,
++        pred: torch.Tensor,
++        target: torch.Tensor,
++        action_valid_mask: torch.Tensor | None = None,
++    ) -> dict[str, torch.Tensor]:
+         """
+         Compute loss only on the first real_dim dimensions.
+ 
+@@ -322,14 +327,25 @@
+         target = self._pad_to_model_dim(target)
+         assert pred.shape == target.shape, f"Shape mismatch: pred {pred.shape} vs target {target.shape}"
+ 
+-        # only compute loss on the real dimensions
+-        joints_loss = (
+-            self.mse(
+-                pred[:, :, : self.real_dim],
+-                target[:, :, : self.real_dim],
++        element_loss = (
++            pred[:, :, : self.real_dim] - target[:, :, : self.real_dim]
++        ).square()
++        if action_valid_mask is None:
++            joints_loss = element_loss.mean()
++        else:
++            mask = action_valid_mask.to(device=element_loss.device, dtype=torch.bool)
++            if mask.shape != element_loss.shape[:2]:
++                raise ValueError(
++                    f"action_valid_mask {tuple(mask.shape)} does not match "
++                    f"action targets {tuple(element_loss.shape[:2])}"
++                )
++            if not torch.all(mask.any(dim=1)):
++                raise ValueError("every anchor must contain a real action target")
++            weights = mask.unsqueeze(-1).to(element_loss.dtype)
++            joints_loss = (element_loss * weights).sum() / (
++                weights.sum() * self.real_dim
+             )
+-            * self.JOINTS_SCALE
+-        )
++        joints_loss = joints_loss * self.JOINTS_SCALE
+ 
+         return {"joints_loss": joints_loss}
+ 
+--- a/models/modeling_xvla.py
++++ b/models/modeling_xvla.py
+@@ -153,6 +153,7 @@
+         domain_id: torch.LongTensor,
+         proprio: torch.Tensor,
+         action: torch.Tensor,  # [B, T=num_actions, D=dim_action]
++        action_valid_mask: torch.Tensor | None = None,
+     ) -> Dict[str, torch.Tensor]:
+         """
+         1) Encode multimodal inputs.
+@@ -175,7 +176,9 @@
+             proprio=proprio_m,
+             **enc,
+         )
+-        return self.action_space.compute_loss(pred_action, action)
++        return self.action_space.compute_loss(
++            pred_action, action, action_valid_mask=action_valid_mask
++        )
+ 
+     # ================================= inference =================================
+     @torch.no_grad()
+--- a/train.py
++++ b/train.py
+@@ -94,6 +94,7 @@
+ 
+     # Schedule
+     parser.add_argument("--iters", type=int, default=1000000)
++    parser.add_argument("--initial_step", type=int, default=0)
+     parser.add_argument("--freeze_steps", type=int, default=1000)
+     parser.add_argument("--warmup_steps", type=int, default=2000)
+     parser.add_argument("--use_cosine_decay", action="store_true", default=False)
+@@ -236,8 +237,11 @@
+ 
+     # Training loop
+     model.train()
+-    global_step, t0 = 0, time.time()
+-    logger.info(f"🚀 Start training for {args.iters} iterations | world_size={accelerator.num_processes}")
++    global_step, t0 = args.initial_step, time.time()
++    logger.info(
++        f"🚀 Continue training from step {global_step} to {args.iters} "
++        f"| world_size={accelerator.num_processes}"
++    )
+     
+     for batch in train_dataloader:
+         # Encode language
+@@ -263,6 +267,10 @@
+         if global_step % args.log_interval == 0:
+             logs = {k: v.detach().float().item() for k, v in loss_dict.items()}
+             logs["loss_total"] = float(loss.detach().item())
++            if "action_valid_mask" in inputs:
++                logs["action_valid_ratio"] = float(
++                    inputs["action_valid_mask"].float().mean().item()
++                )
+             logs.update({f"lr_{g['name']}": g["lr"] for g in optim.param_groups})
+             accelerator.log(logs, step=global_step)
+ 
+@@ -274,6 +282,7 @@
+                 logger.info(
+                     f"[{global_step}/{args.iters}] "
+                     f"loss={logs['loss_total']:.4f} "
++                    f"valid_action_ratio={logs.get('action_valid_ratio', 1.0):.4f} "
+                     f"lr_core={logs['lr_transformer_core']:.2e} "
+                     f"lr_vlm={logs['lr_vlm']:.2e} ({dt:.2f}s/it) "
+                     f"USED_CPU={cpu_mem:.2e} GB "

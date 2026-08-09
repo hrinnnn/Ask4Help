@@ -174,3 +174,11 @@ cd /root/Ask4Help/RLinf
 ```
 
 - Treat ad hoc fixes as temporary diagnostics, not as the reproducible setup. Convert any necessary fix into a documented command or script before relying on it.
+
+## Mandatory Temporal Action Masking
+
+- VLA behavior-cloning datasets must retain every real observation in an episode as a training anchor, including the final `action_horizon - 1` observations.
+- When an action chunk crosses the episode boundary, pad it to the configured horizon by repeating the final real action and attach an explicit boolean temporal validity mask.
+- Flow-matching or behavior-cloning loss must be reduced only over real action timesteps and real action dimensions. Padded timesteps must never contribute to the loss denominator.
+- Filtering out short episode-tail anchors is prohibited for VLA SFT/BC unless the user explicitly requests that ablation. A training launch must have a boundary test proving that the final observation is retained with exactly one valid target timestep.
+- Before any formal training launch, verify and report the total anchor count, tail-anchor count, mask-validity distribution, and a 2-step checkpoint reload/forward smoke. Do not silently substitute complete-window filtering for temporal masking.
