@@ -63,21 +63,29 @@ def index_lerobot_episodes(data_dir: Path) -> List[FrameRef]:
     return refs
 
 
-def validate_lerobot_dataset(data_dir: Path, expected_episodes: int = 98, expected_frames: int = 9109) -> dict:
+def validate_lerobot_dataset(
+    data_dir: Path,
+    expected_episodes: int | None = None,
+    expected_frames: int | None = None,
+) -> dict:
     info = json.loads((data_dir / "meta" / "info.json").read_text())
     episodes = _read_jsonl(data_dir / "meta" / "episodes.jsonl")
     actual_frames = sum(int(item["length"]) for item in episodes)
-    if int(info["total_episodes"]) != expected_episodes or len(episodes) != expected_episodes:
+    if expected_episodes is not None and (
+        int(info["total_episodes"]) != expected_episodes or len(episodes) != expected_episodes
+    ):
         raise ValueError(f"Expected {expected_episodes} episodes, got {len(episodes)}")
-    if actual_frames != expected_frames or int(info["total_frames"]) != expected_frames:
+    if expected_frames is not None and (
+        actual_frames != expected_frames or int(info["total_frames"]) != expected_frames
+    ):
         raise ValueError(f"Expected {expected_frames} frames, got {actual_frames}")
     if info["features"]["actions"]["shape"] != [8]:
         raise ValueError("The airplane experiment requires an 8D action space")
     if info["features"]["image"]["shape"] != [384, 384, 3]:
         raise ValueError("Unexpected base camera shape")
     return {
-        "episodes": expected_episodes,
-        "frames": expected_frames,
+        "episodes": len(episodes),
+        "frames": actual_frames,
         "action_dim": 8,
         "camera": "image",
         "instruction": AIRPLANE_INSTRUCTION,

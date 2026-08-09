@@ -10,10 +10,10 @@ from pathlib import Path
 
 import torch
 import torch.distributed as dist
-from peft import LoraConfig, get_peft_model
+from peft import LoraConfig, PeftModel, get_peft_model
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.optim import AdamW
-from torch.utils.data import DataLoader
+from torch.utils.data import ConcatDataset, DataLoader, Sampler
 from torch.utils.data.distributed import DistributedSampler
 from torchvision.transforms import ColorJitter, Compose, RandomResizedCrop
 from torchvision.transforms.functional import InterpolationMode
@@ -31,6 +31,9 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--vla-path", default="openvla/openvla-7b")
     parser.add_argument("--data-dir", type=Path, required=True)
+    parser.add_argument("--new-data-dir", type=Path)
+    parser.add_argument("--action-stats", type=Path)
+    parser.add_argument("--init-checkpoint", type=Path)
     parser.add_argument("--run-dir", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--max-steps", type=int, default=10_000)
@@ -42,6 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-aug", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--smoke-steps", type=int, default=0)
     parser.add_argument("--seed", type=int, default=20260807)
+    parser.add_argument("--gradient-accumulation-steps", type=int, default=1)
     return parser.parse_args()
 
 
@@ -105,6 +109,36 @@ class AirplaneCollator:
         return self.base_collator(examples)
 
 
+class SourceBalancedBatchSampler(Sampler[list[int]]):
+    """Draw exactly half of every micro-batch from ID replay and new expert data."""
+
+    def __init__(self, id_size: int, new_size: int, batch_size: int, seed: int):
+        if batch_size < 2 or batch_size % 2:
+            raise ValueError("source-balanced batch size must be a positive even number")
+        if id_size < 1 or new_size < 1:
+            raise ValueError("both source datasets must be non-empty")
+        self.id_size = id_size
+        self.new_size = new_size
+        self.batch_size = batch_size
+        self.seed = seed
+        self.epoch = 0
+
+    def __len__(self) -> int:
+        half = self.batch_size // 2
+        return max(1, (max(self.id_size, self.new_size) + half - 1) // half)
+
+    def __iter__(self):
+        generator = torch.Generator().manual_seed(self.seed + self.epoch)
+        self.epoch += 1
+        half = self.batch_size // 2
+        for _ in range(len(self)):
+            id_indices = torch.randint(self.id_size, (half,), generator=generator).tolist()
+            new_indices = (torch.randint(self.new_size, (half,), generator=generator) + self.id_size).tolist()
+            order = torch.randperm(self.batch_size, generator=generator).tolist()
+            combined = id_indices + new_indices
+            yield [combined[index] for index in order]
+
+
 def save_checkpoint(
     model,
     processor,
@@ -135,9 +169,15 @@ def main() -> None:
     is_main = rank == 0
     torch.manual_seed(args.seed + rank)
     if is_main:
-        validate_lerobot_dataset(args.data_dir)
+        validate_lerobot_dataset(args.data_dir, expected_episodes=98, expected_frames=9109)
+        if args.new_data_dir is not None:
+            validate_lerobot_dataset(args.new_data_dir)
         args.run_dir.mkdir(parents=True, exist_ok=True)
-        stats = compute_action_stats(args.data_dir)
+        stats = (
+            json.loads(args.action_stats.read_text(encoding="utf-8"))
+            if args.action_stats is not None
+            else compute_action_stats(args.data_dir)
+        )
         (args.run_dir / "action_stats.json").write_text(json.dumps(stats, indent=2))
     else:
         stats = None
@@ -145,49 +185,80 @@ def main() -> None:
         dist.barrier()
         stats = json.loads((args.run_dir / "action_stats.json").read_text())
 
-    processor = AutoProcessor.from_pretrained(args.vla_path, trust_remote_code=True)
-    model = AutoModelForVision2Seq.from_pretrained(
+    processor_source = (
+        args.init_checkpoint / "processor"
+        if args.init_checkpoint is not None and (args.init_checkpoint / "processor").exists()
+        else args.vla_path
+    )
+    processor = AutoProcessor.from_pretrained(processor_source, trust_remote_code=True)
+    base_model = AutoModelForVision2Seq.from_pretrained(
         args.vla_path,
         torch_dtype=torch.bfloat16,
         low_cpu_mem_usage=True,
         trust_remote_code=True,
-    ).to(local_rank)
-    lora = LoraConfig(
-        r=args.lora_rank,
-        lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout,
-        target_modules="all-linear",
-        init_lora_weights="gaussian",
     )
-    model = get_peft_model(model, lora)
+    if args.init_checkpoint is None:
+        lora = LoraConfig(
+            r=args.lora_rank,
+            lora_alpha=args.lora_alpha,
+            lora_dropout=args.lora_dropout,
+            target_modules="all-linear",
+            init_lora_weights="gaussian",
+        )
+        model = get_peft_model(base_model, lora)
+    else:
+        model = PeftModel.from_pretrained(base_model, args.init_checkpoint / "adapter", is_trainable=True)
+    model = model.to(local_rank)
     if is_main:
         model.print_trainable_parameters()
     model = DDP(model, device_ids=[local_rank], find_unused_parameters=True) if distributed else model
 
     trainable = [parameter for parameter in model.parameters() if parameter.requires_grad]
     optimizer = AdamW(trainable, lr=args.learning_rate)
-    dataset = AirplaneDataset(args.data_dir)
-    sampler = DistributedSampler(dataset, shuffle=True, seed=args.seed) if distributed else None
-    loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        sampler=sampler,
-        shuffle=sampler is None,
-        collate_fn=AirplaneCollator(processor, ActionTokenizer(processor.tokenizer), stats, args.image_aug),
-        num_workers=0,
-        drop_last=True,
-    )
+    id_dataset = AirplaneDataset(args.data_dir)
+    if args.new_data_dir is None:
+        dataset = id_dataset
+        sampler = DistributedSampler(dataset, shuffle=True, seed=args.seed) if distributed else None
+        loader = DataLoader(
+            dataset,
+            batch_size=args.batch_size,
+            sampler=sampler,
+            shuffle=sampler is None,
+            collate_fn=AirplaneCollator(processor, ActionTokenizer(processor.tokenizer), stats, args.image_aug),
+            num_workers=0,
+            drop_last=True,
+        )
+    else:
+        if distributed:
+            raise ValueError("source-balanced continuation uses one process per model")
+        new_dataset = AirplaneDataset(args.new_data_dir)
+        dataset = ConcatDataset([id_dataset, new_dataset])
+        sampler = None
+        loader = DataLoader(
+            dataset,
+            batch_sampler=SourceBalancedBatchSampler(len(id_dataset), len(new_dataset), args.batch_size, args.seed),
+            collate_fn=AirplaneCollator(processor, ActionTokenizer(processor.tokenizer), stats, args.image_aug),
+            num_workers=0,
+        )
     config = vars(args).copy()
-    config["global_batch_size"] = args.batch_size * (dist.get_world_size() if distributed else 1)
+    config["global_batch_size"] = (
+        args.batch_size
+        * (dist.get_world_size() if distributed else 1)
+        * args.gradient_accumulation_steps
+    )
+    config["source_mix"] = "1:1 ID replay:new expert" if args.new_data_dir is not None else "ID only"
+    config["optimizer_state"] = "reset"
     config["trainable_scope"] = "LoRA all-linear; OpenVLA vision backbone and base weights frozen"
     config["action_dim"] = 8
     config["camera_input"] = "base camera only"
     config["quantization"] = False
     log_path = args.run_dir / "train_metrics.jsonl"
     step = 0
+    micro_step = 0
     epoch = 0
     patch_count = None
     model.train()
+    optimizer.zero_grad(set_to_none=True)
     while step < args.max_steps:
         if sampler is not None:
             sampler.set_epoch(epoch)
@@ -199,14 +270,17 @@ def main() -> None:
             input_ids = batch["input_ids"].to(local_rank)
             attention_mask = batch["attention_mask"].to(local_rank)
             labels = batch["labels"].to(local_rank)
-            optimizer.zero_grad(set_to_none=True)
             with torch.autocast("cuda", dtype=torch.bfloat16):
                 output = model(input_ids=input_ids, attention_mask=attention_mask, pixel_values=pixel_values, labels=labels)
                 loss = output.loss
             if not torch.isfinite(loss):
                 raise FloatingPointError(f"Non-finite loss at step {step + 1}: {loss.item()}")
-            loss.backward()
+            (loss / args.gradient_accumulation_steps).backward()
+            micro_step += 1
+            if micro_step % args.gradient_accumulation_steps:
+                continue
             optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
             step += 1
 
             if patch_count is None:

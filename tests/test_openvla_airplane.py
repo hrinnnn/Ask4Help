@@ -7,6 +7,7 @@ import pytest
 from openvla_airplane.dataset import action_token_round_trip, normalize_action
 from openvla_airplane.layers import SELECTED_LLAMA_BLOCKS, validate_selected_blocks
 from openvla_airplane.metrics import summarize
+from openvla_airplane.train import SourceBalancedBatchSampler
 
 
 class FakeTokenizer:
@@ -81,3 +82,10 @@ def test_representative_llama_blocks_are_uniformly_spaced():
     assert validate_selected_blocks(32) == SELECTED_LLAMA_BLOCKS
     with pytest.raises(ValueError, match="block 32"):
         validate_selected_blocks(31)
+
+
+def test_source_balanced_sampler_draws_equal_counts_from_both_sources():
+    sampler = SourceBalancedBatchSampler(id_size=10, new_size=7, batch_size=8, seed=5)
+    for batch in sampler:
+        assert sum(index < 10 for index in batch) == 4
+        assert sum(index >= 10 for index in batch) == 4
