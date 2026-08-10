@@ -13,7 +13,12 @@ from pathlib import Path
 
 METHODS = ("vlm_bridge_pca", "offline_oracle", "failure_recovery", "diffdagger")
 ROOT = Path(os.environ.get("ASK4HELP_ROOT", Path(__file__).resolve().parents[1]))
-RESULT = Path(os.environ["XVLA_STACKCUBE_FOUR_GROUP_RESULT"])
+RESULT = Path(
+    os.environ.get(
+        "XVLA_STACKCUBE_FOUR_GROUP_RESULT",
+        "/tmp/xvla_stackcube_four_group_result_required_at_runtime",
+    )
+)
 ENV = Path("/data/zhaozhixuan/envs/xvla_official_5090")
 XVLA = Path("/data/zhaozhixuan/X-VLA")
 CHECKPOINT = Path(
