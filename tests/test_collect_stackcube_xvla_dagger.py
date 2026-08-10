@@ -3,6 +3,7 @@ from tools.collect_stackcube_xvla_dagger import (
     alternating_split,
     consecutive_gate,
 )
+from tools.run_xvla_stackcube_four_group_pipeline import diffdagger_gate_threshold
 
 
 def test_raw_attempts_alternate_id_ood() -> None:
@@ -26,3 +27,15 @@ def test_consecutive_gate_resets_below_threshold() -> None:
     count, alarm = consecutive_gate(2.0, 1.0, count, 2)
     count, alarm = consecutive_gate(2.0, 1.0, count, 2)
     assert (count, alarm) == (2, True)
+
+
+def test_diffdagger_calibration_matches_patience_statistic() -> None:
+    summary = {
+        "rows": [
+            {"timeline": [{"scores": {"diffdagger": value}} for value in scores]}
+            for scores in ([1.0, 4.0, 3.0], [2.0, 8.0, 5.0], [3.0, 7.0, 6.0])
+        ]
+    }
+    threshold, maxima = diffdagger_gate_threshold(summary, q=0.5, patience=2)
+    assert maxima == [3.0, 5.0, 6.0]
+    assert threshold == 5.0

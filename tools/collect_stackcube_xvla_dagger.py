@@ -241,6 +241,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--flow-steps", type=int, default=10)
     parser.add_argument("--diff-timesteps", type=int, default=16)
     parser.add_argument("--diff-patience", type=int, default=2)
+    parser.add_argument("--diff-threshold", type=float)
     return parser.parse_args()
 
 
@@ -252,7 +253,11 @@ def main() -> None:
     calibration = json.loads(args.calibration.read_text(encoding="utf-8"))
     methods = calibration["methods"]
     pca_threshold = float(methods["vlm_action_bridge_pca"]["threshold"])
-    diff_threshold = float(methods["diffdagger"]["threshold"])
+    diff_threshold = (
+        float(args.diff_threshold)
+        if args.diff_threshold is not None
+        else float(methods["diffdagger"]["threshold"])
+    )
     device = torch.device("cuda")
     bridge_pca = BridgePCA.load(args.internal_assets, device)
     policy = None if args.method == "offline_oracle" else XVLAAirplanePolicy(

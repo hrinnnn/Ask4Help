@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import subprocess
 import sys
@@ -25,6 +26,7 @@ BENCHMARK = Path(
 )
 ASSETS = BENCHMARK / "assets_internal/multilayer_detector_assets.pt"
 CALIBRATION = BENCHMARK / "calibration_q95.json"
+CALIBRATION_ROLLOUTS = BENCHMARK / "calibration_id25/summary.json"
 
 
 def write_json(path: Path, payload: object) -> None:
@@ -49,7 +51,26 @@ def child_env(gpu: int) -> dict[str, str]:
     return env
 
 
-def collector_command(method: str, output: Path, dataset: Path, target: int) -> list[str]:
+def diffdagger_gate_threshold(summary: dict, *, q: float, patience: int) -> tuple[float, list[float]]:
+    """Calibrate the same consecutive-score statistic used by the online gate."""
+    maxima = []
+    for row in summary["rows"]:
+        scores = [
+            float(point["scores"]["diffdagger"])
+            for point in row["timeline"]
+            if point.get("scores", {}).get("diffdagger") is not None
+        ]
+        windows = [min(scores[index : index + patience]) for index in range(len(scores) - patience + 1)]
+        if not windows:
+            raise ValueError("calibration trajectory is shorter than gate patience")
+        maxima.append(max(windows))
+    rank = min(len(maxima), math.ceil((len(maxima) + 1) * q))
+    return sorted(maxima)[rank - 1], maxima
+
+
+def collector_command(
+    method: str, output: Path, dataset: Path, target: int, diff_threshold: float
+) -> list[str]:
     return [
         str(ENV / "bin/python"),
         str(ROOT / "tools/collect_stackcube_xvla_dagger.py"),
@@ -66,10 +87,11 @@ def collector_command(method: str, output: Path, dataset: Path, target: int) -> 
         "--flow-steps", "10",
         "--diff-timesteps", "16",
         "--diff-patience", "2",
+        "--diff-threshold", str(diff_threshold),
     ]
 
 
-def launch_collections(stage: str, target: int) -> None:
+def launch_collections(stage: str, target: int, diff_threshold: float) -> None:
     processes = {}
     handles = []
     for gpu, method in enumerate(METHODS):
@@ -80,7 +102,10 @@ def launch_collections(stage: str, target: int) -> None:
         handle = log_path.open("w", encoding="utf-8")
         handles.append(handle)
         processes[method] = subprocess.Popen(
-            ["taskset", "-c", f"{gpu * 20}-{gpu * 20 + 19}", *collector_command(method, output, dataset, target)],
+            [
+                "taskset", "-c", f"{gpu * 20}-{gpu * 20 + 19}",
+                *collector_command(method, output, dataset, target, diff_threshold),
+            ],
             cwd=ROOT,
             env=child_env(gpu),
             stdout=handle,
@@ -138,10 +163,25 @@ def main() -> None:
     if RESULT.exists():
         raise FileExistsError(RESULT)
     RESULT.mkdir(parents=True)
+    calibration_summary = json.loads(CALIBRATION_ROLLOUTS.read_text(encoding="utf-8"))
+    diff_threshold, maxima = diffdagger_gate_threshold(
+        calibration_summary, q=0.95, patience=2
+    )
+    write_json(
+        RESULT / "diffdagger_gate_calibration_q95_patience2.json",
+        {
+            "source": str(CALIBRATION_ROLLOUTS),
+            "successful_id_trajectories": len(maxima),
+            "q": 0.95,
+            "patience": 2,
+            "threshold": diff_threshold,
+            "trajectory_gate_maxima": maxima,
+        },
+    )
     write_json(RESULT / "pipeline_state.json", {"stage": "collector_smoke"})
-    launch_collections("smoke", 1)
+    launch_collections("smoke", 1, diff_threshold)
     write_json(RESULT / "pipeline_state.json", {"stage": "formal_collection"})
-    launch_collections("formal", 100)
+    launch_collections("formal", 100, diff_threshold)
     promote_formal_layout()
     write_json(RESULT / "pipeline_state.json", {"stage": "training"})
     run_training()
