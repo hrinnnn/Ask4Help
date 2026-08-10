@@ -121,14 +121,25 @@ def launch_collections(stage: str, target: int, diff_threshold: float) -> None:
     failures = {method: process.wait() for method, process in processes.items()}
     for handle in handles:
         handle.close()
-    if any(code != 0 for code in failures.values()):
-        raise RuntimeError(f"{stage} collections failed: {failures}")
     for method in METHODS:
-        summary = json.loads(
-            (RESULT / stage / "collections" / method / "summary.json").read_text(encoding="utf-8")
-        )
+        summary_path = RESULT / stage / "collections" / method / "summary.json"
+        if not summary_path.exists():
+            raise RuntimeError(
+                f"{stage} {method} failed with status {failures[method]} and no summary"
+            )
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
         if int(summary["accepted_total"]) != target:
             raise RuntimeError(f"{method} admitted {summary['accepted_total']}/{target}")
+        if failures[method] not in (0, -6):
+            raise RuntimeError(
+                f"{stage} {method} wrote a summary but exited unexpectedly: {failures[method]}"
+            )
+        if failures[method] == -6:
+            print(
+                f"[stackcube-four-pipeline] accepted simulator teardown SIGABRT "
+                f"after complete {stage} artifacts for {method}",
+                flush=True,
+            )
 
 
 def promote_formal_layout() -> None:
