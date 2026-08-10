@@ -12,7 +12,12 @@ from pathlib import Path
 
 METHODS = ("vlm_bridge_pca", "offline_oracle", "failure_recovery", "diffdagger")
 ROOT = Path(os.environ.get("ASK4HELP_ROOT", Path(__file__).resolve().parents[1]))
-RESULT = Path(os.environ["XVLA_STACKCUBE_FOUR_GROUP_RESULT"])
+RESULT = Path(
+    os.environ.get(
+        "XVLA_STACKCUBE_FOUR_GROUP_RESULT",
+        "/tmp/xvla_stackcube_four_group_result_required_at_runtime",
+    )
+)
 RUN = Path(os.environ.get("XVLA_STACKCUBE_FOUR_GROUP_TRAIN_RUN", RESULT / "training_v1_5000"))
 XVLA = Path("/data/zhaozhixuan/X-VLA")
 ENV = Path("/data/zhaozhixuan/envs/xvla_official_5090")
@@ -118,11 +123,34 @@ def child_env(gpu: int) -> dict[str, str]:
     return env
 
 
+def select_idle_gpus(count: int = 4, max_used_mib: int = 1024) -> list[int]:
+    output = subprocess.check_output(
+        [
+            "nvidia-smi",
+            "--query-gpu=index,memory.used",
+            "--format=csv,noheader,nounits",
+        ],
+        text=True,
+    )
+    available = []
+    for line in output.splitlines():
+        index, used = (int(part.strip()) for part in line.split(","))
+        if used <= max_used_mib:
+            available.append(index)
+    if len(available) < count:
+        raise RuntimeError(
+            f"need {count} idle GPUs with <= {max_used_mib} MiB used, found {available}"
+        )
+    return available[:count]
+
+
 def launch_wave(metas: dict[str, Path], phase: str, steps: int, save_interval: int) -> dict[str, Path]:
     processes: dict[str, subprocess.Popen] = {}
     outputs: dict[str, Path] = {}
     handles = []
-    for gpu, method in enumerate(METHODS):
+    gpus = select_idle_gpus(len(METHODS))
+    write_json(RUN / "gpu_allocations" / f"{phase}.json", dict(zip(METHODS, gpus)))
+    for slot, (gpu, method) in enumerate(zip(gpus, METHODS)):
         output = RUN / phase / method
         output.parent.mkdir(parents=True, exist_ok=True)
         if output.exists():
@@ -133,7 +161,7 @@ def launch_wave(metas: dict[str, Path], phase: str, steps: int, save_interval: i
         handles.append(handle)
         processes[method] = subprocess.Popen(
             [
-                "taskset", "-c", f"{gpu * 20}-{gpu * 20 + 19}",
+                "taskset", "-c", f"{slot * 20}-{slot * 20 + 19}",
                 *training_command(metas[method], output, steps=steps, save_interval=save_interval),
             ],
             cwd=XVLA,

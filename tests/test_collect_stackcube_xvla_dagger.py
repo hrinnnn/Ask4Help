@@ -4,6 +4,7 @@ from tools.collect_stackcube_xvla_dagger import (
     consecutive_gate,
 )
 from tools.run_xvla_stackcube_four_group_pipeline import diffdagger_gate_threshold
+from tools.run_xvla_stackcube_four_group_training import select_idle_gpus
 
 
 def test_raw_attempts_alternate_id_ood() -> None:
@@ -39,3 +40,11 @@ def test_diffdagger_calibration_matches_patience_statistic() -> None:
     threshold, maxima = diffdagger_gate_threshold(summary, q=0.5, patience=2)
     assert maxima == [3.0, 5.0, 6.0]
     assert threshold == 5.0
+
+
+def test_idle_gpu_selection_uses_reported_memory(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "tools.run_xvla_stackcube_four_group_training.subprocess.check_output",
+        lambda *args, **kwargs: "0, 30000\n1, 18\n2, 19\n3, 500\n4, 18\n",
+    )
+    assert select_idle_gpus(4) == [1, 2, 3, 4]
