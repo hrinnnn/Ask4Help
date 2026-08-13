@@ -28,6 +28,6 @@ exec "${PYTHON}" "${ROOT}/tools/run_xvla_stackcube_stage2_pipeline.py" \
   --expert-action-budget 2000 \
   --pool-action-target 2200 \
   --training-steps 10000 \
-  --cohort-screen-episodes 500 \
+  --cohort-screen-episodes 300 \
   --cohort-size 200 \
   "${GPU_ARGS[@]}"

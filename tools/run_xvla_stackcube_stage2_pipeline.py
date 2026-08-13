@@ -100,14 +100,21 @@ def collection_phase(args: argparse.Namespace, gpus: list[int]) -> None:
             "--ood-split", "stage2_ood", "--flow-steps", "10",
             "--failure-recovery-mode", "event",
         ]
-        if method != "immediate":
-            command.extend(["--pool-action-target", str(args.pool_action_target)])
         jobs.append((f"collect_{method}", command,
                      args.result / "logs" / f"collect_{method}.log",
                      output / "summary.json"))
     launch_waves(jobs, gpus=gpus, repo=args.repo, accept_completed_teardown=True)
 
     for method in METHODS:
+        pool_summary = json.loads(
+            (args.result / "collection_pools" / method / "summary.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        if int(pool_summary["accepted_total"]) != args.cohort_size:
+            raise RuntimeError(f"{method} did not complete the common seed cohort")
+        if int(pool_summary["accepted_expert_actions"]) < args.pool_action_target:
+            raise RuntimeError(f"{method} pool did not reach {args.pool_action_target} actions")
         output = args.result / "datasets" / method
         if not (output / "selection_manifest.json").exists():
             subprocess.run(
@@ -186,7 +193,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--expert-action-budget", type=int, default=2000)
     parser.add_argument("--pool-action-target", type=int, default=2200)
     parser.add_argument("--training-steps", type=int, default=10000)
-    parser.add_argument("--cohort-screen-episodes", type=int, default=500)
+    parser.add_argument("--cohort-screen-episodes", type=int, default=300)
     parser.add_argument("--cohort-size", type=int, default=200)
     parser.add_argument("--collection-seed", type=int, default=98000)
     parser.add_argument("--selection-steps", type=int, nargs="+", default=[2000, 4000, 6000, 8000, 10000])
