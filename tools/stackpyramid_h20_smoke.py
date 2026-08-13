@@ -13,6 +13,20 @@ import mani_skill.envs  # noqa: F401  Registers ManiSkill environments.
 import numpy as np
 
 
+def _jsonable(value):
+    if hasattr(value, "detach"):
+        value = value.detach().cpu()
+    if isinstance(value, dict):
+        return {str(key): _jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
 def _shape_summary(value):
     if isinstance(value, dict):
         return {str(key): _shape_summary(item) for key, item in value.items()}
@@ -66,9 +80,9 @@ def main() -> None:
         step_records.append(
             {
                 "step": step + 1,
-                "reward": np.asarray(reward).tolist(),
-                "terminated": np.asarray(terminated).tolist(),
-                "truncated": np.asarray(truncated).tolist(),
+                "reward": _jsonable(reward),
+                "terminated": _jsonable(terminated),
+                "truncated": _jsonable(truncated),
                 "info_keys": sorted(str(key) for key in info),
             }
         )
