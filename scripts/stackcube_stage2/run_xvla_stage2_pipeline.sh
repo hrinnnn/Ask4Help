@@ -25,9 +25,9 @@ exec "${PYTHON}" "${ROOT}/tools/run_xvla_stackcube_stage2_pipeline.py" \
   --checkpoint "${BASE_CHECKPOINT}" \
   --result "${RESULT}" \
   --id-meta "${ID_META}" \
-  --expert-action-budget 2000 \
+  --expert-action-budget 2002 \
   --pool-action-target 2200 \
   --training-steps 10000 \
-  --cohort-screen-episodes 300 \
-  --cohort-size 200 \
+  --cohort-screen-episodes 400 \
+  --cohort-size 300 \
   "${GPU_ARGS[@]}"

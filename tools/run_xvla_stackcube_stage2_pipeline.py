@@ -33,6 +33,43 @@ def child_env(gpu: int, repo: Path) -> dict[str, str]:
     return env
 
 
+def choose_common_checkpoint(
+    rows: list[dict[str, object]],
+    *,
+    steps: list[int],
+    minimum_spread: float = 0.15,
+) -> dict[str, object]:
+    """Choose one shared step without selecting a different optimum per method."""
+    by_step = {
+        step: [
+            float(row["success_rate"])
+            for row in rows
+            if int(row["step"]) == step
+        ]
+        for step in steps
+    }
+    for step in steps:
+        rates = by_step[step]
+        if len(rates) != len(METHODS):
+            raise RuntimeError(f"step {step} has {len(rates)} methods, expected {len(METHODS)}")
+        spread = max(rates) - min(rates)
+        if spread >= minimum_spread and max(rates) > 0.1 and min(rates) < 0.9:
+            return {
+                "step": step,
+                "reason": "earliest_prespecified_step_with_clear_non_saturated_separation",
+                "spread": spread,
+                "rates": rates,
+            }
+    step = steps[-1]
+    rates = by_step[step]
+    return {
+        "step": step,
+        "reason": "maximum_prespecified_step_no_earlier_common_stop",
+        "spread": max(rates) - min(rates),
+        "rates": rates,
+    }
+
+
 def launch_waves(
     jobs: list[tuple[str, list[str], Path, Path]], *, gpus: list[int], repo: Path,
     accept_completed_teardown: bool = False,
@@ -75,6 +112,16 @@ def cohort_phase(args: argparse.Namespace, gpus: list[int]) -> None:
         [("cohort_screen", command, args.result / "logs/cohort_screen.log", screen / "summary.json")],
         gpus=gpus, repo=args.repo, accept_completed_teardown=True,
     )
+    screen_summary = json.loads((screen / "summary.json").read_text(encoding="utf-8"))
+    if float(screen_summary["grasp_rate"]) < 0.8:
+        raise RuntimeError("base policy grasp rate is below the frozen 80% admission gate")
+    lift_rate = sum(
+        int(row["lifted_once"]) for row in screen_summary["rows"]
+    ) / int(screen_summary["episodes"])
+    if lift_rate < 0.8:
+        raise RuntimeError("base policy lift rate is below the frozen 80% admission gate")
+    if float(screen_summary["success_rate"]) > 0.5:
+        raise RuntimeError("base policy OOD success exceeds the frozen 50% upper gate")
     manifest = args.result / "cohort/seed_manifest.json"
     if not manifest.exists():
         subprocess.run(
@@ -83,6 +130,41 @@ def cohort_phase(args: argparse.Namespace, gpus: list[int]) -> None:
              "--count", str(args.cohort_size)],
             cwd=args.repo, check=True,
         )
+
+
+def oracle_validation_phase(args: argparse.Namespace, gpus: list[int]) -> None:
+    root = args.result / "oracle_validation"
+    manifest = root / "seed_manifest.json"
+    if not manifest.exists():
+        write_json(
+            manifest,
+            {
+                "format": "xvla_stackcube_stage2_oracle_validation_v1",
+                "seeds": list(
+                    range(args.oracle_validation_seed,
+                          args.oracle_validation_seed + args.oracle_validation_episodes)
+                ),
+            },
+        )
+    output = root / "collection"
+    dataset = root / "dataset"
+    command = [
+        str(args.python), str(args.repo / "tools/collect_stackcube_xvla_dagger.py"),
+        "--method", "immediate", "--checkpoint", str(args.checkpoint),
+        "--xvla-root", str(args.xvla_root), "--output-dir", str(output),
+        "--repo-id", str(dataset), "--target", str(args.oracle_validation_episodes),
+        "--seed-manifest", str(manifest), "--controlled-timing", "--consume-all-seeds",
+        "--ood-split", "stage2_ood",
+    ]
+    launch_waves(
+        [("oracle_validation", command, args.result / "logs/oracle_validation.log",
+          output / "summary.json")],
+        gpus=gpus, repo=args.repo, accept_completed_teardown=True,
+    )
+    summary = json.loads((output / "summary.json").read_text(encoding="utf-8"))
+    rate = int(summary["accepted_total"]) / args.oracle_validation_episodes
+    if rate < 0.95:
+        raise RuntimeError(f"oracle validation failed: {rate:.3f} < 0.95")
 
 
 def collection_phase(args: argparse.Namespace, gpus: list[int]) -> None:
@@ -192,6 +274,57 @@ def evaluation_phase(args: argparse.Namespace, gpus: list[int]) -> None:
             rows.append({"step": step, "method": method,
                          "success_rate": float(summary["success_rate"]), "summary": str(path)})
     write_json(args.result / "checkpoint_selection/summary.json", {"rows": rows})
+    selected = choose_common_checkpoint(rows, steps=args.selection_steps)
+    write_json(args.result / "checkpoint_selection/selected_checkpoint.json", selected)
+
+
+def final_evaluation_phase(args: argparse.Namespace, gpus: list[int]) -> None:
+    selected = json.loads(
+        (args.result / "checkpoint_selection/selected_checkpoint.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    step = int(selected["step"])
+    jobs = []
+    for split, seed in (("id", args.final_id_seed),
+                        ("stage2_ood", args.final_ood_seed)):
+        for method in METHODS:
+            output = args.result / "final_evaluation" / f"step_{step}" / split / method
+            checkpoint = (
+                args.result / "training" / f"formal_{args.training_steps}"
+                / method / f"ckpt-{step}"
+            )
+            command = [
+                str(args.python), str(args.repo / "tools/evaluate_stackcube_xvla.py"),
+                "--checkpoint", str(checkpoint), "--xvla-root", str(args.xvla_root),
+                "--output-dir", str(output), "--episodes", str(args.final_episodes),
+                "--seed", str(seed), "--split", split, "--execute-horizon", "5",
+                "--max-episode-steps", "150", "--flow-steps", "10",
+            ]
+            jobs.append((
+                f"final_{split}_{method}", command,
+                args.result / "logs" / f"final_{split}_{method}.log",
+                output / "summary.json",
+            ))
+    launch_waves(jobs, gpus=gpus, repo=args.repo, accept_completed_teardown=True)
+    rows = []
+    for split in ("id", "stage2_ood"):
+        for method in METHODS:
+            path = args.result / "final_evaluation" / f"step_{step}" / split / method / "summary.json"
+            summary = json.loads(path.read_text(encoding="utf-8"))
+            rows.append({
+                "step": step,
+                "split": split,
+                "method": method,
+                "successes": int(summary["successes"]),
+                "episodes": int(summary["episodes"]),
+                "success_rate": float(summary["success_rate"]),
+                "summary": str(path),
+            })
+    write_json(
+        args.result / "final_evaluation/summary.json",
+        {"selected_checkpoint": selected, "rows": rows},
+    )
 
 
 def parse_args() -> argparse.Namespace:
@@ -202,21 +335,28 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--result", type=Path, required=True)
     parser.add_argument("--id-meta", type=Path, required=True)
-    parser.add_argument("--expert-action-budget", type=int, default=2000)
+    parser.add_argument("--expert-action-budget", type=int, default=2002)
     parser.add_argument("--pool-action-target", type=int, default=2200)
     parser.add_argument("--training-steps", type=int, default=10000)
-    parser.add_argument("--cohort-screen-episodes", type=int, default=300)
-    parser.add_argument("--cohort-size", type=int, default=200)
+    parser.add_argument("--cohort-screen-episodes", type=int, default=400)
+    parser.add_argument("--cohort-size", type=int, default=300)
     parser.add_argument("--collection-seed", type=int, default=98000)
     parser.add_argument("--selection-steps", type=int, nargs="+", default=[2000, 4000, 6000, 8000, 10000])
     parser.add_argument("--selection-episodes", type=int, default=25)
     parser.add_argument("--selection-seed", type=int, default=99000)
+    parser.add_argument("--oracle-validation-episodes", type=int, default=100)
+    parser.add_argument("--oracle-validation-seed", type=int, default=96000)
+    parser.add_argument("--final-episodes", type=int, default=100)
+    parser.add_argument("--final-id-seed", type=int, default=120000)
+    parser.add_argument("--final-ood-seed", type=int, default=130000)
     parser.add_argument("--gpus", type=int, nargs="*")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.selection_steps[-1] != args.training_steps:
+        raise ValueError("the final selection step must equal training_steps")
     args.result.mkdir(parents=True, exist_ok=True)
     gpus = args.gpus or select_idle_gpus(2)
     if len(gpus) != 2:
@@ -226,14 +366,21 @@ def main() -> None:
         "distribution_shift": "green target position only; red cube paired with ID",
         "controlled_takeover_conditions": list(METHODS),
         "expert_action_budget_per_group": args.expert_action_budget,
+        "budget_note": "2002 is the nearest common full-suffix budget to 2000",
         "pool_action_target_per_group": args.pool_action_target,
         "training_steps": args.training_steps,
         "save_interval": 500,
         "selection_steps": args.selection_steps,
         "gpus": gpus,
     })
-    phases = (("cohort", cohort_phase), ("collection", collection_phase),
-              ("training", training_phase), ("checkpoint_selection", evaluation_phase))
+    phases = (
+        ("oracle_validation", oracle_validation_phase),
+        ("cohort", cohort_phase),
+        ("collection", collection_phase),
+        ("training", training_phase),
+        ("checkpoint_selection", evaluation_phase),
+        ("final_evaluation", final_evaluation_phase),
+    )
     for name, phase in phases:
         write_json(args.result / "pipeline_state.json", {"stage": name})
         phase(args, gpus)
