@@ -93,7 +93,7 @@ class Controller:
         self.run([str(vpy), str(smoke_script)], env=env)
         record_dir = self.output / "stackpyramid_motionplanning"
         record_dir.mkdir(parents=True, exist_ok=True)
-        self.run([str(vpy), "-m", "mani_skill.examples.motionplanning.panda.run", "-e", "StackPyramid-v1", "-n", "1", "--only-count-success", "--save-video", "--render-mode", "rgb_array", "--record-dir", str(record_dir), "--sim-backend", "gpu"], env=env)
+        self.run(["timeout", "180s", str(vpy), "-m", "mani_skill.examples.motionplanning.panda.run", "-e", "StackPyramid-v1", "-n", "1", "--save-video", "--render-mode", "rgb_array", "--record-dir", str(record_dir), "--sim-backend", "gpu"], env=env)
         self.state("smoke", "complete", smoke_dir=str(smoke_dir), motionplanning_dir=str(record_dir))
 
     def persist(self) -> None:
