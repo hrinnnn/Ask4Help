@@ -18,13 +18,13 @@ def write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def child_env(gpu: int, repo: Path) -> dict[str, str]:
+def child_env(gpu: int, repo: Path, *, cpu_count: int) -> dict[str, str]:
     env = os.environ.copy()
     env.update({
         "CUDA_VISIBLE_DEVICES": str(gpu),
         "PYTHONPATH": f"{repo}:{repo / 'RLinf'}",
-        "OMP_NUM_THREADS": "20",
-        "MKL_NUM_THREADS": "20",
+        "OMP_NUM_THREADS": str(cpu_count),
+        "MKL_NUM_THREADS": str(cpu_count),
         "TOKENIZERS_PARALLELISM": "false",
         "HF_HUB_OFFLINE": "1",
         "TRANSFORMERS_OFFLINE": "1",
@@ -74,6 +74,15 @@ def launch_waves(
     jobs: list[tuple[str, list[str], Path, Path]], *, gpus: list[int], repo: Path,
     accept_completed_teardown: bool = False,
 ) -> None:
+    available_cpus = sorted(os.sched_getaffinity(0))
+    if len(available_cpus) < len(gpus):
+        raise RuntimeError(
+            f"only {len(available_cpus)} CPUs are available for {len(gpus)} GPUs"
+        )
+    cpu_sets = [
+        available_cpus[index::len(gpus)]
+        for index in range(len(gpus))
+    ]
     for wave_start in range(0, len(jobs), len(gpus)):
         running = []
         for slot, ((name, command, log, completion), gpu) in enumerate(
@@ -85,9 +94,11 @@ def launch_waves(
                 raise RuntimeError(f"partial output for {name}: {completion.parent}")
             log.parent.mkdir(parents=True, exist_ok=True)
             handle = log.open("w", encoding="utf-8")
+            cpus = cpu_sets[slot]
+            cpu_list = ",".join(str(cpu) for cpu in cpus)
             process = subprocess.Popen(
-                ["taskset", "-c", f"{slot * 20}-{slot * 20 + 19}", *command],
-                cwd=repo, env=child_env(gpu, repo), stdout=handle,
+                ["taskset", "-c", cpu_list, *command],
+                cwd=repo, env=child_env(gpu, repo, cpu_count=len(cpus)), stdout=handle,
                 stderr=subprocess.STDOUT,
             )
             running.append((name, completion, process, handle, gpu))

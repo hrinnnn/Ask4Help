@@ -70,3 +70,11 @@ def test_clean_cohort_requires_a_stage_localized_failure() -> None:
         )
     ]
     assert len(candidates) == 1
+
+
+def test_cpu_partition_is_disjoint_and_balanced() -> None:
+    available = list(range(8))
+    partitions = [available[index::2] for index in range(2)]
+    assert set(partitions[0]).isdisjoint(partitions[1])
+    assert sorted(partitions[0] + partitions[1]) == available
+    assert len(partitions[0]) == len(partitions[1])
