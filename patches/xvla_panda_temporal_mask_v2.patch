@@ -1,0 +1,350 @@
+diff --git a/datasets/__init__.py b/datasets/__init__.py
+--- a/datasets/__init__.py
++++ b/datasets/__init__.py
+@@ -28,13 +28,20 @@ def create_dataloader(batch_size: int,
+                       metas_path: str, 
+                       num_actions: int,
+                       training: bool,
+-                      action_mode: str
++                      action_mode: str,
++                      num_views: int = 2,
+                       ):
+     return DataLoader(
+-        InfiniteDataReader(metas_path, num_actions=num_actions, training=training, action_mode = action_mode),
++        InfiniteDataReader(
++            metas_path,
++            num_actions=num_actions,
++            num_views=num_views,
++            training=training,
++            action_mode=action_mode,
++        ),
+         batch_size=batch_size,
+         num_workers=4,
+         pin_memory=True,
+         worker_init_fn=worker_init_fn,
+         persistent_workers=True
+-    )
+\ No newline at end of file
++    )
+diff --git a/datasets/domain_config.py b/datasets/domain_config.py
+--- a/datasets/domain_config.py
++++ b/datasets/domain_config.py
+@@ -39,6 +39,7 @@ DATA_WEIGHTS = {
+ }
+ 
+ DATA_DOMAIN_ID = {
++    "panda_airplane": 0,
+     # ft
+     "Bridge": 0,
+     "RT1": 1,
+diff --git a/datasets/domain_handler/registry.py b/datasets/domain_handler/registry.py
+--- a/datasets/domain_handler/registry.py
++++ b/datasets/domain_handler/registry.py
+@@ -27,9 +27,11 @@ from .real_world import AIRAgilexHandler, AIRAgilexHQHandler, AIRBotHandler, Wid
+ from .simulations import BridgeHandler, LiberoHandler, VLABenchHandler, RobotWin2Handler, RobocasaHumanHandler, CalvinHandler, RT1Handler
+ from .lerobotv21 import LeRobotV21Handler
+ from .x2robot import X2RobotHandler
++from .panda_airplane import PandaAirplaneHandler
+ 
+ # 1) Exact registry only (no heuristics)
+ _REGISTRY: Dict[str, Type[DomainHandler]] = {
++    "panda_airplane": PandaAirplaneHandler,
+     
+     # X2Robot
+     "x2robot": X2RobotHandler,
+diff --git a/datasets/domain_handler/panda_airplane.py b/datasets/domain_handler/panda_airplane.py
+new file mode 100644
+--- /dev/null
++++ b/datasets/domain_handler/panda_airplane.py
+@@ -0,0 +1,71 @@
++from __future__ import annotations
++
++import random
++
++import numpy as np
++import torch
++
++from ..utils import decode_image_from_bytes, read_parquet
++from .base import DomainHandler
++
++
++class PandaAirplaneHandler(DomainHandler):
++    """Read the existing 8D Panda airplane LeRobot parquet dataset."""
++
++    def iter_episode(
++        self,
++        traj_idx: int,
++        *,
++        num_actions: int,
++        training: bool,
++        image_aug,
++        lang_aug_map: dict | None,
++        **kwargs,
++    ):
++        item = self.meta["datalist"][traj_idx]
++        episode_index = item["episode_index"]
++        episode_chunk = episode_index // self.meta["chunks_size"]
++        data_path = self.meta["data_path"].format(
++            episode_chunk=episode_chunk,
++            episode_index=episode_index,
++        )
++        data = read_parquet(f"{self.meta['root_path']}/{data_path}")
++        total = len(data["actions"])
++        indices = list(range(total))
++        if training:
++            random.shuffle(indices)
++        instruction = item["tasks"][0]
++
++        for index in indices:
++            main_image = decode_image_from_bytes(data["image"][index]["bytes"])
++            wrist_image = decode_image_from_bytes(data["wrist_image"][index]["bytes"])
++            image_input = torch.stack(
++                [image_aug(main_image), image_aug(wrist_image)], dim=0
++            )
++
++            # X-VLA keeps a 20D model-facing interface. The first 8 channels
++            # are the real Panda joint-delta action/state used by this task.
++            proprio = np.zeros(20, dtype=np.float32)
++            proprio[:9] = np.asarray(data["state"][index], dtype=np.float32)
++            real_actions = np.asarray(
++                data["actions"][index:index + num_actions], dtype=np.float32
++            )
++            valid_steps = len(real_actions)
++            action = np.zeros((num_actions, 20), dtype=np.float32)
++            action[:valid_steps, :8] = real_actions
++            if valid_steps < num_actions:
++                action[valid_steps:, :8] = np.asarray(
++                    data["actions"][-1], dtype=np.float32
++                )
++            abs_trajectory = torch.from_numpy(
++                np.concatenate([proprio[None], action], axis=0)
++            )
++            yield {
++                "language_instruction": instruction,
++                "image_input": image_input,
++                "image_mask": torch.ones(2, dtype=torch.bool),
++                "abs_trajectory": abs_trajectory,
++                "action_valid_mask": torch.arange(num_actions) < valid_steps,
++                "idx_for_delta": [],
++                "idx_for_mask_proprio": [],
++            }
+diff --git a/models/action_hub.py b/models/action_hub.py
+--- a/models/action_hub.py
++++ b/models/action_hub.py
+@@ -309,7 +309,12 @@ class AutoActionSpace(BaseActionSpace):
+         """Trim model output max_dim → real_dim."""
+         return x[..., : self.real_dim]
+ 
+-    def compute_loss(self, pred: torch.Tensor, target: torch.Tensor) -> dict[str, torch.Tensor]:
++    def compute_loss(
++        self,
++        pred: torch.Tensor,
++        target: torch.Tensor,
++        action_valid_mask: torch.Tensor | None = None,
++    ) -> dict[str, torch.Tensor]:
+         """
+         Compute loss only on the first real_dim dimensions.
+ 
+@@ -322,14 +327,25 @@ class AutoActionSpace(BaseActionSpace):
+         target = self._pad_to_model_dim(target)
+         assert pred.shape == target.shape, f"Shape mismatch: pred {pred.shape} vs target {target.shape}"
+ 
+-        # only compute loss on the real dimensions
+-        joints_loss = (
+-            self.mse(
+-                pred[:, :, : self.real_dim],
+-                target[:, :, : self.real_dim],
++        element_loss = (
++            pred[:, :, : self.real_dim] - target[:, :, : self.real_dim]
++        ).square()
++        if action_valid_mask is None:
++            joints_loss = element_loss.mean()
++        else:
++            mask = action_valid_mask.to(device=element_loss.device, dtype=torch.bool)
++            if mask.shape != element_loss.shape[:2]:
++                raise ValueError(
++                    f"action_valid_mask {tuple(mask.shape)} does not match "
++                    f"action targets {tuple(element_loss.shape[:2])}"
++                )
++            if not torch.all(mask.any(dim=1)):
++                raise ValueError("every anchor must contain a real action target")
++            weights = mask.unsqueeze(-1).to(element_loss.dtype)
++            joints_loss = (element_loss * weights).sum() / (
++                weights.sum() * self.real_dim
+             )
+-            * self.JOINTS_SCALE
+-        )
++        joints_loss = joints_loss * self.JOINTS_SCALE
+ 
+         return {"joints_loss": joints_loss}
+ 
+diff --git a/models/modeling_xvla.py b/models/modeling_xvla.py
+--- a/models/modeling_xvla.py
++++ b/models/modeling_xvla.py
+@@ -153,6 +153,7 @@ class XVLA(PreTrainedModel):
+         domain_id: torch.LongTensor,
+         proprio: torch.Tensor,
+         action: torch.Tensor,  # [B, T=num_actions, D=dim_action]
++        action_valid_mask: torch.Tensor | None = None,
+     ) -> Dict[str, torch.Tensor]:
+         """
+         1) Encode multimodal inputs.
+@@ -175,7 +176,9 @@ class XVLA(PreTrainedModel):
+             proprio=proprio_m,
+             **enc,
+         )
+-        return self.action_space.compute_loss(pred_action, action)
++        return self.action_space.compute_loss(
++            pred_action, action, action_valid_mask=action_valid_mask
++        )
+ 
+     # ================================= inference =================================
+     @torch.no_grad()
+diff --git a/train.py b/train.py
+--- a/train.py
++++ b/train.py
+@@ -29,6 +29,7 @@ import torch.backends.cudnn as cudnn
+ from torch.optim import AdamW
+ 
+ from accelerate import Accelerator
++from accelerate.utils import InitProcessGroupKwargs
+ from datasets import create_dataloader
+ from models.modeling_xvla import XVLA
+ from models.processing_xvla import XVLAProcessor
+@@ -78,6 +79,11 @@ def get_args_parser():
+     # Data
+     parser.add_argument("--train_metas_path", type=str, required=True, help="Path to training metadata")
+     parser.add_argument("--batch_size", type=int, default=16)
++    parser.add_argument("--num_actions", type=int, default=10)
++    parser.add_argument("--num_views", type=int, default=2)
++    parser.add_argument("--action_mode", type=str, default="auto")
++    parser.add_argument("--real_action_dim", type=int, default=8)
++    parser.add_argument("--max_action_dim", type=int, default=20)
+ 
+     # Optimizer
+     parser.add_argument("--learning_rate", type=float, default=1e-4)
+@@ -88,6 +94,7 @@ def get_args_parser():
+ 
+     # Schedule
+     parser.add_argument("--iters", type=int, default=1000000)
++    parser.add_argument("--initial_step", type=int, default=0)
+     parser.add_argument("--freeze_steps", type=int, default=1000)
+     parser.add_argument("--warmup_steps", type=int, default=2000)
+     parser.add_argument("--use_cosine_decay", action="store_true", default=False)
+@@ -99,6 +106,9 @@ def get_args_parser():
+ 
+     # System
+     parser.add_argument("--seed", type=int, default=0)
++    parser.add_argument("--distributed_backend", choices=("nccl", "gloo"), default="nccl")
++    parser.add_argument("--gradient_checkpointing", action="store_true")
++    parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
+ 
+     return parser
+ 
+@@ -177,20 +187,32 @@ def update_group_lrs(optim, step, args):
+ # ============================================================
+ def main(args):
+     output_dir = Path(args.output_dir)
++    process_group = InitProcessGroupKwargs(backend=args.distributed_backend)
+     accelerator = Accelerator(
+         log_with="tensorboard", 
+-        project_dir=output_dir
++        project_dir=output_dir,
++        gradient_accumulation_steps=args.gradient_accumulation_steps,
++        kwargs_handlers=[process_group],
+     )
++    if torch.cuda.is_available():
++        torch.cuda.set_device(accelerator.local_process_index)
+     accelerator.init_trackers("XVLA-Training")
+     
+-    accelerator.wait_for_everyone()
+     logger = get_logger(__name__, output_dir=output_dir, accelerator=accelerator)
+     
+     set_seed(args.seed + accelerator.process_index)
+     logger.info(f"Args: {args}")
+ 
+     # Load model & processor
+-    model = XVLA.from_pretrained(args.models)
++    from models.configuration_xvla import XVLAConfig
++    config = XVLAConfig.from_pretrained(args.models)
++    config.action_mode = args.action_mode
++    config.real_action_dim = args.real_action_dim
++    config.max_action_dim = args.max_action_dim
++    config.num_actions = args.num_actions
++    model = XVLA.from_pretrained(args.models, config=config)
++    if args.gradient_checkpointing:
++        model.gradient_checkpointing_enable()
+     processor = XVLAProcessor.from_pretrained(args.models)
+ 
+     # Iterable dataloader (don't wrap with prepare)
+@@ -199,6 +221,7 @@ def main(args):
+         metas_path=args.train_metas_path,
+         num_actions=model.num_actions,
+         action_mode=model.action_mode,
++        num_views=args.num_views,
+         training=True,
+     )
+ 
+@@ -214,31 +237,40 @@ def main(args):
+ 
+     # Training loop
+     model.train()
+-    global_step, t0 = 0, time.time()
+-    logger.info(f"🚀 Start training for {args.iters} iterations | world_size={accelerator.num_processes}")
++    global_step, t0 = args.initial_step, time.time()
++    logger.info(
++        f"🚀 Continue training from step {global_step} to {args.iters} "
++        f"| world_size={accelerator.num_processes}"
++    )
+     
+     for batch in train_dataloader:
+         # Encode language
+         lang = processor.encode_language(batch["language_instruction"])
+         batch.pop("language_instruction", None)
+         inputs = {**batch, **lang}
+-        inputs = {k: v.cuda(non_blocking=True) for k, v in inputs.items()}
+-        # Update LR per group
+-        update_group_lrs(optim, global_step, args)
+-
+-        # Forward & backward
+-        loss_dict: Dict[str, torch.Tensor] = model(**inputs)
+-        loss = sum(loss_dict.values())
+-        accelerator.backward(loss)
+-        if args.max_grad_norm:
+-            accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
+-        optim.step()
+-        optim.zero_grad()
++        inputs = {k: v.to(accelerator.device, non_blocking=True) for k, v in inputs.items()}
++        with accelerator.accumulate(model):
++            # global_step counts optimizer updates, not micro-batches.
++            update_group_lrs(optim, global_step, args)
++            loss_dict: Dict[str, torch.Tensor] = model(**inputs)
++            loss = sum(loss_dict.values())
++            accelerator.backward(loss)
++            if accelerator.sync_gradients and args.max_grad_norm:
++                accelerator.clip_grad_norm_(model.parameters(), args.max_grad_norm)
++            optim.step()
++            optim.zero_grad()
++
++        if not accelerator.sync_gradients:
++            continue
+ 
+         # Logging
+         if global_step % args.log_interval == 0:
+             logs = {k: v.detach().float().item() for k, v in loss_dict.items()}
+             logs["loss_total"] = float(loss.detach().item())
++            if "action_valid_mask" in inputs:
++                logs["action_valid_ratio"] = float(
++                    inputs["action_valid_mask"].float().mean().item()
++                )
+             logs.update({f"lr_{g['name']}": g["lr"] for g in optim.param_groups})
+             accelerator.log(logs, step=global_step)
+ 
+@@ -250,6 +282,7 @@ def main(args):
+                 logger.info(
+                     f"[{global_step}/{args.iters}] "
+                     f"loss={logs['loss_total']:.4f} "
++                    f"valid_action_ratio={logs.get('action_valid_ratio', 1.0):.4f} "
+                     f"lr_core={logs['lr_transformer_core']:.2e} "
+                     f"lr_vlm={logs['lr_vlm']:.2e} ({dt:.2f}s/it) "
+                     f"USED_CPU={cpu_mem:.2e} GB "
