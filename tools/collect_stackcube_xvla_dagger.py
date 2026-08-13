@@ -265,6 +265,7 @@ def _run_attempt(
     failure_state = FailureRecoveryState()
     failure_recovery_event = "immediate" if method == "immediate" else None
     oracle = StackCubePrivilegedChunkOracle(chunk_size=EXECUTE_HORIZON)
+    oracle_initialized = False
     success = grasped = on_cube = False
     terminated = truncated = False
 
@@ -324,6 +325,9 @@ def _run_attempt(
                 expert_start = step
 
         if expert_start is not None:
+            if not oracle_initialized:
+                failure_recovery_event = failure_recovery_event or oracle.initialize_from_state(env)
+                oracle_initialized = True
             plan = oracle.plan(env)
             candidate = plan.actions
             source = "expert"
