@@ -29,6 +29,8 @@ def _frame_array(frame):
             if key in frame:
                 return _frame_array(frame[key])
         return None
+    if hasattr(frame, "detach"):
+        frame = frame.detach().cpu()
     array = np.asarray(frame)
     if array.ndim == 4:
         array = array[0]
