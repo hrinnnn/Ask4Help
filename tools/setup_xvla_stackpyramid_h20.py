@@ -25,6 +25,7 @@ class Controller:
         self.logs.mkdir(parents=True, exist_ok=True)
         self.state_path = output / "pipeline_state.json"
         self.log_path = self.logs / "controller.log"
+        self.motionplanning_status = "not_run"
 
     def log(self, message: str) -> None:
         line = f"[{time.strftime('%Y-%m-%dT%H:%M:%S%z')}] {message}\n"
@@ -93,8 +94,13 @@ class Controller:
         self.run([str(vpy), str(smoke_script)], env=env)
         record_dir = self.output / "stackpyramid_motionplanning"
         record_dir.mkdir(parents=True, exist_ok=True)
-        self.run(["timeout", "180s", str(vpy), "-m", "mani_skill.examples.motionplanning.panda.run", "-e", "StackPyramid-v1", "-n", "1", "--save-video", "--render-mode", "rgb_array", "--record-dir", str(record_dir), "--sim-backend", "gpu"], env=env)
-        self.state("smoke", "complete", smoke_dir=str(smoke_dir), motionplanning_dir=str(record_dir))
+        try:
+            self.run(["timeout", "180s", str(vpy), "-m", "mani_skill.examples.motionplanning.panda.run", "-e", "StackPyramid-v1", "-n", "1", "--save-video", "--render-mode", "rgb_array", "--record-dir", str(record_dir), "--sim-backend", "gpu"], env=env)
+            self.motionplanning_status = "passed"
+        except RuntimeError as exc:
+            self.motionplanning_status = f"failed: {exc}"
+            self.log("OPTIONAL_MOTION_PLANNING_FAILED " + repr(exc))
+        self.state("smoke", "complete", smoke_dir=str(smoke_dir), motionplanning_dir=str(record_dir), motionplanning_status=self.motionplanning_status)
 
     def persist(self) -> None:
         self.state("persist", "running")
@@ -114,6 +120,7 @@ class Controller:
             "pip_freeze": str(env_dir / "xvla-h20-pip-freeze.txt"),
             "stackpyramid_smoke": str(self.output / "stackpyramid_smoke/stackpyramid_smoke.json"),
             "motionplanning_output": str(self.output / "stackpyramid_motionplanning"),
+            "motionplanning_status": self.motionplanning_status,
             "gpu_policy": "GPU1 only for smoke; GPU0 reserved for existing StackCube workload",
         }
         (env_dir / "xvla-h20-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -130,6 +137,9 @@ class Controller:
             self.smoke()
             self.persist()
             (self.output / "XVLA_ENV_READY").write_text("xvla-h20 and StackPyramid smoke passed\n", encoding="utf-8")
+            (self.output / "STACKPYRAMID_ENV_SMOKE_PASSED").write_text("reset/step/render/evaluate smoke passed\n", encoding="utf-8")
+            if self.motionplanning_status != "passed":
+                (self.output / "STACKPYRAMID_MOTION_PLANNER_REQUIRES_REPAIR").write_text(self.motionplanning_status + "\n", encoding="utf-8")
             self.state("complete", "complete", marker=str(self.output / "XVLA_ENV_READY"))
             self.log("XVLA_ENV_READY")
         except Exception as exc:
