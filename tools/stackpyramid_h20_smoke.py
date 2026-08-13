@@ -9,6 +9,7 @@ from pathlib import Path
 
 import gymnasium as gym
 import imageio.v3 as iio
+import imageio
 import mani_skill.envs  # noqa: F401  Registers ManiSkill environments.
 import numpy as np
 
@@ -110,7 +111,16 @@ def main() -> None:
         json.dumps(_jsonable(summary), indent=2, ensure_ascii=True, default=str) + "\n", encoding="utf-8"
     )
     if frames:
-        iio.imwrite(output / "stackpyramid_reset_step_smoke.mp4", np.stack(frames), fps=10)
+        with imageio.get_writer(
+            output / "stackpyramid_reset_step_smoke.mp4",
+            format="FFMPEG",
+            mode="I",
+            fps=10,
+            codec="libx264",
+            macro_block_size=None,
+        ) as writer:
+            for frame in frames:
+                writer.append_data(frame)
     env.close()
 
 
