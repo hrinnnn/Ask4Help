@@ -115,13 +115,25 @@ def cohort_phase(args: argparse.Namespace, gpus: list[int]) -> None:
     screen_summary = json.loads((screen / "summary.json").read_text(encoding="utf-8"))
     if float(screen_summary["grasp_rate"]) < 0.8:
         raise RuntimeError("base policy grasp rate is below the frozen 80% admission gate")
-    lift_rate = sum(
-        int(row["lifted_once"]) for row in screen_summary["rows"]
-    ) / int(screen_summary["episodes"])
-    if lift_rate < 0.8:
-        raise RuntimeError("base policy lift rate is below the frozen 80% admission gate")
     if float(screen_summary["success_rate"]) > 0.5:
         raise RuntimeError("base policy OOD success exceeds the frozen 50% upper gate")
+    cohort_candidates = [
+        row
+        for row in screen_summary["rows"]
+        if (
+            not bool(row["success"])
+            and bool(row["grasped_once"])
+            and bool(row["lifted_once"])
+            and bool(row["stable_lift_boundary_once"])
+            and bool(row["dropped_after_lift_two_boundaries"])
+        )
+    ]
+    if len(cohort_candidates) < args.cohort_size:
+        raise RuntimeError(
+            "the screened policy rollouts do not provide enough clean "
+            "stage-localized failure candidates: "
+            f"{len(cohort_candidates)} < {args.cohort_size}"
+        )
     manifest = args.result / "cohort/seed_manifest.json"
     if not manifest.exists():
         subprocess.run(

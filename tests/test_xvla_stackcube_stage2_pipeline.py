@@ -39,3 +39,34 @@ def test_2002_is_exactly_reachable_by_the_observed_full_suffix_lengths() -> None
     assert exact_budget_subset([11] * 182, 2002) is not None
     assert exact_budget_subset([26] * 77, 2002) is not None
     assert exact_budget_subset([11] * 200, 2000) is None
+
+
+def test_clean_cohort_requires_a_stage_localized_failure() -> None:
+    rows = [
+        {
+            "success": False,
+            "grasped_once": True,
+            "lifted_once": True,
+            "stable_lift_boundary_once": True,
+            "dropped_after_lift_two_boundaries": True,
+        },
+        {
+            "success": False,
+            "grasped_once": True,
+            "lifted_once": False,
+            "stable_lift_boundary_once": False,
+            "dropped_after_lift_two_boundaries": False,
+        },
+    ]
+    candidates = [
+        row
+        for row in rows
+        if (
+            not row["success"]
+            and row["grasped_once"]
+            and row["lifted_once"]
+            and row["stable_lift_boundary_once"]
+            and row["dropped_after_lift_two_boundaries"]
+        )
+    ]
+    assert len(candidates) == 1
