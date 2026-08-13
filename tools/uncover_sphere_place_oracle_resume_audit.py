@@ -47,9 +47,9 @@ def step_plan(env, oracle, max_chunks: int, stop):
             _, _, terminated, truncated, _ = env.step(plan.action_at(qpos, index))
             if flag(terminated) or flag(truncated):
                 return chunk + 1, False
-            info = env.unwrapped.evaluate()
-            if stop(info):
-                return chunk + 1, True
+        info = env.unwrapped.evaluate()
+        if stop(info, oracle):
+            return chunk + 1, True
     return max_chunks, False
 
 
@@ -70,7 +70,11 @@ def run(split: str, seed: int, env_module, oracle_module, env_max_steps: int) ->
         env,
         first,
         250,
-        lambda info: flag(info["ever_mug_parked"]) and not flag(info["ever_sphere_grasped"]),
+        lambda info, oracle: (
+            flag(info["ever_mug_parked"])
+            and not flag(info["ever_sphere_grasped"])
+            and oracle._phase == "sphere_reach"
+        ),
     )
     if not reached_sphere:
         env.close()
@@ -82,7 +86,7 @@ def run(split: str, seed: int, env_module, oracle_module, env_max_steps: int) ->
         env,
         resumed_after_cover,
         250,
-        lambda info: flag(info["success"]),
+        lambda info, _oracle: flag(info["success"]),
     )
 
     env.reset(seed=seed)
@@ -91,7 +95,10 @@ def run(split: str, seed: int, env_module, oracle_module, env_max_steps: int) ->
         env,
         first,
         250,
-        lambda info: flag(info["ever_sphere_grasped"]),
+        lambda info, oracle: (
+            flag(info["ever_sphere_grasped"])
+            and oracle._phase in {"sphere_lift", "sphere_move", "sphere_place", "sphere_open", "done"}
+        ),
     )
     if not reached_grasp:
         env.close()
@@ -109,7 +116,7 @@ def run(split: str, seed: int, env_module, oracle_module, env_max_steps: int) ->
         env,
         resumed_after_grasp,
         250,
-        lambda info: flag(info["success"]),
+        lambda info, _oracle: flag(info["success"]),
     )
     env.close()
     return {
