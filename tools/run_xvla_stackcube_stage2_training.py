@@ -255,6 +255,12 @@ def reload_forward_smoke(
     smoke_outputs: dict[str, Path],
     run: Path,
 ) -> None:
+    available_cpus = sorted(os.sched_getaffinity(0))
+    if len(available_cpus) < len(gpus):
+        raise RuntimeError(
+            f"only {len(available_cpus)} CPUs are available for {len(gpus)} GPUs"
+        )
+    cpu_sets = [available_cpus[index::len(gpus)] for index in range(len(gpus))]
     for wave_start in range(0, len(methods), len(gpus)):
         jobs = []
         for slot, (method, gpu) in enumerate(
