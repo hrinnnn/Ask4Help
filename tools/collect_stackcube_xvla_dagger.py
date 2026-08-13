@@ -274,6 +274,7 @@ def _run_attempt(
         score = threshold = None
         alarm = expert_start is not None
         timing_reason = None
+        policy_seed = seed * 1000 + len(timeline)
         if controlled_timing and expert_start is None and method in {
             "post_grasp", "post_lift", "failure_recovery"
         }:
@@ -292,7 +293,7 @@ def _run_attempt(
             assert policy is not None
             if method == "internal_pca":
                 assert internal_probe is not None
-                torch.manual_seed(seed * 1000 + step)
+                torch.manual_seed(policy_seed)
                 inputs = policy.prepare(raw_obs, STACK_CUBE_TASK)
                 with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
                     features, encoding = internal_probe.extract(inputs)
@@ -303,7 +304,7 @@ def _run_attempt(
                 feature = features[internal_layer]
             else:
                 predicted, feature, inputs, encoding = policy.predict(
-                    raw_obs, STACK_CUBE_TASK, seed=seed * 1000 + step, steps=flow_steps
+                    raw_obs, STACK_CUBE_TASK, seed=policy_seed, steps=flow_steps
                 )
             if method in {"internal_pca", "vlm_bridge_pca"}:
                 assert internal_pca is not None
