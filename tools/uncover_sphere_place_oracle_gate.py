@@ -65,6 +65,7 @@ def run_split(
         oracle = oracle_module.UncoverSpherePlacePrivilegedChunkOracle(chunk_size=10)
         last_phase = None
         previous_ever_sphere_grasped = False
+        previous_sphere_grasped = False
         terminated = False
         chunks = 0
         for chunks in range(1, max_chunks + 1):
@@ -80,6 +81,18 @@ def run_split(
             for step_index in range(10):
                 qpos = env.unwrapped.agent.robot.get_qpos()
                 _, _, terminated, truncated, _ = env.step(plan.action_at(qpos, step_index))
+                step_info = env.unwrapped.evaluate()
+                current_sphere_grasped = _bool(step_info["sphere_grasped"])
+                if current_sphere_grasped != previous_sphere_grasped:
+                    sphere_p = env.unwrapped.sphere.pose.p.detach().cpu().reshape(-1, 3)[0].tolist()
+                    print(
+                        f"[oracle-gate] sphere_grasp={current_sphere_grasped} "
+                        f"split={split} seed={seed} chunk={chunks} "
+                        f"step={step_index + 1} phase={oracle._phase} "
+                        f"sphere_p={sphere_p}",
+                        flush=True,
+                    )
+                previous_sphere_grasped = current_sphere_grasped
                 if _bool(terminated) or _bool(truncated):
                     terminated = True
                     break
