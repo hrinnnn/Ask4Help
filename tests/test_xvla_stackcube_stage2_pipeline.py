@@ -1,5 +1,11 @@
+import json
+
 from tools.collect_stackcube_xvla_dagger import exact_budget_subset
-from tools.run_xvla_stackcube_stage2_pipeline import METHODS, choose_common_checkpoint
+from tools.run_xvla_stackcube_stage2_pipeline import (
+    METHODS,
+    choose_common_checkpoint,
+    common_full_suffix_budget,
+)
 
 
 def test_stage2_pipeline_compares_the_four_formal_groups() -> None:
@@ -78,3 +84,30 @@ def test_cpu_partition_is_disjoint_and_balanced() -> None:
     assert set(partitions[0]).isdisjoint(partitions[1])
     assert sorted(partitions[0] + partitions[1]) == available
     assert len(partitions[0]) == len(partitions[1])
+
+
+def test_common_budget_uses_largest_reachable_full_suffix(tmp_path) -> None:
+    root = tmp_path / "timing"
+    seeds = {"seeds": [1, 2, 3]}
+    (root / "cohort").mkdir(parents=True)
+    (root / "cohort/success_intersection.json").write_text(json.dumps(seeds))
+    for method, lengths in {
+        "immediate": [24] * 100,
+        "post_grasp": [24] * 100,
+        "post_lift": [24] * 100,
+        "failure_recovery": [24] * 100,
+    }.items():
+        (root / f"dataset_pools/{method}/meta").mkdir(parents=True)
+        (root / f"collection_pools/{method}").mkdir(parents=True)
+        (root / f"dataset_pools/{method}/meta/episodes.jsonl").write_text(
+            "".join(json.dumps({"length": value}) + "\n" for value in lengths)
+        )
+        (root / f"collection_pools/{method}/training_episodes.jsonl").write_text(
+            "".join(json.dumps({"seed": 1}) + "\n" for _ in lengths)
+        )
+    assert common_full_suffix_budget(
+        root=root,
+        methods=METHODS,
+        allowed_seeds_path=root / "cohort/success_intersection.json",
+        requested_budget=2002,
+    ) == 1992

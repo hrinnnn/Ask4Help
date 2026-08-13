@@ -53,11 +53,11 @@ def dce(alignment: float, saving: float) -> float:
     return float(2.0 * alignment * saving / (alignment + saving + 1e-12))
 
 
-def pool_rows(root: Path, method: str) -> tuple[list[dict], list[dict]]:
+def pool_rows(root: Path, method: str, datasets_root: Path) -> tuple[list[dict], list[dict]]:
     collection = root / "collection_pools" / method
     training = read_jsonl(collection / "training_episodes.jsonl")
     selected = json.loads(
-        (root / "datasets" / method / "selection_manifest.json").read_text(encoding="utf-8")
+        (datasets_root / method / "selection_manifest.json").read_text(encoding="utf-8")
     )["selected_source_episode_indices"]
     chosen = [training[int(index)] for index in selected]
     attempts = {int(row["attempt_index"]): row for row in read_jsonl(collection / "episodes.jsonl")}
@@ -68,6 +68,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--datasets", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -88,7 +89,7 @@ def main() -> None:
     raw_distances = []
     pending = []
     for method in METHODS:
-        selected, attempts = pool_rows(args.root, method)
+        selected, attempts = pool_rows(args.root, method, args.datasets)
         for train_row, attempt in zip(selected, attempts):
             seed = int(attempt["seed"])
             nominal = nominal_by_seed[seed]

@@ -18,6 +18,57 @@ def write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+def read_jsonl(path: Path) -> list[dict[str, object]]:
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+
+
+def common_full_suffix_budget(
+    *,
+    root: Path,
+    methods: tuple[str, ...],
+    allowed_seeds_path: Path,
+    requested_budget: int,
+) -> int:
+    """Find the largest common budget without slicing any expert suffix."""
+    allowed = set(json.loads(allowed_seeds_path.read_text(encoding="utf-8"))["seeds"])
+    reachable_by_method: list[set[int]] = []
+    for method in methods:
+        episodes = read_jsonl(
+            root / "dataset_pools" / method / "meta" / "episodes.jsonl"
+        )
+        collected = read_jsonl(
+            root / "collection_pools" / method / "training_episodes.jsonl"
+        )
+        if len(episodes) != len(collected):
+            raise RuntimeError(
+                f"{method} dataset/collection mismatch: "
+                f"{len(episodes)} != {len(collected)}"
+            )
+        lengths = [
+            int(episode["length"])
+            for episode, row in zip(episodes, collected)
+            if int(row["seed"]) in allowed
+        ]
+        if not lengths:
+            raise RuntimeError(f"{method} has no common-seed full suffixes")
+        reachable: set[int] = {0}
+        for length in lengths:
+            additions = {value + length for value in reachable if value + length <= requested_budget}
+            reachable.update(additions)
+        reachable_by_method.append(reachable)
+    common = set.intersection(*reachable_by_method)
+    candidates = [value for value in common if 0 < value <= requested_budget]
+    if not candidates:
+        raise RuntimeError(
+            f"no positive common full-suffix budget <= {requested_budget}"
+        )
+    return max(candidates)
+
+
 def child_env(gpu: int, repo: Path, *, cpu_count: int) -> dict[str, str]:
     env = os.environ.copy()
     env.update({
@@ -229,24 +280,44 @@ def collection_phase(args: argparse.Namespace, gpus: list[int]) -> None:
              "--output", str(intersection)],
             cwd=args.repo, check=True,
         )
+    resolved_budget = common_full_suffix_budget(
+        root=args.result,
+        methods=METHODS,
+        allowed_seeds_path=intersection,
+        requested_budget=args.expert_action_budget,
+    )
+    args.resolved_expert_action_budget = resolved_budget
+    dataset_root = args.result / f"datasets_budget_{resolved_budget}"
+    write_json(
+        args.result / f"experiment_contract_budget_{resolved_budget}.json",
+        {
+            "requested_expert_action_budget": args.expert_action_budget,
+            "resolved_expert_action_budget": resolved_budget,
+            "budget_rule": "largest common full-suffix budget not exceeding the requested budget",
+            "suffixes_are_never_sliced": True,
+            "common_seed_manifest": str(intersection.resolve()),
+        },
+    )
     for method in METHODS:
-        output = args.result / "datasets" / method
+        output = dataset_root / method
         if not (output / "selection_manifest.json").exists():
             subprocess.run(
                 [str(args.python), str(args.repo / "tools/select_stackcube_xvla_timing_budget.py"),
                  "--pool", str(args.result / "dataset_pools" / method),
                  "--collection", str(args.result / "collection_pools" / method),
                  "--allowed-seeds", str(intersection),
-                 "--output", str(output), "--budget", str(args.expert_action_budget)],
+                 "--output", str(output), "--budget", str(resolved_budget)],
                 cwd=args.repo, check=True,
             )
     quality = args.result / "intervention_quality/summary.json"
     if not quality.exists():
         subprocess.run(
             [str(args.python), str(args.repo / "tools/summarize_stackcube_xvla_timing_quality.py"),
-             "--root", str(args.result), "--output", str(quality)],
+             "--root", str(args.result),
+             "--datasets", str(dataset_root), "--output", str(quality)],
             cwd=args.repo, check=True,
         )
+    args.budget_ready = True
 
 
 def training_phase(args: argparse.Namespace, gpus: list[int]) -> None:
@@ -262,8 +333,10 @@ def training_phase(args: argparse.Namespace, gpus: list[int]) -> None:
             [str(args.python), str(args.repo / "tools/run_xvla_stackcube_stage2_training.py"),
              "--repo", str(args.repo), "--xvla-root", str(args.xvla_root),
              "--python", str(args.python), "--start", str(args.checkpoint),
-             "--id-meta", str(args.id_meta), "--datasets", str(args.result / "datasets"),
-             "--run", str(run), "--expert-action-budget", str(args.expert_action_budget),
+             "--id-meta", str(args.id_meta),
+             "--datasets", str(args.result / f"datasets_budget_{args.resolved_expert_action_budget}"),
+             "--run", str(run),
+             "--expert-action-budget", str(args.resolved_expert_action_budget),
              "--steps", str(args.training_steps), "--save-interval", "500",
              "--gpus", *(str(gpu) for gpu in gpus)],
             cwd=args.repo, env=child_env(gpus[0], args.repo), stdout=handle,
