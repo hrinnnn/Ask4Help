@@ -18,6 +18,7 @@ from rlinf.envs.maniskill.stack_cube_privileged_oracle import StackCubePrivilege
 from rlinf.envs.maniskill.stack_cube_variants import STACK_CUBE_TASK
 from tools.collect_stackcube_xvla_dagger import FailureRecoveryState, _make_env
 from tools.evaluate_stackcube_xvla import bool_scalar, clip_action_chunk
+from tools.stackcube_stage2_ood import register_stack_cube_splits
 from tools.xvla_airplane_runtime import XVLAAirplanePolicy
 
 
@@ -32,6 +33,7 @@ def main() -> None:
     if args.output.exists():
         raise FileExistsError(args.output)
     policy = XVLAAirplanePolicy(args.checkpoint, args.xvla_root)
+    register_stack_cube_splits()
     env = _make_env("stage2_ood")
     obs, _ = env.reset(seed=args.seed)
     low = np.asarray(env.action_space.low, dtype=np.float32).reshape(-1)
