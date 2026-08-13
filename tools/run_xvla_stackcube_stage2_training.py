@@ -138,14 +138,20 @@ def training_command(
     ]
 
 
-def child_env(gpu: int, *, root: Path, port: int) -> dict[str, str]:
+def child_env(
+    gpu: int,
+    *,
+    root: Path,
+    port: int,
+    cpu_count: int,
+) -> dict[str, str]:
     env = os.environ.copy()
     env.update(
         {
             "CUDA_VISIBLE_DEVICES": str(gpu),
             "PYTHONPATH": f"{root}:{root / 'RLinf'}",
-            "OMP_NUM_THREADS": "20",
-            "MKL_NUM_THREADS": "20",
+            "OMP_NUM_THREADS": str(cpu_count),
+            "MKL_NUM_THREADS": str(cpu_count),
             "TOKENIZERS_PARALLELISM": "false",
             "HF_HUB_OFFLINE": "1",
             "TRANSFORMERS_OFFLINE": "1",
@@ -177,6 +183,12 @@ def launch_phase(
     save_interval: int,
 ) -> dict[str, Path]:
     outputs: dict[str, Path] = {}
+    available_cpus = sorted(os.sched_getaffinity(0))
+    if len(available_cpus) < len(gpus):
+        raise RuntimeError(
+            f"only {len(available_cpus)} CPUs are available for {len(gpus)} GPUs"
+        )
+    cpu_sets = [available_cpus[index::len(gpus)] for index in range(len(gpus))]
     for wave_start in range(0, len(methods), len(gpus)):
         wave = methods[wave_start : wave_start + len(gpus)]
         jobs = []
@@ -198,9 +210,17 @@ def launch_phase(
                 seed=7300,
             )
             process = subprocess.Popen(
-                ["taskset", "-c", f"{slot * 20}-{slot * 20 + 19}", *command],
+                [
+                    "taskset", "-c", ",".join(str(cpu) for cpu in cpu_sets[slot]),
+                    *command,
+                ],
                 cwd=xvla,
-                env=child_env(gpu, root=root, port=29820 + wave_start + slot),
+                env=child_env(
+                    gpu,
+                    root=root,
+                    port=29820 + wave_start + slot,
+                    cpu_count=len(cpu_sets[slot]),
+                ),
                 stdout=handle,
                 stderr=subprocess.STDOUT,
             )
@@ -249,9 +269,17 @@ def reload_forward_smoke(
             ]
             handle = log.open("w", encoding="utf-8")
             process = subprocess.Popen(
-                ["taskset", "-c", f"{slot * 20}-{slot * 20 + 19}", *command],
+                [
+                    "taskset", "-c", ",".join(str(cpu) for cpu in cpu_sets[slot]),
+                    *command,
+                ],
                 cwd=root,
-                env=child_env(gpu, root=root, port=29920 + wave_start + slot),
+                env=child_env(
+                    gpu,
+                    root=root,
+                    port=29920 + wave_start + slot,
+                    cpu_count=len(cpu_sets[slot]),
+                ),
                 stdout=handle,
                 stderr=subprocess.STDOUT,
             )

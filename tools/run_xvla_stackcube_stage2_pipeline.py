@@ -322,11 +322,26 @@ def collection_phase(args: argparse.Namespace, gpus: list[int]) -> None:
 
 def training_phase(args: argparse.Namespace, gpus: list[int]) -> None:
     run = args.result / "training"
+    retry_manifest = args.result / "training_retry_manifest.json"
+    if retry_manifest.exists():
+        run = Path(json.loads(retry_manifest.read_text(encoding="utf-8"))["active_training_root"])
     complete = run / "TRAINING_COMPLETE"
     if complete.exists():
         return
     if run.exists():
-        raise RuntimeError(f"partial training requires diagnosis: {run}")
+        retry_index = 1
+        while (args.result / f"training_retry{retry_index}").exists():
+            retry_index += 1
+        run = args.result / f"training_retry{retry_index}"
+        write_json(
+            args.result / "training_retry_manifest.json",
+            {
+                "superseded_partial_training": str((args.result / "training").resolve()),
+                "active_training_root": str(run.resolve()),
+                "reason": "previous training attempt failed before formal training",
+            },
+        )
+    args.training_root = run
     log = args.result / "logs/training_orchestrator.log"
     with log.open("w", encoding="utf-8") as handle:
         status = subprocess.run(
@@ -357,7 +372,8 @@ def evaluation_phase(args: argparse.Namespace, gpus: list[int]) -> None:
         jobs = []
         for method in METHODS:
             output = args.result / "checkpoint_selection" / f"step_{step}" / method
-            checkpoint = args.result / "training" / f"formal_{args.training_steps}" / method / f"ckpt-{step}"
+            training_root = getattr(args, "training_root", args.result / "training")
+            checkpoint = training_root / f"formal_{args.training_steps}" / method / f"ckpt-{step}"
             command = [
                 str(args.python), str(args.repo / "tools/evaluate_stackcube_xvla.py"),
                 "--checkpoint", str(checkpoint), "--xvla-root", str(args.xvla_root),
@@ -391,8 +407,9 @@ def final_evaluation_phase(args: argparse.Namespace, gpus: list[int]) -> None:
                         ("stage2_ood", args.final_ood_seed)):
         for method in METHODS:
             output = args.result / "final_evaluation" / f"step_{step}" / split / method
+            training_root = getattr(args, "training_root", args.result / "training")
             checkpoint = (
-                args.result / "training" / f"formal_{args.training_steps}"
+                training_root / f"formal_{args.training_steps}"
                 / method / f"ckpt-{step}"
             )
             command = [
