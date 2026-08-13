@@ -1,6 +1,6 @@
 # X-VLA StackCube 目标位置 OOD 与受控介入计划
 
-**状态：首轮 cohort 已完成审计并因候选筛选门槛中止；retry1 正在从已完成 screen 结果进入正式 collection。** 本计划记录已审核的第一组 stage-localized OOD takeover-timing study。
+**状态：首轮 cohort 已完成审计；retry1 因服务器 CPU affinity 启动包装问题保留为故障记录；retry2 正在正式 collection。** 本计划记录已审核的第一组 stage-localized OOD takeover-timing study。
 
 ## 1. 研究问题
 
@@ -44,7 +44,7 @@ privileged oracle 必须支持从未抓取、已抓取、已抬起和已放置�
 - 保存完整 controller timeline、阶段 predicate、动作、状态、双相机视频、reset metadata、介入步数和失败原因。
 - 每个 OOD seed 额外保存 full-oracle nominal demonstration，供 DCA 对齐。
 - 每组先建立共同成功 seed pool，再以确定性 subset selection 选取完整 suffix。
-- 四组统一使用 `B=2002` 个低层 expert actions；不得截断单条 suffix。该值是最接近原定 2000、同时能由 11-step Post-Lift suffix 与主要 26-step suffix 精确组成的共同可达预算，偏差为 0.1%。首轮 400 条 screen 中有 286 条满足 clean stage-localized failure 条件，因此 retry1 使用其中确定性选出的 250 条共同 cohort，不改变 OOD 定义或专家预算。
+- 四组统一使用 `B=2002` 个低层 expert actions；不得截断单条 suffix。该值是最接近原定 2000、同时能由 11-step Post-Lift suffix 与主要 26-step suffix 精确组成的共同可达预算，偏差为 0.1%。首轮 400 条 screen 中有 286 条满足 clean stage-localized failure 条件，因此 retry2 使用其中确定性选出的 250 条共同 cohort，不改变 OOD 定义或专家预算。
 - 训练数据为原始 128 条 ID demonstrations 与该组 OOD expert suffix，1:1 source-balanced。
 - 从同一 ckpt-7500 初始化并重置 optimizer；action chunk 10，temporal mask。
 - per-device batch 8，gradient accumulation 4，最大训练 10000 steps，每 500 steps 保存；默认在 2k、4k、6k、8k、10k 进行共同 checkpoint-selection evaluation。
@@ -68,4 +68,4 @@ privileged oracle 必须支持从未抓取、已抓取、已抬起和已放置�
 
 ## 8. 实现状态
 
-`tools/run_xvla_stackcube_stage2_pipeline.py` 已对齐四个 timing condition，并以共同 OOD cohort、完整 suffix 的 `B=2002`、10k 上限、每 500-step checkpoint、共同 checkpoint selection，以及最终每组 100 ID/100 OOD 评测推进整条流水线。首轮 screen 的整体 lift rate 不能代替 cohort admission；正式 cohort 只按稳定 lift 后的目标相关失败候选筛选。启动前物理 smoke 已验证 Post-Grasp 与 Post-Lift 能从 policy 中间状态继续完成任务；Failure-Recovery 的迟触发样本允许因剩余 horizon 不足而失败，并只将成功恢复轨迹纳入共同 seed intersection。
+`tools/run_xvla_stackcube_stage2_pipeline.py` 已对齐四个 timing condition，并以共同 OOD cohort、完整 suffix 的 `B=2002`、10k 上限、每 500-step checkpoint、共同 checkpoint selection，以及最终每组 100 ID/100 OOD 评测推进整条流水线。首轮 screen 的整体 lift rate 不能代替 cohort admission；正式 cohort 只按稳定 lift 后的目标相关失败候选筛选。启动前物理 smoke 已验证 Post-Grasp 与 Post-Lift 能从 policy 中间状态继续完成任务；Failure-Recovery 的迟触发样本允许因剩余 horizon 不足而失败，并只将成功恢复轨迹纳入共同 seed intersection。retry1 仅保留启动失败记录，retry2 使用按实际可用 CPU 自动分片的调度器重新启动。
