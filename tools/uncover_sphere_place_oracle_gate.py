@@ -64,6 +64,7 @@ def run_split(
         env.reset(seed=seed)
         oracle = oracle_module.UncoverSpherePlacePrivilegedChunkOracle(chunk_size=10)
         last_phase = None
+        previous_ever_sphere_grasped = False
         terminated = False
         chunks = 0
         for chunks in range(1, max_chunks + 1):
@@ -87,6 +88,26 @@ def run_split(
             info = env.unwrapped.evaluate()
             if _bool(info["success"]):
                 break
+            current_ever_sphere_grasped = _bool(info["ever_sphere_grasped"])
+            current_sphere_grasped = _bool(info["sphere_grasped"])
+            if previous_ever_sphere_grasped and not current_sphere_grasped:
+                sphere_p = env.unwrapped.sphere.pose.p.detach().cpu().reshape(-1, 3)[0].tolist()
+                print(
+                    f"[oracle-gate] SPHERE_GRASP_LOST split={split} seed={seed} "
+                    f"chunk={chunks} oracle_phase={oracle._phase} "
+                    f"sphere_p={sphere_p}",
+                    flush=True,
+                )
+            previous_ever_sphere_grasped = current_ever_sphere_grasped and current_sphere_grasped
+            if oracle._phase in {"sphere_lift", "sphere_move", "sphere_place"} and not _bool(
+                info["sphere_grasped"]
+            ):
+                sphere_p = env.unwrapped.sphere.pose.p.detach().cpu().reshape(-1, 3)[0].tolist()
+                print(
+                    f"[oracle-gate] LOST_SPHERE_GRASP split={split} seed={seed} "
+                    f"chunk={chunks} phase={oracle._phase} sphere_p={sphere_p}",
+                    flush=True,
+                )
             if chunks % 25 == 0:
                 print(
                     f"[oracle-gate] split={split} seed={seed} "
@@ -109,6 +130,7 @@ def run_split(
                 "sphere_in_bowl": _bool(info["sphere_in_bowl"]),
                 "sphere_released": _bool(info["sphere_released"]),
                 "sphere_static": _bool(info["sphere_static"]),
+                "sphere_position": env.unwrapped.sphere.pose.p.detach().cpu().reshape(-1, 3)[0].tolist(),
             }
         )
         print(
