@@ -52,6 +52,7 @@ def run_split(
     env_id = env_module.UNCOVER_ENV_IDS[split]
     results = []
     for seed in seeds:
+        print(f"[oracle-gate] start split={split} seed={seed}", flush=True)
         env = gym.make(
             env_id,
             obs_mode="state",
@@ -68,6 +69,12 @@ def run_split(
         for chunks in range(1, max_chunks + 1):
             plan = oracle.plan(env)
             if plan.phase != last_phase:
+                print(
+                    f"[oracle-gate] split={split} seed={seed} "
+                    f"chunk={chunks} phase={plan.phase} "
+                    f"planned={plan.planning_succeeded}",
+                    flush=True,
+                )
                 last_phase = plan.phase
             for step_index in range(10):
                 qpos = env.unwrapped.agent.robot.get_qpos()
@@ -80,6 +87,12 @@ def run_split(
             info = env.unwrapped.evaluate()
             if _bool(info["success"]):
                 break
+            if chunks % 25 == 0:
+                print(
+                    f"[oracle-gate] split={split} seed={seed} "
+                    f"chunk={chunks} phase={oracle._phase}",
+                    flush=True,
+                )
 
         info = env.unwrapped.evaluate()
         results.append(
@@ -98,6 +111,12 @@ def run_split(
                 "sphere_static": _bool(info["sphere_static"]),
             }
         )
+        print(
+            f"[oracle-gate] done split={split} seed={seed} "
+            f"success={results[-1]['success']} chunks={chunks} "
+            f"phase={oracle._phase}",
+            flush=True,
+        )
         env.close()
     return results
 
@@ -109,13 +128,19 @@ def main() -> None:
     parser.add_argument("--num-seeds", type=int, default=3)
     parser.add_argument("--max-chunks", type=int, default=250)
     parser.add_argument("--env-max-steps", type=int, default=None)
+    parser.add_argument(
+        "--splits",
+        nargs="+",
+        choices=("id", "handle_ood", "goal_ood"),
+        default=("id", "handle_ood", "goal_ood"),
+    )
     args = parser.parse_args()
 
     env_module, oracle_module = _load_modules(args.rlinf_root)
     env_module.register_uncover_sphere_place_variants()
     seeds = list(range(args.num_seeds))
     rows = []
-    for split in ("id", "handle_ood", "goal_ood"):
+    for split in args.splits:
         rows.extend(
             run_split(
                 env_module,
