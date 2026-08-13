@@ -1,6 +1,6 @@
 # UncoverSpherePlace ID 与阶段 OOD 审计
 
-**状态：环境 import/reset 与 20-seed paired-reset 审计已通过；oracle 20-seed smoke 进行中，尚未进入正式采集。**
+**状态：环境 import/reset 与 20-seed paired-reset 审计已通过；当前用收窄的配对 nuisance 抖动重新进行 oracle gate，尚未进入正式采集。**
 
 ## 任务定义
 
@@ -16,6 +16,6 @@ paired reset 审计已在 20 个相同 seed 上完成：`handle_ood` 只改变 c
 
 ## 当前实现与门槛
 
-环境与 oracle：`RLinf/rlinf/envs/maniskill/uncover_sphere_place.py`、`RLinf/rlinf/envs/maniskill/uncover_sphere_place_privileged_oracle.py`。import/注册、paired reset 和阶段 predicate smoke 已完成；当前正在运行冻结的 20-seed oracle smoke。ID、两个 OOD split 均须至少 19/20 严格成功，并验证 oracle 可以从“遮挡物已停入 parking zone”和“小球已抓住”两个中间状态继续完成任务。
+环境与 oracle：`RLinf/rlinf/envs/maniskill/uncover_sphere_place.py`、`RLinf/rlinf/envs/maniskill/uncover_sphere_place_privileged_oracle.py`。import/注册、paired reset 和阶段 predicate smoke 已完成；前一版 20-seed oracle gate 为 ID 14/20、两个 OOD split 各 15/20，失败集中在小球抓取。当前恢复官方球体尺寸，并将仅用于配对审计的球/遮挡物中心抖动收窄到 $±0.02$ m，重新运行可复现 gate。ID、两个 OOD split 均须至少 19/20 严格成功，并验证 oracle 可以从“遮挡物已停入 parking zone”和“小球已抓住”两个中间状态继续完成任务。
 
 未通过上述门槛前，不启动 base policy、failure detection、gated collection 或正式训练。
