@@ -62,6 +62,12 @@ def run_split(
         if env_max_steps is not None and hasattr(env, "_max_episode_steps"):
             env._max_episode_steps = env_max_steps
         env.reset(seed=seed)
+        initial_sphere = env.unwrapped.sphere.pose.p.detach().cpu().reshape(-1, 3)[0].tolist()
+        print(
+            f"[oracle-gate] reset split={split} seed={seed} "
+            f"sphere_p={initial_sphere}",
+            flush=True,
+        )
         oracle = oracle_module.UncoverSpherePlacePrivilegedChunkOracle(chunk_size=10)
         last_phase = None
         previous_ever_sphere_grasped = False
@@ -74,7 +80,8 @@ def run_split(
                 print(
                     f"[oracle-gate] split={split} seed={seed} "
                     f"chunk={chunks} phase={plan.phase} "
-                    f"planned={plan.planning_succeeded}",
+                    f"planned={plan.planning_succeeded} "
+                    f"sphere_p={env.unwrapped.sphere.pose.p.detach().cpu().reshape(-1, 3)[0].tolist()}",
                     flush=True,
                 )
                 last_phase = plan.phase
