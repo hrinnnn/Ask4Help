@@ -228,7 +228,7 @@ def task_state(env: Any, *, grasped: bool = False, on_cube: bool = False) -> np.
     cube = base.cubeA.pose.p.reshape(-1, 3)[0].detach().cpu().numpy()
     target = base.cubeB.pose.p.reshape(-1, 3)[0].detach().cpu().numpy()
     tcp = base.agent.tcp.pose.p.reshape(-1, 3)[0].detach().cpu().numpy()
-    qpos = base.agent.get_qpos().reshape(-1).detach().cpu().numpy()
+    qpos = base.agent.robot.get_qpos().reshape(-1).detach().cpu().numpy()
     gripper_width = float(qpos[-2:].sum())
     return np.concatenate(
         [cube, target, tcp, tcp - cube, cube - target,
