@@ -39,7 +39,14 @@ def _bool(value) -> bool:
     return bool(value.reshape(-1)[0]) if hasattr(value, "reshape") else bool(value)
 
 
-def run_split(env_module, oracle_module, split: str, seeds: list[int], max_chunks: int) -> list[dict]:
+def run_split(
+    env_module,
+    oracle_module,
+    split: str,
+    seeds: list[int],
+    max_chunks: int,
+    env_max_steps: int | None,
+) -> list[dict]:
     import gymnasium as gym
 
     env_id = env_module.UNCOVER_ENV_IDS[split]
@@ -51,6 +58,8 @@ def run_split(env_module, oracle_module, split: str, seeds: list[int], max_chunk
             control_mode="pd_joint_delta_pos",
             render_mode=None,
         )
+        if env_max_steps is not None and hasattr(env, "_max_episode_steps"):
+            env._max_episode_steps = env_max_steps
         env.reset(seed=seed)
         oracle = oracle_module.UncoverSpherePlacePrivilegedChunkOracle(chunk_size=10)
         last_phase = None
@@ -99,6 +108,7 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--num-seeds", type=int, default=3)
     parser.add_argument("--max-chunks", type=int, default=250)
+    parser.add_argument("--env-max-steps", type=int, default=None)
     args = parser.parse_args()
 
     env_module, oracle_module = _load_modules(args.rlinf_root)
@@ -106,7 +116,16 @@ def main() -> None:
     seeds = list(range(args.num_seeds))
     rows = []
     for split in ("id", "handle_ood", "goal_ood"):
-        rows.extend(run_split(env_module, oracle_module, split, seeds, args.max_chunks))
+        rows.extend(
+            run_split(
+                env_module,
+                oracle_module,
+                split,
+                seeds,
+                args.max_chunks,
+                args.env_max_steps,
+            )
+        )
     summary = {
         split: sum(row["success"] for row in rows if row["split"] == split)
         for split in ("id", "handle_ood", "goal_ood")

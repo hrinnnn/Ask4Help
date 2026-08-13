@@ -47,9 +47,9 @@ def step_plan(env, oracle, max_chunks: int, stop):
             _, _, terminated, truncated, _ = env.step(plan.action_at(qpos, index))
             if flag(terminated) or flag(truncated):
                 return chunk + 1, False
-        info = env.unwrapped.evaluate()
-        if stop(info, oracle):
-            return chunk + 1, True
+            info = env.unwrapped.evaluate()
+            if stop(info):
+                return chunk + 1, True
     return max_chunks, False
 
 
@@ -62,13 +62,15 @@ def run(split: str, seed: int, env_module, oracle_module) -> dict:
         control_mode="pd_joint_delta_pos",
         render_mode=None,
     )
+    if hasattr(env, "_max_episode_steps"):
+        env._max_episode_steps = 5000
     env.reset(seed=seed)
     first = oracle_module.UncoverSpherePlacePrivilegedChunkOracle(chunk_size=10)
     first_chunks, reached_sphere = step_plan(
         env,
         first,
         250,
-        lambda _info, oracle: oracle._phase == "sphere_reach",
+        lambda info: flag(info["ever_mug_parked"]) and not flag(info["ever_sphere_grasped"]),
     )
     if not reached_sphere:
         env.close()
@@ -80,7 +82,7 @@ def run(split: str, seed: int, env_module, oracle_module) -> dict:
         env,
         resumed_after_cover,
         250,
-        lambda info, _oracle: flag(info["success"]),
+        lambda info: flag(info["success"]),
     )
 
     env.reset(seed=seed)
@@ -89,7 +91,7 @@ def run(split: str, seed: int, env_module, oracle_module) -> dict:
         env,
         first,
         250,
-        lambda info, _oracle: flag(info["sphere_grasped"]),
+        lambda info: flag(info["ever_sphere_grasped"]),
     )
     if not reached_grasp:
         env.close()
@@ -107,7 +109,7 @@ def run(split: str, seed: int, env_module, oracle_module) -> dict:
         env,
         resumed_after_grasp,
         250,
-        lambda info, _oracle: flag(info["success"]),
+        lambda info: flag(info["success"]),
     )
     env.close()
     return {
@@ -128,6 +130,7 @@ def main() -> None:
     parser.add_argument("--rlinf-root", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--num-seeds", type=int, default=3)
+    parser.add_argument("--env-max-steps", type=int, default=5000)
     args = parser.parse_args()
     env_module, oracle_module = load_modules(args.rlinf_root)
     env_module.register_uncover_sphere_place_variants()
