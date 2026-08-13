@@ -107,7 +107,7 @@ def main() -> None:
         "render_frames": len(frames),
     }
     (output / "stackpyramid_smoke.json").write_text(
-        json.dumps(_jsonable(summary), indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+        json.dumps(_jsonable(summary), indent=2, ensure_ascii=True, default=str) + "\n", encoding="utf-8"
     )
     if frames:
         iio.imwrite(output / "stackpyramid_reset_step_smoke.mp4", np.stack(frames), fps=10)
