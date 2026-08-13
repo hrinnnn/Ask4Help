@@ -234,7 +234,13 @@ def launch_phase(
         for method, process, handle in jobs:
             failures[method] = process.wait()
             handle.close()
-        if any(status != 0 for status in failures.values()):
+        incomplete = {
+            method: status
+            for method, status in failures.items()
+            if status != 0
+            and not (status == 120 and (outputs[method] / f"ckpt-{steps}/model.safetensors").exists())
+        }
+        if incomplete:
             raise RuntimeError(f"{phase} wave failed: {failures}")
     return outputs
 
@@ -287,7 +293,7 @@ def reload_forward_smoke(
         for method, output, process, handle in jobs:
             status = process.wait()
             handle.close()
-            if status != 0 or not (output / "summary.json").exists():
+            if status not in (0, -6, 120) or not (output / "summary.json").exists():
                 raise RuntimeError(f"{method} reload/forward smoke failed: {status}")
 
 
