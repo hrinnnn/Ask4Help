@@ -328,10 +328,11 @@ def _run_attempt(
         if expert_start is not None:
             if not oracle_initialized:
                 stable_grasp_event = failure_recovery_event in {"post_grasp", "post_lift"}
-                failure_recovery_event = failure_recovery_event or oracle.initialize_from_state(
+                initialized_phase = oracle.initialize_from_state(
                     env,
                     grasped_hint=True if stable_grasp_event else None,
                 )
+                failure_recovery_event = failure_recovery_event or initialized_phase
                 oracle_initialized = True
             plan = oracle.plan(env)
             candidate = plan.actions
