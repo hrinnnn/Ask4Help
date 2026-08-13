@@ -22,6 +22,8 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pool", type=Path, required=True)
+    parser.add_argument("--collection", type=Path, required=True)
+    parser.add_argument("--allowed-seeds", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--budget", type=int, default=2000)
     args = parser.parse_args()
@@ -30,10 +32,21 @@ def main() -> None:
 
     episodes = read_jsonl(args.pool / "meta/episodes.jsonl")
     lengths = [int(row["length"]) for row in episodes]
-    selected = exact_budget_subset(lengths, args.budget)
+    training = read_jsonl(args.collection / "training_episodes.jsonl")
+    if len(training) != len(episodes):
+        raise RuntimeError(
+            f"collection/dataset episode mismatch: {len(training)} != {len(episodes)}"
+        )
+    allowed = set(json.loads(args.allowed_seeds.read_text(encoding="utf-8"))["seeds"])
+    candidate_indices = [
+        index for index, row in enumerate(training) if int(row["seed"]) in allowed
+    ]
+    relative = exact_budget_subset([lengths[index] for index in candidate_indices], args.budget)
+    selected = None if relative is None else [candidate_indices[index] for index in relative]
     if selected is None:
         raise RuntimeError(
-            f"no full-episode subset reaches exact budget {args.budget}; pool={sum(lengths)}"
+            f"no common-seed full-episode subset reaches exact budget {args.budget}; "
+            f"eligible_pool={sum(lengths[index] for index in candidate_indices)}"
         )
 
     import numpy as np
@@ -83,6 +96,8 @@ def main() -> None:
             {
                 "format": "xvla_stackcube_timing_exact_budget_v1",
                 "source_pool": str(args.pool.resolve()),
+                "source_collection": str(args.collection.resolve()),
+                "allowed_seed_manifest": str(args.allowed_seeds.resolve()),
                 "budget": args.budget,
                 "selected_source_episode_indices": selected,
                 "selected_lengths": [lengths[index] for index in selected],

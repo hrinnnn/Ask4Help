@@ -412,6 +412,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pool-action-target", type=int)
     parser.add_argument("--seed-manifest", type=Path)
     parser.add_argument("--controlled-timing", action="store_true")
+    parser.add_argument("--consume-all-seeds", action="store_true")
     parser.add_argument("--offline-per-split", type=int, default=50)
     parser.add_argument(
         "--ood-split", choices=("ood", STACK_CUBE_STAGE2_OOD_SPLIT), default="ood"
@@ -528,9 +529,10 @@ def main() -> None:
     try:
         for attempt_index in range(args.max_attempts):
             target_actions = args.pool_action_target or args.expert_action_budget
-            if collection_complete(accepted, accepted_expert_actions,
-                                   target_episodes=args.target,
-                                   expert_action_budget=target_actions):
+            if not args.consume_all_seeds and collection_complete(
+                accepted, accepted_expert_actions,
+                target_episodes=args.target, expert_action_budget=target_actions
+            ):
                 break
             if frozen_seeds is not None and attempt_index >= len(frozen_seeds):
                 break
@@ -674,9 +676,10 @@ def main() -> None:
             env.close()
 
     target_actions = args.pool_action_target or args.expert_action_budget
-    if not collection_complete(accepted, accepted_expert_actions,
-                               target_episodes=args.target,
-                               expert_action_budget=target_actions):
+    if not args.consume_all_seeds and not collection_complete(
+        accepted, accepted_expert_actions,
+        target_episodes=args.target, expert_action_budget=target_actions
+    ):
         raise RuntimeError(
             f"collection incomplete: episodes={accepted}/{args.target}, "
             f"expert_actions={accepted_expert_actions}/{target_actions}"

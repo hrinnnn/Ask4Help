@@ -97,6 +97,7 @@ def collection_phase(args: argparse.Namespace, gpus: list[int]) -> None:
             "--xvla-root", str(args.xvla_root), "--output-dir", str(output),
             "--repo-id", str(dataset), "--target", str(args.cohort_size),
             "--seed-manifest", str(cohort), "--controlled-timing",
+            "--consume-all-seeds",
             "--ood-split", "stage2_ood", "--flow-steps", "10",
             "--failure-recovery-mode", "event",
         ]
@@ -106,20 +107,31 @@ def collection_phase(args: argparse.Namespace, gpus: list[int]) -> None:
     launch_waves(jobs, gpus=gpus, repo=args.repo, accept_completed_teardown=True)
 
     for method in METHODS:
-        pool_summary = json.loads(
+        summary = json.loads(
             (args.result / "collection_pools" / method / "summary.json").read_text(
                 encoding="utf-8"
             )
         )
-        if int(pool_summary["accepted_total"]) != args.cohort_size:
-            raise RuntimeError(f"{method} did not complete the common seed cohort")
-        if int(pool_summary["accepted_expert_actions"]) < args.pool_action_target:
-            raise RuntimeError(f"{method} pool did not reach {args.pool_action_target} actions")
+        if int(summary["raw_total"]) != args.cohort_size:
+            raise RuntimeError(
+                f"{method} consumed {summary['raw_total']} seeds, expected {args.cohort_size}"
+            )
+    intersection = args.result / "cohort/success_intersection.json"
+    if not intersection.exists():
+        subprocess.run(
+            [str(args.python), str(args.repo / "tools/build_stackcube_xvla_timing_intersection.py"),
+             "--collections", str(args.result / "collection_pools"),
+             "--output", str(intersection)],
+            cwd=args.repo, check=True,
+        )
+    for method in METHODS:
         output = args.result / "datasets" / method
         if not (output / "selection_manifest.json").exists():
             subprocess.run(
                 [str(args.python), str(args.repo / "tools/select_stackcube_xvla_timing_budget.py"),
                  "--pool", str(args.result / "dataset_pools" / method),
+                 "--collection", str(args.result / "collection_pools" / method),
+                 "--allowed-seeds", str(intersection),
                  "--output", str(output), "--budget", str(args.expert_action_budget)],
                 cwd=args.repo, check=True,
             )
