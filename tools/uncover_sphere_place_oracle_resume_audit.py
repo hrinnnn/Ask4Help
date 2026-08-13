@@ -53,7 +53,7 @@ def step_plan(env, oracle, max_chunks: int, stop):
     return max_chunks, False
 
 
-def run(split: str, seed: int, env_module, oracle_module) -> dict:
+def run(split: str, seed: int, env_module, oracle_module, env_max_steps: int) -> dict:
     import gymnasium as gym
 
     env = gym.make(
@@ -63,7 +63,7 @@ def run(split: str, seed: int, env_module, oracle_module) -> dict:
         render_mode=None,
     )
     if hasattr(env, "_max_episode_steps"):
-        env._max_episode_steps = 5000
+        env._max_episode_steps = env_max_steps
     env.reset(seed=seed)
     first = oracle_module.UncoverSpherePlacePrivilegedChunkOracle(chunk_size=10)
     first_chunks, reached_sphere = step_plan(
@@ -135,7 +135,7 @@ def main() -> None:
     env_module, oracle_module = load_modules(args.rlinf_root)
     env_module.register_uncover_sphere_place_variants()
     rows = [
-        run(split, seed, env_module, oracle_module)
+        run(split, seed, env_module, oracle_module, args.env_max_steps)
         for split in ("id", "handle_ood", "goal_ood")
         for seed in range(args.num_seeds)
     ]
