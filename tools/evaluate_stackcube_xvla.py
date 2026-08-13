@@ -108,7 +108,7 @@ def main() -> None:
             raw_obs, _ = env.reset(seed=seed)
             metadata = stack_cube_reset_metadata(env, split=args.split)
             records, actions = [_extract_record(raw_obs)], []
-            success = grasped = lifted = on_cube = static = False
+            success = grasped = lifted = stable_lift_boundary = on_cube = static = False
             dropped_after_lift_boundaries = 0
             dropped_after_lift_event = False
             max_cube_z = float(env.unwrapped.cubeA.pose.p.reshape(-1, 3)[0, 2].item())
@@ -142,6 +142,7 @@ def main() -> None:
                 dropped_now = (
                     lifted and not currently_grasped and not currently_on_cube and cube_z < 0.06
                 )
+                stable_lift_boundary |= currently_grasped and cube_z >= 0.07
                 dropped_after_lift_boundaries = (
                     dropped_after_lift_boundaries + 1 if dropped_now else 0
                 )
@@ -175,6 +176,7 @@ def main() -> None:
                 "success": success,
                 "grasped_once": grasped,
                 "lifted_once": lifted,
+                "stable_lift_boundary_once": stable_lift_boundary,
                 "max_cube_z": max_cube_z,
                 "dropped_after_lift_two_boundaries": dropped_after_lift_event,
                 "on_cube_once": on_cube,

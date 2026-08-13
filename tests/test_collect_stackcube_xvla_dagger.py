@@ -57,6 +57,8 @@ def test_controlled_timing_requires_lift_and_two_drop_boundaries() -> None:
     assert state.timing_trigger("post_grasp") == "post_grasp"
     assert state.timing_trigger("post_lift") == "post_lift"
     state.update(env_step=15, currently_grasped=False, on_cube=False, success=False, cube_z=0.03)
+    assert state.timing_trigger("post_grasp") is None
+    assert state.timing_trigger("post_lift") is None
     assert state.timing_trigger("failure_recovery") is None
     assert state.timing_trigger("failure_recovery") == "dropped_after_lift_two_boundaries"
 

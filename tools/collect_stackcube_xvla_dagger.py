@@ -129,9 +129,9 @@ class FailureRecoveryState:
 
     def timing_trigger(self, condition: str) -> str | None:
         """Evaluate a controlled takeover condition at an action-chunk boundary."""
-        if condition == "post_grasp" and self.ever_grasped:
+        if condition == "post_grasp" and self.currently_grasped:
             return "post_grasp"
-        if condition == "post_lift" and self.ever_lifted:
+        if condition == "post_lift" and self.currently_grasped and self.cube_z >= 0.07:
             return "post_lift"
         if condition == "failure_recovery":
             dropped = (

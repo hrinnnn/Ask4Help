@@ -15,6 +15,7 @@ def select_cohort(rows: list[dict], count: int) -> list[dict]:
         if not bool(row["success"])
         and bool(row["grasped_once"])
         and bool(row["lifted_once"])
+        and bool(row["stable_lift_boundary_once"])
         and bool(row["dropped_after_lift_two_boundaries"])
     ]
     return selected[:count]
@@ -38,7 +39,7 @@ def main() -> None:
     payload = {
         "format": "xvla_stackcube_stage2_timing_cohort_v1",
         "source": str(args.policy_summary.resolve()),
-        "rule": "policy failure after grasp, lift, and two dropped decision boundaries",
+        "rule": "policy failure after a stable grasped lift boundary and two dropped decision boundaries",
         "count": len(selected),
         "seeds": [int(row["seed"]) for row in selected],
         "rows": selected,
