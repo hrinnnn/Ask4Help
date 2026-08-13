@@ -339,7 +339,12 @@ def training_phase(args: argparse.Namespace, gpus: list[int]) -> None:
              "--expert-action-budget", str(args.resolved_expert_action_budget),
              "--steps", str(args.training_steps), "--save-interval", "500",
              "--gpus", *(str(gpu) for gpu in gpus)],
-            cwd=args.repo, env=child_env(gpus[0], args.repo), stdout=handle,
+            cwd=args.repo,
+            env=child_env(
+                gpus[0], args.repo,
+                cpu_count=max(1, len(os.sched_getaffinity(0)) // len(gpus)),
+            ),
+            stdout=handle,
             stderr=subprocess.STDOUT,
         ).returncode
     if status != 0 or not complete.exists():
