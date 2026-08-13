@@ -16,13 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RLINF_ROOT = ROOT / "RLinf"
 sys.path[:0] = [str(ROOT), str(RLINF_ROOT)]
 
-from rlinf.envs.maniskill.stack_cube_variants import (  # noqa: E402
-    STACK_CUBE_ID_ENV_ID,
-    STACK_CUBE_OOD_ENV_ID,
-    STACK_CUBE_TASK,
-    register_controlled_stack_cube_variants,
-    reset_metadata,
-)
+from rlinf.envs.maniskill.stack_cube_variants import STACK_CUBE_TASK  # noqa: E402
 from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     MAIN_CAMERA_CANDIDATES,
     WRIST_CAMERA_CANDIDATES,
@@ -34,6 +28,12 @@ from toolkits.lerobot.collect_maniskill_plug_lerobot_joint import (  # noqa: E40
     write_episode_video_durably,
 )
 from tools.xvla_airplane_runtime import XVLAAirplanePolicy  # noqa: E402
+from tools.stackcube_stage2_ood import (  # noqa: E402
+    STACK_CUBE_SPLITS,
+    register_stack_cube_splits,
+    stack_cube_env_id,
+    stack_cube_reset_metadata,
+)
 
 
 def bool_scalar(value: Any) -> bool:
@@ -55,6 +55,8 @@ def clip_action_chunk(
         array = array[0]
     if array.ndim != 2 or array.shape[1] < low.size:
         raise ValueError(f"invalid X-VLA action shape: {array.shape}")
+    if not np.isfinite(array).all():
+        raise ValueError("X-VLA produced non-finite actions")
     return np.clip(array[:execute_horizon, : low.size], low, high).astype(np.float32)
 
 
@@ -65,7 +67,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--seed", type=int, default=10000)
-    parser.add_argument("--split", choices=("id", "ood"), default="id")
+    parser.add_argument("--split", choices=STACK_CUBE_SPLITS, default="id")
     parser.add_argument("--execute-horizon", type=int, default=5)
     parser.add_argument("--max-episode-steps", type=int, default=100)
     parser.add_argument("--flow-steps", type=int, default=10)
@@ -83,9 +85,9 @@ def main() -> None:
     (args.output_dir / "actions").mkdir()
 
     policy = XVLAAirplanePolicy(args.checkpoint, args.xvla_root)
-    register_controlled_stack_cube_variants()
+    register_stack_cube_splits()
     env = gym.make(
-        STACK_CUBE_ID_ENV_ID if args.split == "id" else STACK_CUBE_OOD_ENV_ID,
+        stack_cube_env_id(args.split),
         robot_uids="panda_wristcam",
         num_envs=1,
         obs_mode="rgb",
@@ -104,7 +106,7 @@ def main() -> None:
         for episode_index in range(args.episodes):
             seed = args.seed + episode_index
             raw_obs, _ = env.reset(seed=seed)
-            metadata = reset_metadata(env, split=args.split)
+            metadata = stack_cube_reset_metadata(env, split=args.split)
             records, actions = [_extract_record(raw_obs)], []
             success = grasped = on_cube = static = False
             decision = 0

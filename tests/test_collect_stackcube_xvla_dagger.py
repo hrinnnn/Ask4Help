@@ -1,6 +1,8 @@
 from tools.collect_stackcube_xvla_dagger import (
+    FailureRecoveryState,
     admitted_suffix,
     alternating_split,
+    collection_complete,
     consecutive_gate,
 )
 from tools.run_xvla_stackcube_four_group_pipeline import diffdagger_gate_threshold
@@ -11,6 +13,41 @@ def test_raw_attempts_alternate_id_ood() -> None:
     assert [alternating_split(index) for index in range(6)] == [
         "id", "ood", "id", "ood", "id", "ood"
     ]
+
+
+def test_raw_attempts_can_alternate_stage2_ood() -> None:
+    assert [alternating_split(index, "stage2_ood") for index in range(4)] == [
+        "id", "stage2_ood", "id", "stage2_ood"
+    ]
+
+
+def test_action_budget_takes_precedence_over_episode_target() -> None:
+    assert not collection_complete(
+        100, 2499, target_episodes=100, expert_action_budget=2500
+    )
+    assert collection_complete(
+        91, 2500, target_episodes=100, expert_action_budget=2500
+    )
+
+
+def test_failure_recovery_event_latches_after_drop() -> None:
+    state = FailureRecoveryState()
+    state.update(
+        env_step=10,
+        currently_grasped=True,
+        on_cube=False,
+        success=False,
+        cube_z=0.08,
+    )
+    assert state.reason is None
+    state.update(
+        env_step=15,
+        currently_grasped=False,
+        on_cube=False,
+        success=False,
+        cube_z=0.03,
+    )
+    assert state.reason == "dropped_after_grasp"
 
 
 def test_only_successful_nonempty_expert_suffix_is_admitted() -> None:
