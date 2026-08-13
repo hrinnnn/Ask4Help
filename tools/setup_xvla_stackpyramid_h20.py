@@ -86,20 +86,31 @@ class Controller:
     def smoke(self) -> None:
         self.state("smoke", "running")
         vpy = self.venv / "bin/python"
-        smoke_dir = self.output / "stackpyramid_smoke"
+        work_dir = Path("/tmp") / f"xvla_stackpyramid_{self.output.name}"
+        smoke_dir = work_dir / "stackpyramid_smoke"
+        record_dir = work_dir / "stackpyramid_motionplanning"
         smoke_dir.mkdir(parents=True, exist_ok=True)
+        record_dir.mkdir(parents=True, exist_ok=True)
         env = {"CUDA_VISIBLE_DEVICES": "1", "STACKPYRAMID_SMOKE_DIR": str(smoke_dir)}
         self.run([str(vpy), "-c", "import torch; import mani_skill; import transformers; assert torch.cuda.is_available() and torch.cuda.device_count() >= 1; print(torch.__version__, transformers.__version__, mani_skill.__file__)"], env=env)
         smoke_script = Path(__file__).with_name("stackpyramid_h20_smoke.py")
         self.run([str(vpy), str(smoke_script)], env=env)
-        record_dir = self.output / "stackpyramid_motionplanning"
-        record_dir.mkdir(parents=True, exist_ok=True)
         try:
             self.run(["timeout", "180s", str(vpy), "-m", "mani_skill.examples.motionplanning.panda.run", "-e", "StackPyramid-v1", "-n", "1", "--save-video", "--render-mode", "rgb_array", "--record-dir", str(record_dir), "--sim-backend", "gpu"], env=env)
             self.motionplanning_status = "passed"
         except RuntimeError as exc:
             self.motionplanning_status = f"failed: {exc}"
             self.log("OPTIONAL_MOTION_PLANNING_FAILED " + repr(exc))
+        persistent_smoke = self.output / "stackpyramid_smoke"
+        persistent_record = self.output / "stackpyramid_motionplanning"
+        if persistent_smoke.exists() or persistent_record.exists():
+            raise RuntimeError("persistent smoke output unexpectedly exists; refusing to overwrite")
+        if smoke_dir.exists():
+            shutil.copytree(smoke_dir, persistent_smoke)
+        if record_dir.exists():
+            shutil.copytree(record_dir, persistent_record)
+        smoke_dir = persistent_smoke
+        record_dir = persistent_record
         self.state("smoke", "complete", smoke_dir=str(smoke_dir), motionplanning_dir=str(record_dir), motionplanning_status=self.motionplanning_status)
 
     def persist(self) -> None:
