@@ -96,11 +96,12 @@ def collection_phase(args: argparse.Namespace, gpus: list[int]) -> None:
             "--method", method, "--checkpoint", str(args.checkpoint),
             "--xvla-root", str(args.xvla_root), "--output-dir", str(output),
             "--repo-id", str(dataset), "--target", str(args.cohort_size),
-            "--pool-action-target", str(args.pool_action_target),
             "--seed-manifest", str(cohort), "--controlled-timing",
             "--ood-split", "stage2_ood", "--flow-steps", "10",
             "--failure-recovery-mode", "event",
         ]
+        if method != "immediate":
+            command.extend(["--pool-action-target", str(args.pool_action_target)])
         jobs.append((f"collect_{method}", command,
                      args.result / "logs" / f"collect_{method}.log",
                      output / "summary.json"))
@@ -115,6 +116,13 @@ def collection_phase(args: argparse.Namespace, gpus: list[int]) -> None:
                  "--output", str(output), "--budget", str(args.expert_action_budget)],
                 cwd=args.repo, check=True,
             )
+    quality = args.result / "intervention_quality/summary.json"
+    if not quality.exists():
+        subprocess.run(
+            [str(args.python), str(args.repo / "tools/summarize_stackcube_xvla_timing_quality.py"),
+             "--root", str(args.result), "--output", str(quality)],
+            cwd=args.repo, check=True,
+        )
 
 
 def training_phase(args: argparse.Namespace, gpus: list[int]) -> None:

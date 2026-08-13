@@ -223,6 +223,19 @@ def _make_env(split: str):
     )
 
 
+def task_state(env: Any, *, grasped: bool = False, on_cube: bool = False) -> np.ndarray:
+    base = env.unwrapped
+    cube = base.cubeA.pose.p.reshape(-1, 3)[0].detach().cpu().numpy()
+    target = base.cubeB.pose.p.reshape(-1, 3)[0].detach().cpu().numpy()
+    tcp = base.agent.tcp.pose.p.reshape(-1, 3)[0].detach().cpu().numpy()
+    qpos = base.agent.get_qpos().reshape(-1).detach().cpu().numpy()
+    gripper_width = float(qpos[-2:].sum())
+    return np.concatenate(
+        [cube, target, tcp, tcp - cube, cube - target,
+         np.asarray([gripper_width, float(grasped), float(on_cube)], dtype=np.float32)]
+    ).astype(np.float32)
+
+
 def _run_attempt(
     *,
     method: str,
@@ -246,6 +259,7 @@ def _run_attempt(
     actions: list[np.ndarray] = []
     sources: list[str] = []
     timeline: list[dict[str, Any]] = []
+    task_states = [task_state(env)]
     expert_start = 0 if method in {"offline_oracle", "immediate"} else None
     gate_count = 0
     failure_state = FailureRecoveryState()
@@ -349,6 +363,13 @@ def _run_attempt(
                 success=bool_scalar(info.get("success", False)),
                 cube_z=float(env.unwrapped.cubeA.pose.p.reshape(-1, 3)[0, 2].item()),
             )
+            task_states.append(
+                task_state(
+                    env,
+                    grasped=bool_scalar(info.get("is_cubeA_grasped", False)),
+                    on_cube=bool_scalar(info.get("is_cubeA_on_cubeB", False)),
+                )
+            )
             if success or bool_scalar(terminated) or bool_scalar(truncated):
                 break
 
@@ -367,6 +388,8 @@ def _run_attempt(
         "failure_recovery_mode": failure_recovery_mode,
         "failure_recovery_event": failure_recovery_event,
         "timeline": timeline,
+        "task_state_dim": int(task_states[0].shape[0]),
+        "task_states": np.stack(task_states),
         **stack_cube_reset_metadata(env, split=split),
     }
 
@@ -544,6 +567,7 @@ def main() -> None:
                 controlled_timing=args.controlled_timing,
             )
             row["attempt_index"] = attempt_index
+            task_states = row.pop("task_states")
             frames = _build_frames(
                 records=records,
                 actions=actions,
@@ -567,6 +591,13 @@ def main() -> None:
             action_stem = args.output_dir / "raw_archive/actions" / f"episode_{attempt_index:06d}_seed_{seed:06d}"
             action_stem.parent.mkdir(parents=True, exist_ok=True)
             np.save(str(action_stem) + ".npy", np.asarray(actions, dtype=np.float32))
+            task_state_path = (
+                args.output_dir / "raw_archive/task_states"
+                / f"episode_{attempt_index:06d}_seed_{seed:06d}.npy"
+            )
+            task_state_path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(task_state_path, task_states)
+            row["task_states"] = str(task_state_path)
             Path(str(action_stem) + ".sources.json").write_text(
                 json.dumps(sources) + "\n", encoding="utf-8"
             )
