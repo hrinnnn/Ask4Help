@@ -108,7 +108,10 @@ def main() -> None:
             raw_obs, _ = env.reset(seed=seed)
             metadata = stack_cube_reset_metadata(env, split=args.split)
             records, actions = [_extract_record(raw_obs)], []
-            success = grasped = on_cube = static = False
+            success = grasped = lifted = on_cube = static = False
+            dropped_after_lift_boundaries = 0
+            dropped_after_lift_event = False
+            max_cube_z = float(env.unwrapped.cubeA.pose.p.reshape(-1, 3)[0, 2].item())
             decision = 0
             while len(actions) < args.max_episode_steps and not success:
                 predicted, _, _, _ = policy.predict(
@@ -126,11 +129,23 @@ def main() -> None:
                     actions.append(action.copy())
                     records.append(_extract_record(raw_obs))
                     grasped |= bool_scalar(info.get("is_cubeA_grasped", False))
-                    on_cube |= bool_scalar(info.get("is_cubeA_on_cubeB", False))
+                    currently_grasped = bool_scalar(info.get("is_cubeA_grasped", False))
+                    cube_z = float(env.unwrapped.cubeA.pose.p.reshape(-1, 3)[0, 2].item())
+                    max_cube_z = max(max_cube_z, cube_z)
+                    lifted |= currently_grasped and cube_z >= 0.07
+                    currently_on_cube = bool_scalar(info.get("is_cubeA_on_cubeB", False))
+                    on_cube |= currently_on_cube
                     static |= bool_scalar(info.get("is_cubeA_static", False))
                     success = bool_scalar(info.get("success", False))
                     if success or bool_scalar(terminated) or bool_scalar(truncated):
                         break
+                dropped_now = (
+                    lifted and not currently_grasped and not currently_on_cube and cube_z < 0.06
+                )
+                dropped_after_lift_boundaries = (
+                    dropped_after_lift_boundaries + 1 if dropped_now else 0
+                )
+                dropped_after_lift_event |= dropped_after_lift_boundaries >= 2
 
             main_camera = _select_camera(
                 records[0].obs, "", ("base_camera",) + MAIN_CAMERA_CANDIDATES, "main"
@@ -159,6 +174,9 @@ def main() -> None:
                 "seed": seed,
                 "success": success,
                 "grasped_once": grasped,
+                "lifted_once": lifted,
+                "max_cube_z": max_cube_z,
+                "dropped_after_lift_two_boundaries": dropped_after_lift_event,
                 "on_cube_once": on_cube,
                 "static_once": static,
                 "steps": len(actions),

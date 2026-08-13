@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 
-METHODS = ("internal_pca", "offline_oracle", "failure_recovery", "diffdagger")
+METHODS = ("immediate", "post_grasp", "post_lift", "failure_recovery")
 
 
 def read_json(path: Path) -> dict:
@@ -273,7 +273,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--datasets", type=Path, required=True)
     parser.add_argument("--run", type=Path, required=True)
     parser.add_argument("--expert-action-budget", type=int, required=True)
-    parser.add_argument("--steps", type=int, default=2500)
+    parser.add_argument("--steps", type=int, default=10000)
     parser.add_argument("--save-interval", type=int, default=500)
     parser.add_argument("--gpus", type=int, nargs="*")
     return parser.parse_args()

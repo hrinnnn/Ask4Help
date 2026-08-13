@@ -4,6 +4,7 @@ from tools.collect_stackcube_xvla_dagger import (
     alternating_split,
     collection_complete,
     consecutive_gate,
+    exact_budget_subset,
 )
 from tools.run_xvla_stackcube_four_group_pipeline import diffdagger_gate_threshold
 from tools.run_xvla_stackcube_four_group_training import select_idle_gpus
@@ -48,6 +49,21 @@ def test_failure_recovery_event_latches_after_drop() -> None:
         cube_z=0.03,
     )
     assert state.reason == "dropped_after_grasp"
+
+
+def test_controlled_timing_requires_lift_and_two_drop_boundaries() -> None:
+    state = FailureRecoveryState()
+    state.update(env_step=10, currently_grasped=True, on_cube=False, success=False, cube_z=0.08)
+    assert state.timing_trigger("post_grasp") == "post_grasp"
+    assert state.timing_trigger("post_lift") == "post_lift"
+    state.update(env_step=15, currently_grasped=False, on_cube=False, success=False, cube_z=0.03)
+    assert state.timing_trigger("failure_recovery") is None
+    assert state.timing_trigger("failure_recovery") == "dropped_after_lift_two_boundaries"
+
+
+def test_exact_budget_subset_never_slices_an_episode() -> None:
+    assert exact_budget_subset([17, 23, 31, 40], 80) == [0, 1, 3]
+    assert exact_budget_subset([17, 23], 39) is None
 
 
 def test_only_successful_nonempty_expert_suffix_is_admitted() -> None:

@@ -49,6 +49,12 @@ METHODS = (
     "failure_recovery",
     "diffdagger",
 )
+TIMING_CONDITIONS = (
+    "immediate",
+    "post_grasp",
+    "post_lift",
+    "failure_recovery",
+)
 EXECUTE_HORIZON = 5
 TASK_HORIZON = 150
 FAILURE_RECOVERY_STEP = 50
@@ -85,9 +91,14 @@ class InternalPCA:
 @dataclass
 class FailureRecoveryState:
     ever_grasped: bool = False
+    ever_lifted: bool = False
     best_stage: int = 0
     last_progress_step: int = 0
     reason: str | None = None
+    currently_grasped: bool = False
+    on_cube: bool = False
+    cube_z: float = 0.0
+    dropped_decision_boundaries: int = 0
 
     def update(
         self,
@@ -98,7 +109,11 @@ class FailureRecoveryState:
         success: bool,
         cube_z: float,
     ) -> None:
+        self.currently_grasped = currently_grasped
+        self.on_cube = on_cube
+        self.cube_z = cube_z
         self.ever_grasped |= currently_grasped
+        self.ever_lifted |= currently_grasped and cube_z >= 0.07
         stage = 3 if on_cube else 2 if cube_z >= 0.07 else 1 if currently_grasped else 0
         if stage > self.best_stage:
             self.best_stage = stage
@@ -112,6 +127,26 @@ class FailureRecoveryState:
         elif env_step >= FAILURE_TIMEOUT_STEP:
             self.reason = "episode_timeout"
 
+    def timing_trigger(self, condition: str) -> str | None:
+        """Evaluate a controlled takeover condition at an action-chunk boundary."""
+        if condition == "post_grasp" and self.ever_grasped:
+            return "post_grasp"
+        if condition == "post_lift" and self.ever_lifted:
+            return "post_lift"
+        if condition == "failure_recovery":
+            dropped = (
+                self.ever_lifted
+                and not self.currently_grasped
+                and not self.on_cube
+                and self.cube_z < 0.06
+            )
+            self.dropped_decision_boundaries = (
+                self.dropped_decision_boundaries + 1 if dropped else 0
+            )
+            if self.dropped_decision_boundaries >= 2:
+                return "dropped_after_lift_two_boundaries"
+        return None
+
 
 def alternating_split(attempt_index: int, ood_split: str = "ood") -> str:
     if attempt_index < 0:
@@ -119,6 +154,19 @@ def alternating_split(attempt_index: int, ood_split: str = "ood") -> str:
     if ood_split not in {"ood", STACK_CUBE_STAGE2_OOD_SPLIT}:
         raise ValueError(f"unsupported OOD split: {ood_split}")
     return "id" if attempt_index % 2 == 0 else ood_split
+
+
+def exact_budget_subset(lengths: list[int], budget: int) -> list[int] | None:
+    """Return a deterministic full-episode subset whose action count is exact."""
+    reachable: dict[int, tuple[int, ...]] = {0: ()}
+    for index, length in enumerate(lengths):
+        for total, chosen in list(reachable.items())[::-1]:
+            candidate = total + length
+            if candidate <= budget and candidate not in reachable:
+                reachable[candidate] = (*chosen, index)
+        if budget in reachable:
+            return list(reachable[budget])
+    return None
 
 
 def collection_complete(
@@ -182,7 +230,7 @@ def _run_attempt(
     seed: int,
     env: Any,
     policy: XVLAAirplanePolicy | None,
-    internal_pca: InternalPCA,
+    internal_pca: InternalPCA | None,
     internal_layer: str,
     internal_probe: XVLAMultilayerProbe | None,
     pca_threshold: float,
@@ -191,16 +239,17 @@ def _run_attempt(
     diff_timesteps: int,
     flow_steps: int,
     failure_recovery_mode: str,
+    controlled_timing: bool = False,
 ) -> tuple[list[Any], list[np.ndarray], list[str], int | None, dict[str, Any]]:
     raw_obs, _ = env.reset(seed=seed)
     records = [_extract_record(raw_obs)]
     actions: list[np.ndarray] = []
     sources: list[str] = []
     timeline: list[dict[str, Any]] = []
-    expert_start = 0 if method == "offline_oracle" else None
+    expert_start = 0 if method in {"offline_oracle", "immediate"} else None
     gate_count = 0
     failure_state = FailureRecoveryState()
-    failure_recovery_event = None
+    failure_recovery_event = "immediate" if method == "immediate" else None
     oracle = StackCubePrivilegedChunkOracle(chunk_size=EXECUTE_HORIZON)
     success = grasped = on_cube = False
     terminated = truncated = False
@@ -209,7 +258,15 @@ def _run_attempt(
         step = len(actions)
         score = threshold = None
         alarm = expert_start is not None
-        if expert_start is None and method == "failure_recovery":
+        timing_reason = None
+        if controlled_timing and expert_start is None and method in {
+            "post_grasp", "post_lift", "failure_recovery"
+        }:
+            timing_reason = failure_state.timing_trigger(method)
+            if timing_reason is not None:
+                expert_start, alarm = step, True
+                failure_recovery_event = timing_reason
+        if expert_start is None and method == "failure_recovery" and not controlled_timing:
             if failure_recovery_mode == "fixed_step" and step >= FAILURE_RECOVERY_STEP:
                 expert_start, alarm = step, True
                 failure_recovery_event = "fixed_step"
@@ -234,6 +291,7 @@ def _run_attempt(
                     raw_obs, STACK_CUBE_TASK, seed=seed * 1000 + step, steps=flow_steps
                 )
             if method in {"internal_pca", "vlm_bridge_pca"}:
+                assert internal_pca is not None
                 score, threshold = internal_pca.score(feature), pca_threshold
                 gate_count, alarm = consecutive_gate(score, threshold, gate_count, 1)
             elif method == "diffdagger":
@@ -301,6 +359,8 @@ def _run_attempt(
         "success": success,
         "grasped_once": grasped,
         "on_cube_once": on_cube,
+        "lifted_once": failure_state.ever_lifted,
+        "max_stage": failure_state.best_stage,
         "steps": len(actions),
         "expert_start_step": expert_start,
         "expert_action_steps": 0 if expert_start is None else len(actions) - expert_start,
@@ -313,15 +373,18 @@ def _run_attempt(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--method", choices=METHODS, required=True)
+    parser.add_argument("--method", choices=tuple(dict.fromkeys((*METHODS, *TIMING_CONDITIONS))), required=True)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--xvla-root", type=Path, required=True)
-    parser.add_argument("--internal-assets", type=Path, required=True)
-    parser.add_argument("--calibration", type=Path, required=True)
+    parser.add_argument("--internal-assets", type=Path)
+    parser.add_argument("--calibration", type=Path)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--repo-id", type=Path, required=True)
     parser.add_argument("--target", type=int, default=100)
     parser.add_argument("--expert-action-budget", type=int)
+    parser.add_argument("--pool-action-target", type=int)
+    parser.add_argument("--seed-manifest", type=Path)
+    parser.add_argument("--controlled-timing", action="store_true")
     parser.add_argument("--offline-per-split", type=int, default=50)
     parser.add_argument(
         "--ood-split", choices=("ood", STACK_CUBE_STAGE2_OOD_SPLIT), default="ood"
@@ -349,21 +412,30 @@ def main() -> None:
     if args.output_dir.exists() or args.repo_id.exists():
         raise FileExistsError("output and dataset paths must be new")
     args.output_dir.mkdir(parents=True)
-    calibration = json.loads(args.calibration.read_text(encoding="utf-8"))
-    methods = calibration["methods"]
     calibration_name = f"{args.internal_layer}_pca"
-    pca_threshold = float(methods[calibration_name]["threshold"])
-    diff_threshold = (
-        float(args.diff_threshold)
+    calibration = (
+        json.loads(args.calibration.read_text(encoding="utf-8"))
+        if args.calibration is not None
+        else {"methods": {}}
+    )
+    methods = calibration["methods"]
+    pca_threshold = float(methods.get(calibration_name, {}).get("threshold", 0.0))
+    diff_threshold = float(
+        args.diff_threshold
         if args.diff_threshold is not None
-        else float(methods["diffdagger"]["threshold"])
+        else methods.get("diffdagger", {}).get("threshold", 0.0)
     )
     device = torch.device("cuda")
-    internal_pca = InternalPCA.load(
-        args.internal_assets, device, layer=args.internal_layer
+    internal_pca = (
+        InternalPCA.load(args.internal_assets, device, layer=args.internal_layer)
+        if args.method in {"internal_pca", "vlm_bridge_pca"}
+        and args.internal_assets is not None
+        else None
     )
-    policy = None if args.method == "offline_oracle" else XVLAAirplanePolicy(
-        args.checkpoint, args.xvla_root
+    policy = (
+        None
+        if args.method in {"offline_oracle", "immediate"}
+        else XVLAAirplanePolicy(args.checkpoint, args.xvla_root)
     )
     internal_probe = (
         XVLAMultilayerProbe(
@@ -378,8 +450,10 @@ def main() -> None:
             "format": "xvla_stackcube_four_group_collection_v1",
             "method": args.method,
             "checkpoint": str(args.checkpoint.resolve()),
-            "internal_assets": str(args.internal_assets.resolve()),
-            "calibration": str(args.calibration.resolve()),
+            "internal_assets": (
+                str(args.internal_assets.resolve()) if args.internal_assets else None
+            ),
+            "calibration": str(args.calibration.resolve()) if args.calibration else None,
             "internal_pca_threshold": pca_threshold,
             "internal_layer": args.internal_layer,
             "internal_calibration_method": calibration_name,
@@ -392,6 +466,9 @@ def main() -> None:
             "ood_split": args.ood_split,
             "target_episodes": args.target,
             "expert_action_budget": args.expert_action_budget,
+            "pool_action_target": args.pool_action_target,
+            "seed_manifest": str(args.seed_manifest.resolve()) if args.seed_manifest else None,
+            "controlled_timing": args.controlled_timing,
             "task_horizon": TASK_HORIZON,
             "failure_recovery_step": FAILURE_RECOVERY_STEP,
             "failure_recovery_mode": args.failure_recovery_mode,
@@ -415,16 +492,24 @@ def main() -> None:
     accepted_actions_by_split = {split: 0 for split in active_splits}
     raw_by_split = {split: 0 for split in active_splits}
     next_seed = {"id": args.id_seed, args.ood_split: args.ood_seed}
+    frozen_seeds = None
+    if args.seed_manifest is not None:
+        seed_payload = json.loads(args.seed_manifest.read_text(encoding="utf-8"))
+        frozen_seeds = [int(seed) for seed in seed_payload["seeds"]]
+        if not frozen_seeds:
+            raise ValueError("seed manifest contains no seeds")
     try:
         for attempt_index in range(args.max_attempts):
-            if collection_complete(
-                accepted,
-                accepted_expert_actions,
-                target_episodes=args.target,
-                expert_action_budget=args.expert_action_budget,
-            ):
+            target_actions = args.pool_action_target or args.expert_action_budget
+            if collection_complete(accepted, accepted_expert_actions,
+                                   target_episodes=args.target,
+                                   expert_action_budget=target_actions):
                 break
-            split = alternating_split(attempt_index, args.ood_split)
+            if frozen_seeds is not None and attempt_index >= len(frozen_seeds):
+                break
+            split = args.ood_split if frozen_seeds is not None else alternating_split(
+                attempt_index, args.ood_split
+            )
             if (
                 args.method == "offline_oracle"
                 and args.expert_action_budget is None
@@ -437,8 +522,9 @@ def main() -> None:
                 and accepted_by_split[split] >= args.offline_per_split
             ):
                 break
-            seed = next_seed[split]
-            next_seed[split] += 1
+            seed = frozen_seeds[attempt_index] if frozen_seeds is not None else next_seed[split]
+            if frozen_seeds is None:
+                next_seed[split] += 1
             raw_by_split[split] += 1
             records, actions, sources, expert_start, row = _run_attempt(
                 method=args.method,
@@ -455,6 +541,7 @@ def main() -> None:
                 diff_timesteps=args.diff_timesteps,
                 flow_steps=args.flow_steps,
                 failure_recovery_mode=args.failure_recovery_mode,
+                controlled_timing=args.controlled_timing,
             )
             row["attempt_index"] = attempt_index
             frames = _build_frames(
@@ -488,7 +575,7 @@ def main() -> None:
             if admitted is not None:
                 begin, end = admitted
                 full_expert_actions = end - begin
-                if args.expert_action_budget is not None:
+                if args.expert_action_budget is not None and args.pool_action_target is None:
                     remaining = args.expert_action_budget - accepted_expert_actions
                     end = min(end, begin + remaining)
                 selected_expert_actions = end - begin
@@ -540,7 +627,7 @@ def main() -> None:
                 f"[xvla-stackcube-collect] method={args.method} raw={attempt_index + 1} "
                 f"split={split} accepted={accepted}/{args.target} "
                 f"expert_actions={accepted_expert_actions}/"
-                f"{args.expert_action_budget or 'episode-target'} by_split={accepted_by_split}",
+                f"{target_actions or 'episode-target'} by_split={accepted_by_split}",
                 flush=True,
             )
     finally:
@@ -551,15 +638,13 @@ def main() -> None:
         for env in envs.values():
             env.close()
 
-    if not collection_complete(
-        accepted,
-        accepted_expert_actions,
-        target_episodes=args.target,
-        expert_action_budget=args.expert_action_budget,
-    ):
+    target_actions = args.pool_action_target or args.expert_action_budget
+    if not collection_complete(accepted, accepted_expert_actions,
+                               target_episodes=args.target,
+                               expert_action_budget=target_actions):
         raise RuntimeError(
             f"collection incomplete: episodes={accepted}/{args.target}, "
-            f"expert_actions={accepted_expert_actions}/{args.expert_action_budget}"
+            f"expert_actions={accepted_expert_actions}/{target_actions}"
         )
     _write_json(
         args.output_dir / "summary.json",
@@ -567,6 +652,7 @@ def main() -> None:
             "method": args.method,
             "accepted_total": accepted,
             "accepted_expert_actions": accepted_expert_actions,
+            "pool_action_target": args.pool_action_target,
             "accepted_by_split": accepted_by_split,
             "accepted_actions_by_split": accepted_actions_by_split,
             "raw_by_split": raw_by_split,
