@@ -53,6 +53,13 @@ def _value(value):
     return value
 
 
+def _scalar(value):
+    value = _value(value)
+    if isinstance(value, list) and len(value) == 1:
+        return _scalar(value[0])
+    return value
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
@@ -104,8 +111,8 @@ def main() -> None:
             evaluation = None
             if result != -1 and result is not None:
                 final = result[-1]
-                success = bool(_value(final["success"]))
-                elapsed_steps = int(_value(final["elapsed_steps"]))
+                success = bool(_scalar(final["success"]))
+                elapsed_steps = int(_scalar(final["elapsed_steps"]))
                 evaluation = _value(env.unwrapped.evaluate())
             attempts.append(
                 {
