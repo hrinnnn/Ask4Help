@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+"""Collect raw StackPyramid motion-planning attempts on local storage."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+import gymnasium as gym
+import mani_skill.envs  # noqa: F401
+import numpy as np
+
+from mani_skill.examples.motionplanning.panda.solutions import solveStackPyramid
+from mani_skill.utils.wrappers.record import RecordEpisode
+
+from tools.stackpyramid_task import (
+    reset_metadata,
+    register_stackpyramid_splits,
+    stackpyramid_env_id,
+)
+
+
+def _value(value):
+    if hasattr(value, "detach"):
+        value = value.detach().cpu()
+    if isinstance(value, dict):
+        return {str(key): _value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_value(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--split", choices=("id", "stage1_ood", "stage2_ood", "stage3_ood"), required=True)
+    parser.add_argument("--episodes", type=int, default=2)
+    parser.add_argument("--start-seed", type=int, default=13000)
+    args = parser.parse_args()
+    if args.episodes <= 0:
+        raise ValueError("episodes must be positive")
+
+    register_stackpyramid_splits()
+    output_dir = args.output / stackpyramid_env_id(args.split) / "motionplanning"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    env = gym.make(
+        stackpyramid_env_id(args.split),
+        obs_mode="rgb+state",
+        control_mode="pd_joint_pos",
+        render_mode="rgb_array",
+        sim_backend="gpu",
+    )
+    env = RecordEpisode(
+        env,
+        output_dir=str(output_dir),
+        trajectory_name=f"oracle_{args.split}",
+        save_video=True,
+        source_type="motionplanning",
+        source_desc="official ManiSkill Panda StackPyramid solver on controlled split",
+        video_fps=30,
+        record_reward=False,
+        save_on_reset=False,
+    )
+
+    attempts = []
+    try:
+        for offset in range(args.episodes):
+            seed = args.start_seed + offset
+            env.reset(seed=seed)
+            initial_metadata = reset_metadata(env, split=args.split)
+            planner_error = None
+            result = None
+            try:
+                result = solveStackPyramid(env, seed=seed, debug=False, vis=False)
+            except Exception as exc:  # preserve the raw attempt and diagnose later
+                planner_error = repr(exc)
+
+            success = False
+            elapsed_steps = None
+            if result != -1 and result is not None:
+                final = result[-1]
+                success = bool(_value(final["success"]))
+                elapsed_steps = int(_value(final["elapsed_steps"]))
+            attempts.append(
+                {
+                    "seed": seed,
+                    "split": args.split,
+                    "strict_success": success,
+                    "elapsed_steps": elapsed_steps,
+                    "planner_error": planner_error,
+                    "initial_metadata": initial_metadata,
+                }
+            )
+            env.flush_trajectory(save=True)
+            env.flush_video(save=True)
+            print(
+                json.dumps(
+                    {
+                        "seed": seed,
+                        "strict_success": success,
+                        "elapsed_steps": elapsed_steps,
+                        "planner_error": planner_error,
+                    },
+                    ensure_ascii=True,
+                ),
+                flush=True,
+            )
+    finally:
+        env.close()
+
+    summary = {
+        "format": "stackpyramid_oracle_raw_attempts_v1",
+        "env_id": stackpyramid_env_id(args.split),
+        "split": args.split,
+        "episodes": len(attempts),
+        "strict_successes": sum(item["strict_success"] for item in attempts),
+        "success_rate": sum(item["strict_success"] for item in attempts) / len(attempts),
+        "attempts": attempts,
+    }
+    args.output.mkdir(parents=True, exist_ok=True)
+    (args.output / f"oracle_summary_{args.split}.json").write_text(
+        json.dumps(summary, indent=2, ensure_ascii=True) + "\n", encoding="utf-8"
+    )
+
+
+if __name__ == "__main__":
+    main()
