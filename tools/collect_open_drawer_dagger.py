@@ -307,6 +307,13 @@ def main() -> None:
             if not success or not expert_records or not expert_actions:
                 print(f"[open-drawer-collect] attempt={attempts} source={source} split={split} success=0 trigger={bool(trigger)}", flush=True)
                 continue
+            if counts[source] >= args.target_per_source:
+                print(
+                    f"[open-drawer-collect] attempt={attempts} source={source} "
+                    f"success=1 quota_full=1; keeping raw attempt only",
+                    flush=True,
+                )
+                continue
             if dataset is None:
                 preview = _build_frames(records=expert_records, actions=expert_actions, task=TASK_INSTRUCTION,
                                         main_camera=_select_camera(expert_records[0].obs, "", ("base_camera",) + MAIN_CAMERA_CANDIDATES, "main"),
