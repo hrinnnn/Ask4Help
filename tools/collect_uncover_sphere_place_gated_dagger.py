@@ -243,7 +243,10 @@ def main() -> None:
             trigger: dict[str, Any] | None = None
             policy_decisions = 0
             expert_active = False
-            oracle = UncoverSpherePlacePrivilegedChunkOracle(chunk_size=args.execute_horizon)
+            # Keep the oracle's planning horizon aligned with the validated
+            # action-horizon-10 dataset; the deployment loop may still execute
+            # only the first five low-level actions before replanning.
+            oracle = UncoverSpherePlacePrivilegedChunkOracle(chunk_size=10)
             low = np.asarray(env.action_space.low, dtype=np.float32).reshape(-1)
             high = np.asarray(env.action_space.high, dtype=np.float32).reshape(-1)
 
