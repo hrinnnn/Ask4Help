@@ -90,6 +90,7 @@ def main() -> None:
     parser.add_argument("--split", choices=("id", "stage1_ood", "stage2_ood", "stage3_ood"), required=True)
     parser.add_argument("--episodes", type=int, default=2)
     parser.add_argument("--start-seed", type=int, default=13000)
+    parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="gpu")
     args = parser.parse_args()
     if args.episodes <= 0:
         raise ValueError("episodes must be positive")
@@ -103,7 +104,7 @@ def main() -> None:
         obs_mode="rgb+state",
         control_mode="pd_joint_pos",
         render_mode="rgb_array",
-        sim_backend="gpu",
+        sim_backend=args.sim_backend,
     )
     env = RecordEpisode(
         env,
