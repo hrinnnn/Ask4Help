@@ -151,7 +151,9 @@ def _policy_until_trigger(*, env: Any, model: Any, prior: torch.Tensor, detector
     while len(prefix_actions) < max_policy_steps:
         env_obs = _model_obs(raw_obs)
         with torch.inference_mode():
-            features = model.extract_multilayer_llmd_features(env_obs, prior)
+            features = model.extract_multilayer_llmd_features(
+                env_obs, prior, include_action_expert_final=True
+            )
             predicted, _ = model.predict_action_batch(env_obs=env_obs, mode="eval", compute_values=False)
         scores = {name: _score(features[layer], kind, stats) for name, (layer, kind, stats) in detectors.items()}
         alarms = {name: score >= thresholds[name] for name, score in scores.items()}
