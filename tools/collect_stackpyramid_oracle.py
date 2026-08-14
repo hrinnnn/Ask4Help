@@ -12,6 +12,7 @@ import mani_skill.envs  # noqa: F401
 import numpy as np
 
 from mani_skill.examples.motionplanning.panda.solutions import solveStackPyramid
+from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
 from mani_skill.utils.wrappers.record import RecordEpisode
 
 from tools.stackpyramid_task import (
@@ -19,6 +20,23 @@ from tools.stackpyramid_task import (
     register_stackpyramid_splits,
     stackpyramid_env_id,
 )
+
+
+def _install_rrt_fallback() -> None:
+    original = PandaArmMotionPlanningSolver.move_to_pose_with_screw
+    if getattr(original, "_stackpyramid_rrt_fallback", False):
+        return
+
+    def move_with_fallback(self, pose, dry_run=False, refine_steps=0):
+        result = original(self, pose, dry_run=dry_run, refine_steps=refine_steps)
+        if result != -1:
+            return result
+        return self.move_to_pose_with_RRTConnect(
+            pose, dry_run=dry_run, refine_steps=refine_steps
+        )
+
+    move_with_fallback._stackpyramid_rrt_fallback = True
+    PandaArmMotionPlanningSolver.move_to_pose_with_screw = move_with_fallback
 
 
 def _value(value):
@@ -46,6 +64,7 @@ def main() -> None:
         raise ValueError("episodes must be positive")
 
     register_stackpyramid_splits()
+    _install_rrt_fallback()
     output_dir = args.output / stackpyramid_env_id(args.split) / "motionplanning"
     output_dir.mkdir(parents=True, exist_ok=True)
     env = gym.make(
