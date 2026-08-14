@@ -67,7 +67,7 @@ def main() -> None:
             "--sim-backend",
             "cpu",
             "--render-backend",
-            "cpu",
+            "gpu",
         ]
         env = dict(**__import__("os").environ)
         env["CUDA_VISIBLE_DEVICES"] = args.gpu
