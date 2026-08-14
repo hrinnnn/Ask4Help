@@ -23,6 +23,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seeds", type=int, default=8)
+    parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="cpu")
+    parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="cpu")
     args = parser.parse_args()
     register_stackpyramid_splits()
     records = []
@@ -34,7 +36,8 @@ def main() -> None:
                 num_envs=1,
                 obs_mode="state",
                 control_mode="pd_joint_pos",
-                sim_backend="gpu",
+                sim_backend=args.sim_backend,
+                render_backend=args.render_backend,
             )
             _, info = env.reset(seed=seed)
             metadata = reset_metadata(env, split=split)
