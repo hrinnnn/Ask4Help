@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -54,13 +55,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--execute-horizon", type=int, default=5)
     parser.add_argument("--max-episode-steps", type=int, default=400)
+    parser.add_argument("--state-file", type=Path)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     args.output_root.mkdir(parents=True, exist_ok=True)
-    state_path = args.output_root / "pipeline_state.json"
+    state_path = args.state_file or (args.output_root / "pipeline_state.json")
     common = [
         str(args.python),
         "-u",
@@ -84,13 +86,44 @@ def main() -> None:
         if complete_marker.exists() and _complete(output_dir, args.episodes):
             continue
         if output_dir.exists() and any(output_dir.iterdir()):
+            external_pid_file = args.output_root.parent / f"{split}_parallel.pid"
+            external_pid = None
+            if external_pid_file.is_file():
+                try:
+                    external_pid = int(external_pid_file.read_text().strip())
+                except ValueError:
+                    external_pid = None
+            if external_pid is None or subprocess.run(
+                ["kill", "-0", str(external_pid)], check=False
+            ).returncode != 0:
+                _write_state(
+                    state_path,
+                    stage=split,
+                    status="blocked_partial_output",
+                    detail=f"existing incomplete output: {output_dir}",
+                )
+                raise SystemExit(2)
             _write_state(
                 state_path,
                 stage=split,
-                status="blocked_partial_output",
-                detail=f"existing incomplete output: {output_dir}",
+                status="waiting_external",
+                detail=f"waiting for external split PID {external_pid}",
             )
-            raise SystemExit(2)
+            while not _complete(output_dir, args.episodes):
+                if subprocess.run(
+                    ["kill", "-0", str(external_pid)], check=False
+                ).returncode != 0:
+                    _write_state(
+                        state_path,
+                        stage=split,
+                        status="failed_incomplete",
+                        detail=f"external PID {external_pid} exited before validation",
+                    )
+                    raise SystemExit(1)
+                time.sleep(60)
+            complete_marker.write_text("evaluation summary and videos verified\n")
+            _write_state(state_path, stage=split, status="completed")
+            continue
         output_dir.mkdir(parents=True, exist_ok=True)
         _write_state(state_path, stage=split, status="running")
         log_path = args.output_root / "logs" / f"{split}.log"
