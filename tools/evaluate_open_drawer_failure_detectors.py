@@ -240,7 +240,12 @@ def main() -> None:
     model = _load_model(args.checkpoint, args.norm_stats, args.pi05_base)
     # Construct the same deterministic fixed prior used when fitting the ID assets.
     from rlinf.algorithms.vla_fail import fixed_gaussian_prior
-    prior = fixed_gaussian_prior(int(model.config.action_horizon), int(model.config.action_dim), seed=int(asset["fixed_prior_seed"]), device="cuda")
+    prior = fixed_gaussian_prior(
+        action_horizon=int(model.config.action_horizon),
+        action_dim=int(model.config.action_dim),
+        seed=int(asset["fixed_prior_seed"]),
+        device="cuda",
+    )
     env = _env(args.split, args.max_episode_steps)
     rows: list[dict[str, Any]] = []
     try:
