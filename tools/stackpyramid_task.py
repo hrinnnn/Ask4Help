@@ -92,9 +92,17 @@ def _set_xy(env: Any, env_idx: Any, xy: np.ndarray) -> None:
             )
     for cube_index, cube in enumerate(cubes):
         position = cube.pose.p.clone()
-        position[env_idx, :2] = torch.as_tensor(
+        target = position[env_idx, :2]
+        values = torch.as_tensor(
             xy[:, cube_index], dtype=position.dtype, device=base.device
         )
+        if target.shape != values.shape:
+            raise ValueError(
+                f"StackPyramid pose assignment mismatch: env_idx={env_idx!r}, "
+                f"position={tuple(position.shape)}, target={tuple(target.shape)}, "
+                f"xy={tuple(xy.shape)}, values={tuple(values.shape)}"
+            )
+        position[env_idx, :2] = values
         cube.set_pose(Pose.create_from_pq(position, cube.pose.q.clone()))
 
 
