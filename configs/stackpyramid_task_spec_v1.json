@@ -1,0 +1,78 @@
+{
+  "format": "ask4help_stackpyramid_task_spec_v1",
+  "status": "paired_reset_audit_passed_oracle_gate_running",
+  "base_env_id": "StackPyramid-v1",
+  "controlled_env_ids": {
+    "id": "Ask4HelpStackPyramidID-v1",
+    "stage1_ood": "Ask4HelpStackPyramidStage1OOD-v1",
+    "stage2_ood": "Ask4HelpStackPyramidStage2OOD-v1",
+    "stage3_ood": "Ask4HelpStackPyramidStage3OOD-v1"
+  },
+  "task": "stack the red cube next to the green cube and place the blue cube on top",
+  "objects": {
+    "red": "cubeA",
+    "green": "cubeB",
+    "blue": "cubeC"
+  },
+  "id_xy_centers_m": [
+    [-0.02, -0.04],
+    [0.02, -0.04],
+    [0.0, 0.04]
+  ],
+  "id_xy_jitter_m": [-0.008, 0.008],
+  "object_order": ["red", "green", "blue"],
+  "ood_single_object_xy_shifts_m": {
+    "stage1_ood": {"object": "red", "shift": [0.08, 0.10]},
+    "stage2_ood": {"object": "green", "shift": [0.12, 0.10]},
+    "stage3_ood": {"object": "blue", "shift": [0.12, -0.16]}
+  },
+  "fixed_factors": {
+    "cube_quaternion": [1.0, 0.0, 0.0, 0.0],
+    "robot": "panda_wristcam",
+    "robot_init_qpos_noise": 0.02,
+    "camera": "official StackPyramid panda_wristcam camera configuration",
+    "instruction": "stack the red cube next to the green cube and place the blue cube on top"
+  },
+  "success_definition": {
+    "red_green_xy_distance_m_at_most": 0.0615685406,
+    "blue_green_xy_distance_m_at_most": 0.0615685406,
+    "blue_red_xy_distance_m_at_most": 0.0615685406,
+    "blue_green_abs_z_difference_m_greater_than": 0.02,
+    "blue_red_abs_z_difference_m_greater_than": 0.02,
+    "red_static": true,
+    "blue_static": true,
+    "red_not_grasped": true,
+    "blue_not_grasped": true,
+    "source": "ManiSkill StackPyramidEnv.evaluate"
+  },
+  "stage_predicates": {
+    "stage1": "red is grasped and lifted from its reset pose",
+    "stage2": "red is transported and placed next to green",
+    "stage3": "blue is grasped and placed on top of both red and green"
+  },
+  "episode": {
+    "max_episode_steps": 250,
+    "obs_mode": "rgb+state",
+    "action_space_dimension": 7,
+    "control_mode": "pd_joint_pos",
+    "oracle_sim_backend": "cpu",
+    "oracle_render_backend": "gpu",
+    "oracle": "official ManiSkill Panda solveStackPyramid with RRTConnect fallback"
+  },
+  "audit": {
+    "paired_reset_seed_manifest": [12000, 12001, 12002, 12003, 12004, 12005, 12006, 12007],
+    "paired_reset_audit_artifact": "/mnt/data/ask4help/results/xvla_stackpyramid_task_audit_v2_retry4/paired_reset_audit.json",
+    "oracle_gate_requirement": "at least 19 strict successes out of 20 raw attempts per split",
+    "oracle_gate_seed_ranges": {
+      "id": [16000, 16019],
+      "stage1_ood": [17000, 17019],
+      "stage2_ood": [18000, 18019],
+      "stage3_ood": [19000, 19019]
+    }
+  },
+  "source": {
+    "repository": "https://github.com/2toinf/X-VLA",
+    "commit": "6bc2513f5f1cbec715cc668b414392a6cae5c671",
+    "controlled_task_code": "tools/stackpyramid_task.py"
+  }
+}
