@@ -253,6 +253,7 @@ def main() -> None:
                         inputs = policy.prepare(raw_obs, TASK)
                         with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
                             features, encoding = probe.extract(inputs)
+                            torch.manual_seed(seed * 1000 + policy_decisions)
                             generated = policy._generate_from_encoding(
                                 inputs, encoding, steps=args.flow_steps
                             )
