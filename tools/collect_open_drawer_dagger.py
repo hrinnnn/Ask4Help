@@ -59,6 +59,14 @@ from tools.maniskill_pi05_vfd_online_awbc import _load_model  # noqa: E402
 OOD_SPLITS = ("handle_ood", "grasp_ood", "goal_ood")
 
 
+def _json_default(value: Any) -> Any:
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 def _stats_from_spec(spec: dict[str, Any]) -> Any:
     kind = spec["kind"]
     if kind == "llmd":
@@ -305,7 +313,7 @@ def main() -> None:
             raw_row["trigger"] = trigger
             raw_row["reset_metadata"] = metadata
             with manifest_path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(raw_row, sort_keys=True) + "\n")
+                handle.write(json.dumps(raw_row, sort_keys=True, default=_json_default) + "\n")
             if not success or not expert_records or not expert_actions:
                 print(f"[open-drawer-collect] attempt={attempts} source={source} split={split} success=0 trigger={bool(trigger)}", flush=True)
                 continue
@@ -333,7 +341,7 @@ def main() -> None:
                             "seed": seed, "expert_actions": len(expert_actions), "trigger": trigger,
                             "raw_video": raw_row["video"], "metadata": metadata}
             with accepted_path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(accepted_row, sort_keys=True) + "\n")
+                handle.write(json.dumps(accepted_row, sort_keys=True, default=_json_default) + "\n")
             print(f"[open-drawer-collect] accepted={accepted} id={counts['id']} ood={counts['ood']} method={args.method}", flush=True)
     finally:
         if dataset is not None and getattr(dataset, "image_writer", None) is not None:
