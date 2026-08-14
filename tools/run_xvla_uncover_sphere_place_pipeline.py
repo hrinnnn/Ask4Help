@@ -103,6 +103,46 @@ def run_command(
         raise RuntimeError(f"command failed with exit code {result.returncode}: {command}")
 
 
+def evaluator_output_complete(output: Path, episodes: int) -> bool:
+    """Accept a post-rollout native shutdown error only after full output exists."""
+    summary_path = output / "summary.json"
+    if not summary_path.is_file():
+        return False
+    try:
+        summary = read_json(summary_path)
+    except (OSError, json.JSONDecodeError):
+        return False
+    rows = summary.get("rows")
+    if summary.get("episodes") != episodes or not isinstance(rows, list) or len(rows) != episodes:
+        return False
+    for row in rows:
+        for key in ("video", "actions"):
+            value = row.get(key)
+            if not value or not Path(value).is_file():
+                return False
+    return True
+
+
+def run_evaluator(
+    command: list[str],
+    *,
+    output: Path,
+    episodes: int,
+    cwd: Path,
+    log_path: Path,
+    env: dict[str, str],
+) -> None:
+    try:
+        run_command(command, cwd=cwd, log_path=log_path, env=env)
+    except RuntimeError:
+        if not evaluator_output_complete(output, episodes):
+            raise
+        print(
+            f"[uncover-pipeline] evaluator exited nonzero after complete output: {output}",
+            flush=True,
+        )
+
+
 def base_env(args: argparse.Namespace) -> dict[str, str]:
     env = os.environ.copy()
     env.update(
@@ -181,7 +221,7 @@ def checkpoint_selection(args: argparse.Namespace, root: Path) -> Path:
     for step in (2000, 4000, 6000, 8000, 10000):
         checkpoint = args.train_dir / f"ckpt-{step}"
         eval_dir = output / f"id_validation_{step}"
-        run_command(
+        run_evaluator(
             evaluator_command(
                 args,
                 checkpoint,
@@ -190,6 +230,8 @@ def checkpoint_selection(args: argparse.Namespace, root: Path) -> Path:
                 args.id_selection_episodes,
                 30000 + step,
             ),
+            output=eval_dir,
+            episodes=args.id_selection_episodes,
             cwd=args.repo_root,
             log_path=root / "logs" / f"checkpoint_selection_id_{step}.log",
             env=base_env(args),
@@ -207,7 +249,7 @@ def checkpoint_selection(args: argparse.Namespace, root: Path) -> Path:
         print(f"[uncover-pipeline] selection step={step} sr={row['success_rate']:.3f}", flush=True)
         if row["success_rate"] >= 0.8:
             confirm_dir = output / f"id_confirmation_{step}"
-            run_command(
+            run_evaluator(
                 evaluator_command(
                     args,
                     checkpoint,
@@ -216,6 +258,8 @@ def checkpoint_selection(args: argparse.Namespace, root: Path) -> Path:
                     args.id_confirm_episodes,
                     40000 + step,
                 ),
+                output=confirm_dir,
+                episodes=args.id_confirm_episodes,
                 cwd=args.repo_root,
                 log_path=root / "logs" / f"checkpoint_confirmation_id_{step}.log",
                 env=base_env(args),
@@ -251,8 +295,10 @@ def final_policy_evaluation(args: argparse.Namespace, root: Path, checkpoint: Pa
     output = next_output(output)
     splits = ("id", "handle_ood", "goal_ood")
     for offset, split in enumerate(splits):
-        run_command(
+        run_evaluator(
             evaluator_command(args, checkpoint, output / split, split, args.final_episodes, 50000 + offset * 1000),
+            output=output / split,
+            episodes=args.final_episodes,
             cwd=args.repo_root,
             log_path=root / "logs" / f"final_policy_{split}.log",
             env=base_env(args),
@@ -320,7 +366,7 @@ def passive_detector_evaluation(args: argparse.Namespace, root: Path, checkpoint
         return output
     output = next_output(output)
     for offset, split in enumerate(("id", "handle_ood", "goal_ood")):
-        run_command(
+        run_evaluator(
             [
                 str(args.python),
                 "tools/evaluate_uncover_sphere_place_failure_detectors.py",
@@ -351,6 +397,8 @@ def passive_detector_evaluation(args: argparse.Namespace, root: Path, checkpoint
                 "--device",
                 "cuda",
             ],
+            output=output / split,
+            episodes=args.final_episodes,
             cwd=args.repo_root,
             log_path=root / "logs" / f"passive_detector_{split}.log",
             env=base_env(args),
@@ -581,8 +629,10 @@ def updated_evaluation(args: argparse.Namespace, root: Path, training: Path) -> 
     output = next_output(output)
     checkpoint = training / "ckpt-2500"
     for offset, split in enumerate(("id", "handle_ood", "goal_ood")):
-        run_command(
+        run_evaluator(
             evaluator_command(args, checkpoint, output / split, split, args.final_episodes, 80000 + offset * 1000),
+            output=output / split,
+            episodes=args.final_episodes,
             cwd=args.repo_root,
             log_path=root / "logs" / f"gated_final_{split}.log",
             env=base_env(args),
