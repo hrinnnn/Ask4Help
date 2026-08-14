@@ -41,7 +41,7 @@ def _install_rrt_fallback() -> None:
 
 def _value(value):
     if hasattr(value, "detach"):
-        value = value.detach().cpu()
+        value = value.detach().cpu().numpy()
     if isinstance(value, dict):
         return {str(key): _value(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
