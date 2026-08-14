@@ -1,6 +1,6 @@
 # X-VLA StackPyramid 全阶段 OOD 计划
 
-**状态：H20 X-VLA 原生环境与 StackPyramid reset/step/render smoke 已完成；官方 motion-planning 单轨迹已保存但 seed0 success=false。正式 oracle、ID/OOD 收集和训练仍须先完成任务审计与 oracle 验收。**
+**状态：H20 X-VLA 原生环境、任务审计、oracle gate 和正式 ID/Stage-1/2/3 OOD 采集已完成；X-VLA base 已从 5090 恢复，2-step masked training/reload smoke 已通过，ID SFT 正等待空闲 GPU。**
 
 ## 1. 目标
 
@@ -14,7 +14,7 @@
 2. **Stage 2：构建红绿底座**。机器人把红块运输到绿块旁边并正确放置。
 3. **Stage 3：放置蓝块**。机器人抓取蓝块并将其放到红绿底座上方。
 
-正式实现前必须用实际 ManiSkill 环境和 oracle smoke 核实颜色、成功几何和上述执行顺序。核实后的物体名称、ID/OOD 位置范围、阶段 predicate、成功条件、failure reason、oracle 接口、base checkpoint 和 norm 全部写入 `task_spec.json`。当前仓库尚无已核实的 StackPyramid 正式实现，因此本节是需要实现和验证的冻结设计目标，不能跳过 smoke 直接采集。
+正式实现前必须用实际 ManiSkill 环境和 oracle smoke 核实颜色、成功几何和上述执行顺序。核实后的物体名称、ID/OOD 位置范围、阶段 predicate、成功条件、failure reason、oracle 接口、base checkpoint 和 norm 全部写入 `task_spec.json`。本轮已完成 paired-reset 审计、20/20 四 split oracle gate 和正式采集；旧的官方单轨迹失败记录只保留为诊断证据。
 
 ## 3. 固定 ID 分布
 
@@ -67,12 +67,14 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 
 ## 7. 产物结构
 
-建议根目录：`xvla_stackpyramid_stage_ood_v1/`，其下按 `stage1_grasp`、`stage2_transport`、`stage3_assembly` 分开保存：
+当前正式采集根目录：`/mnt/data/ask4help/results/xvla_stackpyramid_formal_collection_v2/`；其下按 `id`、`stage1_ood`、`stage2_ood`、`stage3_ood` 保存：
 
 - `task_spec.json` 与 seed manifests；
 - base-policy rollouts、状态 snapshots 和 nominal oracle trajectories；
 - detector、collection、training 与 evaluation；
 - 每阶段 summary，以及跨阶段总表。
+
+本轮采集验收：ID `128/128`，三个 Stage OOD 均 `100/100`，所有 split raw attempts 均严格成功，视频分别为 `138/110/110/110`。H5 loader 已验证所有 action-bearing observation 均作为 anchor，ID 128 条轨迹共 `10579` anchors，尾部 anchors `1152`，最终 observation 恰有 1 个有效 target；2-step checkpoint reload/forward smoke 已通过。
 
 该任务完成后，才能启动完整的 StackPyramid timing sweep 汇总。
 
