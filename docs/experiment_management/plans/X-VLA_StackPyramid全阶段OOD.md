@@ -1,6 +1,6 @@
 # X-VLA StackPyramid 全阶段 OOD 计划
 
-**状态：H20 X-VLA 原生环境、任务审计、oracle gate 和正式 ID/Stage-1/2/3 OOD 采集已完成；X-VLA base 已从 5090 恢复，2-step masked training/reload smoke 已通过，ID SFT 正等待空闲 GPU。**
+**状态：H20 X-VLA 原生环境、任务审计、oracle gate、正式 ID/Stage-1/2/3 OOD 采集、ID SFT 和四 split 基线评测已完成；下一步进入 stage-localized failure detection、timing 和 matched-budget gated DAgger。**
 
 ## 1. 目标
 
@@ -77,6 +77,15 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 本轮采集验收：ID `128/128`，三个 Stage OOD 均 `100/100`，所有 split raw attempts 均严格成功，视频分别为 `138/110/110/110`。H5 loader 已验证所有 action-bearing observation 均作为 anchor，ID 128 条轨迹共 `10579` anchors，尾部 anchors `1152`，最终 observation 恰有 1 个有效 target；2-step checkpoint reload/forward smoke 已通过。
 
 该任务完成后，才能启动完整的 StackPyramid timing sweep 汇总。
+
+## 9. 当前基线结果
+
+固定 `ckpt-10000` 的纯 policy 评测使用 100 条 seeds per split、
+`execute_horizon=5`、`max_episode_steps=250`。结果为：ID
+`ever_grasped=100/100, strict_success=95/100`；Stage-1 OOD
+`52/100, 0/100`；Stage-2 OOD `99/100, 0/100`；Stage-3 OOD
+`0/100, 0/100`。四个 split 的 400 个评测视频和完整 summary 保存在
+`/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_baseline_eval_ckpt10000_v1/`。
 
 ## 8. 运行位置
 
