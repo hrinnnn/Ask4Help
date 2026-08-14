@@ -38,6 +38,7 @@ def run_stage(
     repo_root: Path,
     python: str,
     gpu: str,
+    render_backend: str,
     state: dict,
     state_path: Path,
 ) -> dict:
@@ -65,7 +66,7 @@ def run_stage(
         "--sim-backend",
         "cpu",
         "--render-backend",
-        "gpu",
+        render_backend,
     ]
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = gpu
@@ -130,6 +131,7 @@ def main() -> None:
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--gpu", default="1")
+    parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="cpu")
     parser.add_argument("--attempt-margin", type=int, default=10)
     args = parser.parse_args()
     if args.attempt_margin < 0:
@@ -164,6 +166,7 @@ def main() -> None:
             repo_root=args.repo_root,
             python=args.python,
             gpu=args.gpu,
+            render_backend=args.render_backend,
             state=state,
             state_path=state_path,
         )
