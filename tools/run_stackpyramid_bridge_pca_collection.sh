@@ -8,8 +8,8 @@ PY=$ROOT/../envs/xvla_official_5090/bin/python
 SCRIPT=$ROOT/tools/collect_stackpyramid_xvla_dagger.py
 MODEL=$ROOT/stackpyramid_id_sft_10000_v1/formal_id_sft/ckpt-10000
 XVLA=/data/zhaozhixuan/X-VLA
-ASSET=$ROOT/stackpyramid_gated_dagger_v1/assets_retry1/bridge_pca.pt
-THRESHOLD=0.8620001673698425
+ASSET=${ASSET:-$ROOT/stackpyramid_gated_dagger_v1/assets_retry2/bridge_pca.pt}
+THRESHOLD=${THRESHOLD:-0.8620001673698425}
 MAX_ATTEMPTS=${MAX_ATTEMPTS:-180}
 
 mkdir -p "$OUT/logs"

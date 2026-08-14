@@ -24,6 +24,7 @@ def main() -> None:
     parser.add_argument("--collection-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--batch-size", type=int, default=16)
+    parser.add_argument("--target-episodes", type=int, default=128)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -67,6 +68,8 @@ def main() -> None:
         for h5_path in h5_paths:
             with h5py.File(h5_path, "r") as handle:
                 for group_name in sorted(name for name in handle if name.startswith("traj_")):
+                    if episode_count >= args.target_episodes:
+                        break
                     group = handle[group_name]
                     base = np.asarray(group["obs/sensor_data/base_camera/rgb"], dtype=np.uint8)
                     wrist = np.asarray(group["obs/sensor_data/hand_camera/rgb"], dtype=np.uint8)
@@ -81,6 +84,8 @@ def main() -> None:
                             encode_batch()
                     if anchor_count and anchor_count % 512 < length:
                         print(f"[stackpyramid-pca] anchors={anchor_count}", flush=True)
+            if episode_count >= args.target_episodes:
+                break
         encode_batch()
 
     matrix = torch.cat(features, dim=0).unsqueeze(1)

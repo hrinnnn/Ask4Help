@@ -22,6 +22,8 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=25)
     parser.add_argument("--start-seed", type=int, default=45000)
     parser.add_argument("--flow-steps", type=int, default=5)
+    parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="cpu")
+    parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="cpu")
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -42,7 +44,7 @@ def main() -> None:
     processor = XVLAProcessor.from_pretrained(args.checkpoint)
     payload = torch.load(args.asset, map_location="cpu", weights_only=False)
     stats = PCAResidualStatistics.from_state_dict(payload["statistics"])
-    env = gym.make(stackpyramid_env_id("id"), obs_mode="rgb+state", control_mode="pd_joint_pos", render_mode="rgb_array", sim_backend="gpu", render_backend="gpu")
+    env = gym.make(stackpyramid_env_id("id"), obs_mode="rgb+state", control_mode="pd_joint_pos", render_mode="rgb_array", sim_backend=args.sim_backend, render_backend=args.render_backend)
     maxima = []
     rows = []
     try:
