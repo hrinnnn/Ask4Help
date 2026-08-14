@@ -91,6 +91,7 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=2)
     parser.add_argument("--start-seed", type=int, default=13000)
     parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="gpu")
+    parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="gpu")
     args = parser.parse_args()
     if args.episodes <= 0:
         raise ValueError("episodes must be positive")
@@ -105,6 +106,7 @@ def main() -> None:
         control_mode="pd_joint_pos",
         render_mode="rgb_array",
         sim_backend=args.sim_backend,
+        render_backend=args.render_backend,
     )
     env = RecordEpisode(
         env,
