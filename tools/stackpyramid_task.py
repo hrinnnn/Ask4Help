@@ -19,7 +19,7 @@ _ID_CENTERS = np.asarray(
     [[-0.04, -0.04], [0.04, -0.04], [0.00, 0.04]], dtype=np.float64
 )
 _OOD_SHIFTS = {
-    "stage1_ood": np.asarray([0.08, 0.08], dtype=np.float64),
+    "stage1_ood": np.asarray([0.08, 0.10], dtype=np.float64),
     "stage2_ood": np.asarray([0.12, 0.10], dtype=np.float64),
     "stage3_ood": np.asarray([0.12, -0.16], dtype=np.float64),
 }
