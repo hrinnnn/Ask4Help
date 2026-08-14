@@ -1,6 +1,6 @@
 # X-VLA StackCube 目标位置 OOD 与受控介入计划
 
-**状态：首轮 cohort 已完成审计；retry1 因服务器 CPU affinity 启动包装问题保留为故障记录；retry2 正在正式 collection。** 本计划记录已审核的第一组 stage-localized OOD takeover-timing study。
+**状态：retry2 的四组 matched-budget training、共同 checkpoint selection 与最终 100-ID/100-OOD evaluation 已完成。** 本计划记录已审核的第一组 stage-localized OOD takeover-timing study。
 
 ## 1. 研究问题
 
@@ -68,4 +68,6 @@ privileged oracle 必须支持从未抓取、已抓取、已抬起和已放置�
 
 ## 8. 实现状态
 
-`tools/run_xvla_stackcube_stage2_pipeline.py` 已对齐四个 timing condition，并以共同 OOD cohort、共同可达完整 suffix 预算、10k 上限、每 500-step checkpoint、共同 checkpoint selection，以及最终每组 100 ID/100 OOD 评测推进整条流水线。首轮 screen 的整体 lift rate 不能代替 cohort admission；正式 cohort 只按稳定 lift 后的目标相关失败候选筛选。启动前物理 smoke 已验证 Post-Grasp 与 Post-Lift 能从 policy 中间状态继续完成任务；Failure-Recovery 的迟触发样本允许因剩余 horizon 不足而失败，并只将成功恢复轨迹纳入共同 seed intersection。retry1 仅保留启动失败记录，retry2 使用按实际可用 CPU 自动分片的调度器重新启动；采集完成后应先验收共同预算，再恢复预算选择、数据审计和训练。
+`tools/run_xvla_stackcube_stage2_pipeline.py` 已对齐四个 timing condition，并以共同 OOD cohort、共同可达完整 suffix 预算、10k 上限、每 500-step checkpoint、共同 checkpoint selection，以及最终每组 100 ID/100 OOD 评测推进整条流水线。首轮 screen 的整体 lift rate 不能代替 cohort admission；正式 cohort 只按稳定 lift 后的目标相关失败候选筛选。启动前物理 smoke 已验证 Post-Grasp 与 Post-Lift 能从 policy 中间状态继续完成任务；Failure-Recovery 的迟触发样本允许因剩余 horizon 不足而失败，并只将成功恢复轨迹纳入共同 seed intersection。retry1 仅保留启动失败记录，retry2 使用按实际可用 CPU 自动分片的调度器重新启动；retry2 的训练 checkpoint、selection summary 和最终评测均已完成，主结果位于 `training_retry3/`、`checkpoint_selection_retry2/` 与 `final_evaluation_retry2/`。
+
+共同 selection 在 2k 选择 checkpoint；最终 100-ID success rate 为 Immediate 73%、Post-Grasp 58%、Post-Lift 95%、Failure-Recovery 71%，100-stage2-OOD success rate 为 52%、10%、4% 和 30%。完整汇总见 `final_evaluation_retry2/summary.json`。
