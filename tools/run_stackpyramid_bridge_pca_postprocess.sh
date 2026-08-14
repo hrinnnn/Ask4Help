@@ -7,7 +7,7 @@ TRAIN=${TRAIN:-$ROOT/stackpyramid_gated_dagger_v1/bridge_pca_training_v1}
 OUT=${OUT:-$ROOT/stackpyramid_gated_dagger_v1/bridge_pca_postprocess_v1}
 PY=$ROOT/../envs/xvla_official_5090/bin/python
 XVLA=/data/zhaozhixuan/X-VLA
-ID_H5=$ROOT/stackpyramid_formal_collection_v2/id/Ask4HelpStackPyramidID-v1/motionplanning/oracle_id.h5
+ID_H5=${ID_H5:-$ROOT/stackpyramid_formal_collection_v2/id/Ask4HelpStackPyramidID-v1/motionplanning/oracle_id.h5}
 EVAL=$ROOT/tools/evaluate_stackpyramid_xvla.py
 TIMING=$ROOT/tools/summarize_stackpyramid_timing.py
 

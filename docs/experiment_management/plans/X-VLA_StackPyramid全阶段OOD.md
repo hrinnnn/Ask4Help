@@ -1,6 +1,6 @@
 # X-VLA StackPyramid 全阶段 OOD 计划
 
-**状态：H20 X-VLA 原生环境、任务审计、oracle gate、正式 ID/Stage-1/2/3 OOD 采集、ID SFT 和四 split 基线评测已完成；下一步进入 stage-localized failure detection、timing 和 matched-budget gated DAgger。**
+**状态：已完成 H20 X-VLA 原生环境、任务审计、oracle gate、正式 ID/Stage-1/2/3 OOD 采集、ID SFT、Bridge-PCA gated DAgger、timing 诊断和六 split 最终评测。完整多介入时机 sweep 仍作为后续独立实验。**
 
 ## 1. 目标
 
@@ -76,9 +76,9 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 
 本轮采集验收：ID `128/128`，三个 Stage OOD 均 `100/100`，所有 split raw attempts 均严格成功，视频分别为 `138/110/110/110`。H5 loader 已验证所有 action-bearing observation 均作为 anchor，ID 128 条轨迹共 `10579` anchors，尾部 anchors `1152`，最终 observation 恰有 1 个有效 target；2-step checkpoint reload/forward smoke 已通过。
 
-该任务完成后，才能启动完整的 StackPyramid timing sweep 汇总。
+本轮 Bridge-PCA stage-localized gated DAgger 已完成；完整多介入时机 sweep 仍需单独建立 matched timing conditions，不能由本轮 DCA/EAS/DCE 诊断代理替代。
 
-## 9. 当前基线结果
+## 8. 当前基线结果
 
 固定 `ckpt-10000` 的纯 policy 评测使用 100 条 seeds per split、
 `execute_horizon=5`、`max_episode_steps=250`。结果为：ID
@@ -87,6 +87,35 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 `0/100, 0/100`。四个 split 的 400 个评测视频和完整 summary 保存在
 `/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_baseline_eval_ckpt10000_v1/`。
 
-## 8. 运行位置
+## 9. Bridge-PCA gated DAgger 第一轮结果
+
+本轮使用固定 ID base policy `ckpt-10000`、`assets_retry2/bridge_pca.pt` 和 ID25 校准阈值
+`0.95207279920578`。三个 stage 各收集 100 条非空 expert suffix；对应 raw attempt
+分别为 103、203、100，收集根为
+`/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_v1/bridge_pca_collection_v3/`。
+
+| 条件 | Ever grasped | Base completed | Strict success |
+|---|---:|---:|---:|
+| Stage 1 ID | 100/100 | 95/100 | 95/100 |
+| Stage 1 OOD | 12/100 | 10/100 | 9/100 |
+| Stage 2 ID | 100/100 | 100/100 | 99/100 |
+| Stage 2 OOD | 50/100 | 4/100 | 2/100 |
+| Stage 3 ID | 100/100 | 95/100 | 89/100 |
+| Stage 3 OOD | 100/100 | 100/100 | 97/100 |
+
+三组 source-balanced 训练均完成 `ckpt-500/1000/1500/2000`，最终 loss 分别为
+Stage 1 `0.02377`、Stage 2 `0.20849`、Stage 3 `0.01823`。训练输出为
+`/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_v1/bridge_pca_training_v1/`。
+每组正式训练均保留 ID 与 expert 的 temporal-mask anchor 报告；最终 observation 保留且只有
+1 个有效 target timestep，尾部 anchor 没有被过滤。
+
+Timing 诊断和最终评测输出为
+`/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_v1/bridge_pca_postprocess_v1/`。
+其中包含三组 DCA/EAS/DCE 诊断 summary、六份 100-episode summary、600 个评测视频、
+`comparison.json`、`comparison.md` 和 `PIPELINE_COMPLETE`。DCA/EAS/DCE 当前是基于 nominal
+state 与 expert suffix 的诊断代理；在 paired state-snapshot DTW 完成前，不将其表述为最终的
+takeover timing utility。
+
+## 10. 运行位置
 
 优先复用 5090 上已核实的 X-VLA 环境。若 5090 在我们的配额内没有足够空闲卡，不等待卡位，直接按《环境与存储》的回退规则在阿里云 H20 建立原生 X-VLA 环境、同步冻结资产并完成 smoke。两处运行必须使用相同源码版本、数据、base checkpoint、norm、seed manifest 和成功定义。
