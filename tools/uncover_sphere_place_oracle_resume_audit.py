@@ -45,11 +45,11 @@ def step_plan(env, oracle, max_chunks: int, stop):
         for index in range(10):
             qpos = env.unwrapped.agent.robot.get_qpos()
             _, _, terminated, truncated, _ = env.step(plan.action_at(qpos, index))
+            info = env.unwrapped.evaluate()
+            if stop(info, oracle):
+                return chunk + 1, True
             if flag(terminated) or flag(truncated):
                 return chunk + 1, False
-        info = env.unwrapped.evaluate()
-        if stop(info, oracle):
-            return chunk + 1, True
     return max_chunks, False
 
 
