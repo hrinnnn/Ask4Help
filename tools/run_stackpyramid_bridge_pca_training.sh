@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT=/data/zhaozhixuan/xvla_stackcube_data
-COLLECT=${COLLECT:-$ROOT/stackpyramid_gated_dagger_v1/bridge_pca_collection_v2}
+COLLECT=${COLLECT:-$ROOT/stackpyramid_gated_dagger_v1/bridge_pca_collection_v3}
 OUT=${OUT:-$ROOT/stackpyramid_gated_dagger_v1/bridge_pca_training_v1}
 PY=$ROOT/../envs/xvla_official_5090/bin/python
 SCRIPT=$ROOT/tools/run_stackpyramid_gated_training.py
