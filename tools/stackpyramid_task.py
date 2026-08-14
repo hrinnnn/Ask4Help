@@ -31,7 +31,12 @@ def sample_stackpyramid_xy(rng: Any, count: int, *, split: str) -> np.ndarray:
         raise ValueError("count must be positive")
     if split not in STACKPYRAMID_SPLITS:
         raise ValueError(f"unknown StackPyramid split: {split}")
-    jitter = rng.uniform(-0.008, 0.008, size=(count, 3, 2))
+    # ManiSkill's batched RNG supplies the leading environment dimension.
+    jitter = np.asarray(rng.uniform(-0.008, 0.008, size=(3, 2)))
+    if jitter.ndim == 2:
+        jitter = jitter[None, ...]
+    if jitter.shape[0] != count:
+        raise ValueError(f"unexpected StackPyramid jitter shape {jitter.shape} for {count} environments")
     centers = np.broadcast_to(_ID_CENTERS, (count, 3, 2)).copy()
     if split != "id":
         target = {"stage1_ood": 0, "stage2_ood": 1, "stage3_ood": 2}[split]
