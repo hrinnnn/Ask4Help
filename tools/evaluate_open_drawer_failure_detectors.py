@@ -168,7 +168,7 @@ def _run_episode(*, model: Any, prior: torch.Tensor, env: Any, detectors: dict[s
         env_obs = _model_obs(raw_obs)
         with torch.inference_mode():
             features = model.extract_multilayer_llmd_features(
-                env_obs, prior
+                env_obs, prior, include_action_expert_final=True
             )
             predicted, _ = model.predict_action_batch(env_obs=env_obs, mode="eval", compute_values=False)
         scores = {name: _score(features[spec["layer"]], spec) for name, spec in detectors.items()}
