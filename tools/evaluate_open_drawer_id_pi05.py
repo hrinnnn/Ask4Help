@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ import numpy as np
 import torch
 
 ROOT = Path(__file__).resolve().parents[1]
-RLINF_ROOT = ROOT / "RLinf"
+RLINF_ROOT = Path(os.environ.get("ASK4HELP_RLINF_ROOT", ROOT / "RLinf"))
 sys.path[:0] = [str(ROOT), str(RLINF_ROOT)]
 
 from rlinf.envs.maniskill.open_drawer_retrieve_place_spec import (  # noqa: E402
