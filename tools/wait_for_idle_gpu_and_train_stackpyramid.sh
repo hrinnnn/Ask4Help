@@ -6,6 +6,7 @@ set -euo pipefail
 ROOT=/data/zhaozhixuan/xvla_stackcube_data
 PY=/data/zhaozhixuan/envs/xvla_official_5090/bin/python
 XVLA=/data/zhaozhixuan/X-VLA
+export PYTHONPATH="$ROOT:$XVLA${PYTHONPATH:+:$PYTHONPATH}"
 COLLECTION=$ROOT/stackpyramid_formal_collection_v2
 RUN_ROOT=$ROOT/stackpyramid_id_sft_10000_v1
 FORMAL=$RUN_ROOT/formal_id_sft
