@@ -23,9 +23,14 @@ import torch
 
 
 def _load_modules(root: Path):
-    for name, path in (("rlinf", None), ("rlinf.envs", None), ("rlinf.envs.maniskill", root)):
+    package_root = root.parents[1]
+    for name, path in (
+        ("rlinf", package_root),
+        ("rlinf.envs", package_root / "envs"),
+        ("rlinf.envs.maniskill", root),
+    ):
         module = types.ModuleType(name)
-        module.__path__ = [str(path)] if path else []
+        module.__path__ = [str(path)]
         sys.modules[name] = module
 
     def load(name: str, filename: str):
