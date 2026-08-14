@@ -108,7 +108,9 @@ def _set_xy(env: Any, env_idx: Any, xy: np.ndarray) -> None:
                 f"xy={tuple(xy.shape)}, values={tuple(values.shape)}"
             )
         position[env_idx, :2] = values
-        cube.set_pose(Pose.create_from_pq(position, cube.pose.q.clone()))
+        quaternion = torch.zeros_like(cube.pose.q)
+        quaternion[..., 0] = 1.0
+        cube.set_pose(Pose.create_from_pq(position, quaternion))
 
 
 def register_stackpyramid_splits() -> None:
