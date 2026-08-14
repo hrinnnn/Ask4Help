@@ -80,7 +80,9 @@ def prepare_inputs(model: Any, processor: Any, raw_obs: dict[str, Any], device: 
         **processor.encode_image(images),
         **processor.encode_language([TASK]),
     }
-    qpos = raw_obs["agent"]["qpos"]
+    # StackPyramid exposes the Panda state as a flat 64-D observation rather
+    # than the nested agent/qpos structure used by PickSingleYCB.
+    qpos = raw_obs["state"]
     if isinstance(qpos, torch.Tensor):
         qpos = qpos.detach().cpu().numpy()
     qpos = np.asarray(qpos, dtype=np.float32).reshape(-1)
