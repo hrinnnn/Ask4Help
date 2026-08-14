@@ -83,7 +83,12 @@ def _set_xy(env: Any, env_idx: Any, xy: np.ndarray) -> None:
 
     base = env.unwrapped
     cubes = (base.cubeA, base.cubeB, base.cubeC)
-    selected = cubes[0].pose.p[env_idx]
+    position = cubes[0].pose.p
+    if isinstance(env_idx, torch.Tensor):
+        pose_index = env_idx.to(device=position.device)
+    else:
+        pose_index = torch.as_tensor(env_idx, device=position.device)
+    selected = position[pose_index]
     selected_count = 1 if selected.ndim == 1 else int(selected.shape[0])
     xy = np.asarray(xy)
     if xy.ndim == 2:
@@ -97,7 +102,7 @@ def _set_xy(env: Any, env_idx: Any, xy: np.ndarray) -> None:
             )
     for cube_index, cube in enumerate(cubes):
         position = cube.pose.p.clone()
-        target = position[env_idx, :2]
+        target = position[pose_index, :2]
         values = torch.as_tensor(
             xy[:, cube_index], dtype=position.dtype, device=base.device
         )
@@ -107,7 +112,7 @@ def _set_xy(env: Any, env_idx: Any, xy: np.ndarray) -> None:
                 f"position={tuple(position.shape)}, target={tuple(target.shape)}, "
                 f"xy={tuple(xy.shape)}, values={tuple(values.shape)}"
             )
-        position[env_idx, :2] = values
+        position[pose_index, :2] = values
         quaternion = torch.zeros_like(cube.pose.q)
         quaternion[..., 0] = 1.0
         cube.set_pose(Pose.create_from_pq(position, quaternion))
