@@ -16,7 +16,7 @@ STACKPYRAMID_TASK = "stack the red cube next to the green cube and place the blu
 
 # Positions are deliberately narrow and separated. OOD offsets remain on the table.
 _ID_CENTERS = np.asarray(
-    [[-0.10, -0.08], [0.00, -0.08], [0.10, 0.08]], dtype=np.float64
+    [[-0.04, -0.04], [0.04, -0.04], [0.00, 0.04]], dtype=np.float64
 )
 _OOD_SHIFTS = {
     "stage1_ood": np.asarray([-0.10, 0.12], dtype=np.float64),
