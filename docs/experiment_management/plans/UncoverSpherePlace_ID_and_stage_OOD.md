@@ -1,6 +1,6 @@
 # UncoverSpherePlace ID 与阶段 OOD 审计
 
-**状态：formal candidate 的 3x3 Oracle gate、9/9 中间状态续接审计、三 split 正式采集与 temporal-mask 验收均已通过；当前进行 ID base policy 训练，之后进入固定 ID/OOD 评测与 gate 数据收集。**
+**状态：formal candidate 的 3x3 Oracle gate、9/9 中间状态续接审计、三 split 正式采集与 temporal-mask 验收均已通过；ID base policy 正在 GPU4/5 训练，后处理总控已启动，完成后自动进入 checkpoint 选择、固定 ID/OOD 评测、ID-only detector、gated collection、更新训练与最终评测。**
 
 ## 任务定义
 
@@ -20,4 +20,4 @@ paired reset 审计已在相同 seed 上完成：`handle_ood` 只改变 cover ya
 
 LeRobot 运行依赖已在固定环境中完成导入 smoke。三 split collection smoke 位于 `outputs/collection_smoke_stage_localized_v1_retry4/`：ID、Handle OOD、Goal OOD 均为 3/3 成功，所有 episode 均保持 action/observation 对齐，9 个 side-by-side 视频均可解码。该 smoke 只用于验收 collector，不作为正式训练数据。
 
-正式采集输出为 `/data/zhaozhixuan/Ask4Help-uncover-sphere-place/outputs/collection_formal_stage_localized_v1_retry5/`，三个 split 各 128 条成功轨迹。`collection_validation.json` 已验证 action/observation 对齐、双视角图像、视频可解码、完整 episode 尾部 anchor 与 temporal validity mask；每个 split 的最后 observation 均保留且只有一个有效 target。2-step SFT 与 checkpoint reload/forward smoke 输出为 `id_sft_smoke_2_retry1/`，均已通过。正式 ID base policy 从 X-VLA 预训练基座启动于 `id_sft_10000_retry4/`，使用物理 GPU4/5、每 500 步保存，训练完成后再进行模型选择和固定 ID/OOD 评测。
+正式采集输出为 `/data/zhaozhixuan/Ask4Help-uncover-sphere-place/outputs/collection_formal_stage_localized_v1_retry5/`，三个 split 各 128 条成功轨迹。`collection_validation.json` 已验证 action/observation 对齐、双视角图像、视频可解码、完整 episode 尾部 anchor 与 temporal validity mask；每个 split 的最后 observation 均保留且只有一个有效 target。2-step SFT 与 checkpoint reload/forward smoke 输出为 `id_sft_smoke_2_retry1/`，均已通过。正式 ID base policy 从 X-VLA 预训练基座启动于 `id_sft_10000_retry4/`，使用物理 GPU4/5、每 500 步保存。持久化后处理总控为 `post_training_pipeline_v1/`，PID 为服务器 `/tmp/uncover_post_training_pipeline.pid`；它等待训练完成后依次执行模型选择、固定 ID/OOD 评测、ID-only detector 资产与被动评测、内部门控 suffix 收集、matched-budget 更新训练和最终评测。
