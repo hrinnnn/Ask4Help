@@ -58,7 +58,7 @@ dataset = StackPyramidH5Dataset(Path("/data/zhaozhixuan/xvla_stackcube_data/stac
 batch = collate_fn([dataset[len(dataset)-1]], processor)
 model.to(device).eval()
 batch = {k: (v.to(device) if isinstance(v, torch.Tensor) else v) for k, v in batch.items()}
-with torch.no_grad():
+with torch.no_grad(), torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=device.type == "cuda"):
     value = float(masked_flow_loss(model, batch).float().item())
 assert math.isfinite(value)
 Path("/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_id_sft_10000_v1/smoke_reload_ok.json").write_text(json.dumps({"finite_loss": value, "device": str(device), "tail_valid_count": int(batch["action_valid_mask"].sum().item())}) + "\n")
