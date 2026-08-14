@@ -10,6 +10,7 @@ ID_H5=$ROOT/stackpyramid_formal_collection_v2/id/Ask4HelpStackPyramidID-v1/motio
 MODEL=$ROOT/stackpyramid_id_sft_10000_v1/formal_id_sft/ckpt-10000
 XVLA=/data/zhaozhixuan/X-VLA
 STEPS=${STEPS:-2000}
+COLLECTION_MARKER=$COLLECT/BRIDGE_PCA_COLLECTION_COMPLETE
 
 mkdir -p "$OUT/logs"
 exec >>"$OUT/pipeline.log" 2>&1
@@ -18,6 +19,16 @@ state() {
   printf '%s\n' "$1" >"$OUT/pipeline_state.txt"
   printf '[%s] %s\n' "$(date -Is)" "$1"
 }
+
+state waiting_for_collection
+while [[ ! -f "$COLLECTION_MARKER" ]]; do
+  current=$(cat "$COLLECT/pipeline_state.txt" 2>/dev/null || true)
+  if [[ "$current" == *_failed* || "$current" == *_missing* ]]; then
+    state "collection_failed_${current}"
+    exit 1
+  fi
+  sleep 120
+done
 
 run_stage() {
   local split="$1"
