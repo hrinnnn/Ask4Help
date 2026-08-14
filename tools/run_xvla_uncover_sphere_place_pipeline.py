@@ -276,10 +276,10 @@ def final_policy_evaluation(args: argparse.Namespace, root: Path, checkpoint: Pa
 
 def build_detector_assets(args: argparse.Namespace, root: Path, checkpoint: Path) -> Path:
     output = root / "detector_assets"
-    asset = output / "multilayer_detector_assets.pt"
-    if asset.is_file() and completed(output, "DETECTOR_ASSETS_COMPLETE"):
-        return asset
+    if (output / "multilayer_detector_assets.pt").is_file() and completed(output, "DETECTOR_ASSETS_COMPLETE"):
+        return output / "multilayer_detector_assets.pt"
     output = next_output(output)
+    asset = output / "multilayer_detector_assets.pt"
     manifest = output / "assets_manifest.json"
     run_command(
         [
