@@ -101,10 +101,12 @@ def main() -> None:
 
             success = False
             elapsed_steps = None
+            evaluation = None
             if result != -1 and result is not None:
                 final = result[-1]
                 success = bool(_value(final["success"]))
                 elapsed_steps = int(_value(final["elapsed_steps"]))
+                evaluation = _value(env.unwrapped.evaluate())
             attempts.append(
                 {
                     "seed": seed,
@@ -112,6 +114,7 @@ def main() -> None:
                     "strict_success": success,
                     "elapsed_steps": elapsed_steps,
                     "planner_error": planner_error,
+                    "final_evaluation": evaluation,
                     "initial_metadata": initial_metadata,
                 }
             )
