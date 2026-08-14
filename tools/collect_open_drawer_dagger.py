@@ -42,6 +42,7 @@ from toolkits.lerobot.collect_open_drawer_retrieve_place_lerobot import (  # noq
 from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     MAIN_CAMERA_CANDIDATES,
     WRIST_CAMERA_CANDIDATES,
+    _convert_solver_action_to_joint_delta,
     _build_frames,
     _select_camera,
 )
@@ -112,18 +113,25 @@ def _build_split_env(split: str, args: argparse.Namespace, *, control_mode: str)
 
 
 class _RecordingProxy:
-    def __init__(self, env: Any, records: list[Any], actions: list[np.ndarray]):
+    def __init__(self, env: Any, records: list[Any], actions: list[np.ndarray], *, delta_bounds: tuple[np.ndarray, np.ndarray] | None = None):
         self._env = env
         self._records = records
         self._actions = actions
+        self._delta_bounds = delta_bounds
 
     @property
     def unwrapped(self):
         return self._env.unwrapped
 
     def step(self, action, *args, **kwargs):
-        observation, reward, terminated, truncated, info = self._env.step(action, *args, **kwargs)
-        self._actions.append(np.asarray(action, dtype=np.float32).reshape(-1))
+        action_array = np.asarray(action, dtype=np.float32).reshape(-1)
+        if self._delta_bounds is not None:
+            current_qpos = np.asarray(self._env.unwrapped.agent.robot.get_qpos(), dtype=np.float32).reshape(-1)
+            action_array = _convert_solver_action_to_joint_delta(
+                current_qpos, action_array, *self._delta_bounds
+            )
+        observation, reward, terminated, truncated, info = self._env.step(action_array, *args, **kwargs)
+        self._actions.append(action_array)
         self._records.append(_extract_record(observation))
         return observation, reward, terminated, truncated, info
 
@@ -293,7 +301,12 @@ def main() -> None:
                 if trigger is not None:
                     expert_records = [prefix_records[-1]]
                     expert_actions = []
-                    proxy = _RecordingProxy(policy_env, expert_records, expert_actions)
+                    proxy = _RecordingProxy(
+                        policy_env,
+                        expert_records,
+                        expert_actions,
+                        delta_bounds=_joint_delta_arm_bounds(policy_env),
+                    )
                     expert_result = continue_episode(proxy, planner, seed=seed)
                     success = bool(expert_result.get("success", False))
                     full_records = prefix_records + expert_records[1:]
