@@ -161,6 +161,7 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=8200)
+    parser.add_argument("--smoke-only", action="store_true")
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -184,14 +185,16 @@ def main() -> None:
     (args.output / "anchor_report.json").write_text(json.dumps(dataset.report, indent=2) + "\n")
     iterator = iter(loader)
     started = time.time()
-    for step in range(args.steps):
+    total_steps = 2 if args.smoke_only else args.steps
+    save_interval = 2 if args.smoke_only else args.save_interval
+    for step in range(total_steps):
         try:
             batch = next(iterator)
         except StopIteration:
             iterator = iter(loader)
             batch = next(iterator)
         batch = {key: value.to(device) if isinstance(value, torch.Tensor) else value for key, value in batch.items()}
-        _set_learning_rates(optimizer, step, args.steps, args.learning_rate, 0.1, 0, 200)
+        _set_learning_rates(optimizer, step, total_steps, args.learning_rate, 0.1, 0, 1)
         with torch.autocast("cuda", dtype=torch.bfloat16):
             loss = masked_flow_loss(model, batch)
         loss.backward()
@@ -204,13 +207,25 @@ def main() -> None:
             with (args.output / "train.jsonl").open("a") as handle:
                 handle.write(json.dumps(row) + "\n")
             print(json.dumps(row), flush=True)
-        if global_step % args.save_interval == 0 or global_step == args.steps:
+        if global_step % save_interval == 0 or global_step == total_steps:
             checkpoint = args.output / f"ckpt-{global_step}"
             checkpoint.mkdir()
             model.save_pretrained(checkpoint, safe_serialization=True)
             processor.save_pretrained(checkpoint)
             (checkpoint / "state.json").write_text(json.dumps({"global_step": global_step}) + "\n")
-    (args.output / "TRAINING_COMPLETE").write_text("complete\n")
+    if args.smoke_only:
+        reload_model, reload_processor = load_model(args.output / "ckpt-2", args.xvla_root, dtype="bf16")
+        reload_model.to(device).eval()
+        reload_batch = next(iter(loader))
+        reload_batch = {key: value.to(device) if isinstance(value, torch.Tensor) else value for key, value in reload_batch.items()}
+        with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+            reload_loss = masked_flow_loss(reload_model, reload_batch)
+        if not torch.isfinite(reload_loss):
+            raise RuntimeError(f"non-finite reload smoke loss: {reload_loss}")
+        (args.output / "reload_forward_smoke.json").write_text(json.dumps({"finite_loss": float(reload_loss.float()), "batch_size": args.batch_size}) + "\n")
+        (args.output / "RELOAD_SMOKE_COMPLETE").write_text("complete\n")
+    else:
+        (args.output / "TRAINING_COMPLETE").write_text("complete\n")
 
 
 if __name__ == "__main__":

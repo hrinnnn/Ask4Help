@@ -71,7 +71,39 @@ run_stage() {
   state "${split}_passed_rc_${rc}"
 }
 
+run_smoke() {
+  local split="$1"
+  local smoke_out="$OUT/smoke/$split"
+  if [[ -f "$smoke_out/RELOAD_SMOKE_COMPLETE" ]]; then
+    state "${split}_smoke_already_complete"
+    return 0
+  fi
+  if [[ -e "$smoke_out" ]]; then
+    state "${split}_smoke_partial_requires_new_retry"
+    return 1
+  fi
+  local expert_h5="$COLLECT/$split/accepted_suffixes.h5"
+  [[ -f "$expert_h5" ]] || { state "${split}_smoke_missing_expert_h5"; return 1; }
+  state "${split}_smoke_running"
+  set +e
+  CUDA_VISIBLE_DEVICES=0 PYTHONPATH="$ROOT:$XVLA" "$PY" "$SCRIPT" \
+    --xvla-root "$XVLA" --model "$MODEL" --id-h5 "$ID_H5" --expert-h5 "$expert_h5" \
+    --output "$smoke_out" --steps 2 --save-interval 2 --batch-size 8 --seed "$((9100 + ${#split}))" --smoke-only \
+    >"$OUT/logs/${split}_smoke.log" 2>&1
+  local rc=$?
+  set -e
+  if [[ ! -f "$smoke_out/RELOAD_SMOKE_COMPLETE" ]]; then
+    state "${split}_smoke_failed_rc_${rc}"
+    return 1
+  fi
+  state "${split}_smoke_passed_rc_${rc}"
+}
+
 state pending
+run_smoke stage1_ood
+run_smoke stage2_ood
+run_smoke stage3_ood
+state formal_training_pending
 run_stage stage1_ood
 run_stage stage2_ood
 run_stage stage3_ood
