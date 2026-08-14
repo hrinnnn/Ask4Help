@@ -36,7 +36,6 @@ run_split() {
   fi
   wait_gpu
   write_state "${split}_running"
-  mkdir -p "$split_out"
   set +e
   CUDA_VISIBLE_DEVICES=0 PYTHONPATH="$ROOT:$XVLA" "$PY" "$SCRIPT" \
     --checkpoint "$MODEL" --xvla-root "$XVLA" --output "$split_out" \
