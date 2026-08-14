@@ -69,8 +69,14 @@ def training_command(
     steps: int,
     save_interval: int,
 ) -> list[str]:
+    accelerate = python.with_name("accelerate")
     return [
-        str(python),
+        str(accelerate),
+        "launch",
+        "--num_processes", "2",
+        "--multi_gpu",
+        "--mixed_precision", "bf16",
+        "--gpu_ids", "0,1",
         "train.py",
         "--models", str(base_model),
         "--output_dir", str(output),
