@@ -60,6 +60,30 @@ def _scalar(value):
     return value
 
 
+def _evaluation_details(env):
+    base = env.unwrapped
+    positions = [cube.pose.p.detach().cpu().numpy()[0] for cube in (base.cubeA, base.cubeB, base.cubeC)]
+    threshold = float(np.linalg.norm(2 * base.cube_half_size[:2].detach().cpu().numpy()) + 0.005)
+    xy_ab = float(np.linalg.norm((positions[0] - positions[1])[:2])) <= threshold
+    xy_cb = float(np.linalg.norm((positions[2] - positions[1])[:2])) <= threshold
+    xy_ca = float(np.linalg.norm((positions[2] - positions[0])[:2])) <= threshold
+    z_cb = abs(float(positions[2][2] - positions[1][2])) > 0.02
+    z_ca = abs(float(positions[2][2] - positions[0][2])) > 0.02
+    static = [bool(cube.is_static(lin_thresh=1e-2, ang_thresh=0.5).detach().cpu().numpy()[0]) for cube in (base.cubeA, base.cubeB, base.cubeC)]
+    grasped = [bool(base.agent.is_grasping(cube).detach().cpu().numpy()[0]) for cube in (base.cubeA, base.cubeB, base.cubeC)]
+    return {
+        "positions": [position.tolist() for position in positions],
+        "xy_threshold": threshold,
+        "xy_ab": xy_ab,
+        "xy_cb": xy_cb,
+        "xy_ca": xy_ca,
+        "z_cb": z_cb,
+        "z_ca": z_ca,
+        "static": static,
+        "grasped": grasped,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
@@ -113,7 +137,10 @@ def main() -> None:
                 final = result[-1]
                 success = bool(_scalar(final["success"]))
                 elapsed_steps = int(_scalar(final["elapsed_steps"]))
-                evaluation = _value(env.unwrapped.evaluate())
+                evaluation = {
+                    "success": _value(env.unwrapped.evaluate()),
+                    "details": _evaluation_details(env),
+                }
             attempts.append(
                 {
                     "seed": seed,
