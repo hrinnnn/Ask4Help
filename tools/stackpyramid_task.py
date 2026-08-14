@@ -78,6 +78,18 @@ def _set_xy(env: Any, env_idx: Any, xy: np.ndarray) -> None:
 
     base = env.unwrapped
     cubes = (base.cubeA, base.cubeB, base.cubeC)
+    selected = cubes[0].pose.p[env_idx]
+    selected_count = 1 if selected.ndim == 1 else int(selected.shape[0])
+    xy = np.asarray(xy)
+    if xy.ndim == 2:
+        xy = xy[None, ...]
+    if xy.shape[0] != selected_count:
+        if xy.shape[1] == selected_count and xy.shape[0] == 3:
+            xy = np.transpose(xy, (1, 0, 2))
+        else:
+            raise ValueError(
+                f"unexpected StackPyramid xy shape {xy.shape} for {selected_count} environments"
+            )
     for cube_index, cube in enumerate(cubes):
         position = cube.pose.p.clone()
         position[env_idx, :2] = torch.as_tensor(
