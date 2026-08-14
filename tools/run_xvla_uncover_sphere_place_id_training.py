@@ -66,6 +66,7 @@ def training_command(
     *,
     base_model: Path,
     python: Path,
+    gpu_ids: str,
     steps: int,
     save_interval: int,
 ) -> list[str]:
@@ -76,7 +77,7 @@ def training_command(
         "--num_processes", "2",
         "--multi_gpu",
         "--mixed_precision", "bf16",
-        "--gpu_ids", "0,1",
+        "--gpu_ids", gpu_ids,
         "train.py",
         "--models", str(base_model),
         "--output_dir", str(output),
@@ -111,6 +112,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--base-model", type=Path, required=True)
     parser.add_argument("--python", type=Path, required=True)
+    parser.add_argument("--gpu-ids", default="0,1")
     parser.add_argument("--steps", type=int, default=10000)
     parser.add_argument("--save-interval", type=int, default=500)
     parser.add_argument("--print-command", action="store_true")
@@ -122,6 +124,7 @@ def main() -> None:
         args.output,
         base_model=args.base_model,
         python=args.python,
+        gpu_ids=args.gpu_ids,
         steps=args.steps,
         save_interval=args.save_interval,
     )
