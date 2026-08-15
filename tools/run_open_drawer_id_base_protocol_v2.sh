@@ -17,6 +17,7 @@ DATA=$ROOT/results/id_oracle_collection_v1/lerobot_datasets/open_drawer_retrieve
 NORM=$ROOT/results/id_policy_training_v1/norm_stats_open_drawer_id_raw_v1
 PI05=$ROOT/results/model_cache/pi05_base_pytorch_v1
 EVALUATOR=${OPEN_DRAWER_EVALUATOR:-/data/zhaozhixuan/Ask4Help/tools/evaluate_open_drawer_id_pi05.py}
+PLACEMENT=${OPEN_DRAWER_RLINF_PLACEMENT:-7-7}
 
 mkdir -p "$LOG_DIR" "$PID_DIR"
 
@@ -64,7 +65,7 @@ fi
 if ! alive "$PID_DIR/sft_10000.pid" && ! checkpoint_complete 10000; then
   mkdir -p "$TRAIN"
   export PYTHONPATH=$RL EMBODIED_PATH=$RL/examples/sft
-  export ASK4HELP_RLINF_PLACEMENT=${ASK4HELP_RLINF_PLACEMENT:-7-7}
+  export ASK4HELP_RLINF_PLACEMENT=$PLACEMENT
   export OPEN_DRAWER_ID_DATASET="$DATA"
   export OPEN_DRAWER_ID_NORM_STATS="$NORM"
   export OPEN_DRAWER_PI05_MODEL_PATH="$PI05"
@@ -88,6 +89,8 @@ if ! alive "$PID_DIR/sft_10000.pid" && ! checkpoint_complete 10000; then
       --config-path "$RL/examples/sft/config" \
       --config-name open_drawer_retrieve_place_id_sft_openpi_pi05 \
       runner.max_steps=10000 runner.save_interval=500 \
+      actor.micro_batch_size=32 actor.global_batch_size=128 \
+      cluster.component_placement="$PLACEMENT" \
       >"$LOG_DIR/sft_10000.log" 2>&1 < /dev/null &
   echo $! > "$PID_DIR/sft_10000.pid"
   sleep 30
