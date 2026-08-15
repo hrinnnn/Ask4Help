@@ -147,6 +147,38 @@ def details(env: Any) -> dict[str, Any]:
     }
 
 
+def stage_events(env: Any, initial_z: dict[str, float]) -> dict[str, bool]:
+    """Return monotonic physical events used by the stage-locality gate."""
+    base = env.unwrapped
+    red = base.cubeA.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+    blue = base.cubeC.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+    green = base.cubeB.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+    threshold = float(np.linalg.norm(2 * base.cube_half_size[:2].detach().cpu().numpy()) + 0.005)
+    red_grasped = bool_scalar(base.agent.is_grasping(base.cubeA))
+    blue_grasped = bool_scalar(base.agent.is_grasping(base.cubeC))
+    red_lifted = float(red[2]) > initial_z["red"] + 0.015
+    blue_lifted = float(blue[2]) > initial_z["blue"] + 0.015
+    red_placed = (
+        float(np.linalg.norm((red - green)[:2])) <= threshold
+        and not red_grasped
+        and float(red[2]) <= initial_z["red"] + 0.03
+    )
+    return {
+        "red_grasped": red_grasped,
+        "red_lifted": red_lifted,
+        "red_placed": red_placed,
+        "blue_grasped": blue_grasped,
+        "blue_lifted": blue_lifted,
+    }
+
+
+STAGE_LOCALITY_CONTRACTS = {
+    "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},
+    "stage2_ood": {"prefix": "red_lifted", "target": "red_placed"},
+    "stage3_ood": {"prefix": "red_placed", "target": "blue_lifted"},
+}
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", type=Path, required=True)
@@ -194,6 +226,9 @@ def main() -> None:
         for episode_index in range(args.episodes):
             seed = args.start_seed + episode_index
             raw_obs, _ = env.reset(seed=seed)
+            initial_positions = env.unwrapped.cubeA.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+            initial_blue = env.unwrapped.cubeC.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+            initial_z = {"red": float(initial_positions[2]), "blue": float(initial_blue[2])}
             frames: list[np.ndarray] = []
             first = frame_array(env.render())
             if first is not None:
@@ -202,6 +237,8 @@ def main() -> None:
             ever_grasped = False
             ever_base = False
             ever_pyramid = False
+            event_reached = {name: False for name in ("red_grasped", "red_lifted", "red_placed", "blue_grasped", "blue_lifted")}
+            event_steps: dict[str, int | None] = {name: None for name in event_reached}
             final_info: dict[str, Any] = {}
             while executed < args.max_episode_steps and not ever_pyramid:
                 inputs = prepare_inputs(model, processor, raw_obs, device)
@@ -216,6 +253,11 @@ def main() -> None:
                     executed += 1
                     final_info = info if isinstance(info, dict) else {}
                     current = details(env)
+                    events = stage_events(env, initial_z)
+                    for name, reached in events.items():
+                        if reached and not event_reached[name]:
+                            event_reached[name] = True
+                            event_steps[name] = executed
                     ever_grasped |= any(current["grasped"])
                     ever_base |= bool(current["xy_ab"] and (current["z_cb"] or current["z_ca"]))
                     ever_pyramid |= bool(current["success"])
@@ -227,6 +269,11 @@ def main() -> None:
                 if bool_scalar(terminated) or bool_scalar(truncated):
                     break
             final = details(env)
+            events = stage_events(env, initial_z)
+            for name, reached in events.items():
+                if reached and not event_reached[name]:
+                    event_reached[name] = True
+                    event_steps[name] = executed
             video_path = videos / f"{args.split}_{seed}.mp4"
             if frames:
                 with imageio.get_writer(video_path, fps=10, codec="libx264", macro_block_size=None) as writer:
@@ -240,6 +287,8 @@ def main() -> None:
                 "ever_grasped": bool(ever_grasped),
                 "ever_base_completed": bool(ever_base),
                 "strict_success": bool(ever_pyramid),
+                "stage_events": event_reached,
+                "stage_event_steps": event_steps,
                 "final": final,
                 "video": str(video_path),
             }
@@ -255,9 +304,20 @@ def main() -> None:
         "ever_grasped": sum(int(row["ever_grasped"]) for row in rows),
         "ever_base_completed": sum(int(row["ever_base_completed"]) for row in rows),
         "strict_success": sum(int(row["strict_success"]) for row in rows),
+        "stage_event_counts": {
+            name: sum(int(row["stage_events"][name]) for row in rows)
+            for name in ("red_grasped", "red_lifted", "red_placed", "blue_grasped", "blue_lifted")
+        },
         "video_count": len(list(videos.glob("*.mp4"))),
         "rows": rows,
     }
+    if args.split in STAGE_LOCALITY_CONTRACTS:
+        contract = STAGE_LOCALITY_CONTRACTS[args.split]
+        summary["stage_locality_contract"] = contract
+        summary["prefix_completion"] = summary["stage_event_counts"][contract["prefix"]]
+        summary["target_stage_reached"] = summary["stage_event_counts"][contract["target"]]
+        summary["prefix_completion_rate"] = summary["prefix_completion"] / float(len(rows))
+        summary["target_stage_reached_rate"] = summary["target_stage_reached"] / float(len(rows))
     (args.output / "episodes.jsonl").write_text(
         "".join(json.dumps(row, ensure_ascii=True) + "\n" for row in rows), encoding="utf-8"
     )
