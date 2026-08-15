@@ -209,24 +209,27 @@ class StackPyramidOracle:
             self.planner.move_to_pose_with_screw(reach_pose)
             self.planner.move_to_pose_with_screw(grasp_pose)
             self.planner.close_gripper()
-            lift_pose = self.sapien.Pose([0, 0, 0.1]) * grasp_pose
-            self.planner.move_to_pose_with_screw(lift_pose)
             target_xy = target_cube.pose.sp.p
             if hasattr(target_xy, "detach"):
                 target_xy = target_xy.detach().cpu().numpy()
             target_xy = np.asarray(target_xy).reshape(-1, 3)[0]
-            goal_high = self.sapien.Pose(
-                np.array([target_xy[0] * 0.8, target_xy[1] * 0.8, 0.10]),
-                lift_pose.q,
+            goal_xy = np.array([target_xy[0] * 0.8, target_xy[1] * 0.8])
+            goal_pose = self.sapien.Pose(
+                np.array([goal_xy[0], goal_xy[1], target_xy[2]]), grasp_pose.q
             )
-            goal_low = self.sapien.Pose(
-                np.array(
-                    [target_xy[0] * 0.8, target_xy[1] * 0.8, target_xy[2] + 0.025]
-                ),
-                lift_pose.q,
+            self.planner.move_to_pose_with_screw(goal_pose)
+            # Record a physical lift at the target, then lower vertically to
+            # the release height. Horizontal transport remains the official
+            # solver path and does not carry the cube at elevated height.
+            lift_at_goal = self.sapien.Pose(
+                np.array([goal_xy[0], goal_xy[1], 0.10]), grasp_pose.q
             )
-            self.planner.move_to_pose_with_screw(goal_high)
-            self.planner.move_to_pose_with_screw(goal_low)
+            release_at_goal = self.sapien.Pose(
+                np.array([goal_xy[0], goal_xy[1], target_xy[2] + 0.025]),
+                grasp_pose.q,
+            )
+            self.planner.move_to_pose_with_screw(lift_at_goal)
+            self.planner.move_to_pose_with_screw(release_at_goal)
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
