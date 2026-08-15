@@ -185,7 +185,6 @@ if ! alive "$STAGE_PID"; then
     OPEN_DRAWER_PROTOCOL_PCA_CALIBRATION="$PCA_CAL/calibration.json" \
     OPEN_DRAWER_PROTOCOL_DIFF_CALIBRATION="$DIFF_CAL" \
     OPEN_DRAWER_TARGET_TOTAL_ACCEPTED=100 OPEN_DRAWER_MAX_ATTEMPTS=1600 \
-    nohup "$TOOLS/run_open_drawer_protocol_v2_controller.sh" >"$LOG_DIR/protocol_v2_controller_stdout.log" 2>&1 < /dev/null &
+    nohup bash "$TOOLS/run_open_drawer_protocol_v2_controller.sh" >"$LOG_DIR/protocol_v2_controller_stdout.log" 2>&1 < /dev/null &
   echo $! > "$STAGE_PID"
 fi
-
