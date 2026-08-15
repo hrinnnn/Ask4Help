@@ -199,28 +199,22 @@ class StackPyramidOracle:
         distance = float(np.linalg.norm(moving_position - target_position))
         need_move_a_b = distance > 0.07
         if need_move_a_b:
-            # Keep the official ManiSkill order: approach open, close at grasp,
-            # then transport. The recorder only captures the same env.step calls.
-            grasp_pose = base.agent.build_grasp_pose(approaching, closing, moving_cube.pose.sp.p)
+            # Keep the official ManiSkill order and retain the red cube until
+            # the blue-cube reach phase, where the official solver releases it.
+            self.planner.close_gripper()
+            grasp_pose = base.agent.build_grasp_pose(
+                approaching, closing, moving_cube.pose.sp.p
+            )
             reach_pose = grasp_pose * self.sapien.Pose([0, 0, -0.05])
-            self.planner.open_gripper()
             self.planner.move_to_pose_with_screw(reach_pose)
             self.planner.move_to_pose_with_screw(grasp_pose)
             self.planner.close_gripper()
             lift_pose = self.sapien.Pose([0, 0, 0.1]) * grasp_pose
             self.planner.move_to_pose_with_screw(lift_pose)
-            target_position = target_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0].copy()
-            red_position = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
-            direction = red_position[:2] - target_position[:2]
-            direction /= max(float(np.linalg.norm(direction)), 1e-6)
-            target_position[:2] += 0.020 * direction
-            # Release above the tabletop so the open fingers do not sweep
-            # through the green cube while descending to the contact plane.
-            target_position[2] += 0.060
-            goal_pose = self.sapien.Pose(target_position, lift_pose.q)
+            goal_pose = self.sapien.Pose(
+                target_cube.pose.sp.p * 0.8, grasp_pose.q
+            )
             self.planner.move_to_pose_with_screw(goal_pose)
-            self.planner.open_gripper()
-            self.planner.move_to_pose_with_screw(goal_pose * self.sapien.Pose([0, 0, 0.08]))
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
@@ -251,30 +245,11 @@ class StackPyramidOracle:
         goal_pose_a = base.cubeA.pose * self.sapien.Pose([0, 0, base.cube_half_size[2] * 2])
         goal_pose_b = base.cubeB.pose * self.sapien.Pose([0, 0, base.cube_half_size[2] * 2])
         goal_p = (goal_pose_a.p + goal_pose_b.p) / 2
-        goal_center = goal_p.detach().cpu().numpy().reshape(-1, 3)[0]
-        # Approach the stack from above and release slightly above the nominal
-        # blue-center height, then retreat while keeping the gripper open. This
-        # gives the blue cube time to settle before ManiSkill evaluates static
-        # placement, without changing the task geometry or success predicate.
-        release_z = float(max(goal_center[2], 0.0) + 0.035)
-        lift_center = np.asarray(lift_pose.p).reshape(-1, 3)[0]
-        high_z = max(float(lift_center[2]), release_z + 0.08)
-        high_pose = self.sapien.Pose(
-            np.array([goal_center[0], goal_center[1], high_z]), lift_pose.q
-        )
-        release_pose = self.sapien.Pose(
-            np.array([goal_center[0], goal_center[1], release_z]), lift_pose.q
-        )
-        self.planner.move_to_pose_with_screw(high_pose)
-        self.planner.move_to_pose_with_screw(release_pose)
+        offset = (goal_p - base.cubeC.pose.p).cpu().numpy()[0]
+        align_pose = self.sapien.Pose(lift_pose.p + offset, lift_pose.q)
+        self.planner.move_to_pose_with_screw(align_pose)
         self.planner.open_gripper()
-        self.planner.move_to_pose_with_screw(
-            self.sapien.Pose(
-                np.array([goal_center[0], goal_center[1], release_z + 0.08]),
-                lift_pose.q,
-            )
-        )
-        self.planner.open_gripper()
+        self.planner.close_gripper()
 
 
 def _load_asset(path: Path, device: torch.device):
