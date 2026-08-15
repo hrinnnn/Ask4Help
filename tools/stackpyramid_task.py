@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import numpy as np
@@ -18,12 +19,33 @@ STACKPYRAMID_TASK = "stack the red cube next to the green cube and place the blu
 _ID_CENTERS = np.asarray(
     [[-0.02, -0.04], [0.02, -0.04], [0.00, 0.04]], dtype=np.float64
 )
-_OOD_SHIFTS = {
+_OOD_SHIFTS_V1 = {
     "stage1_ood": np.asarray([0.08, 0.10], dtype=np.float64),
     "stage2_ood": np.asarray([0.12, 0.10], dtype=np.float64),
     "stage3_ood": np.asarray([0.12, -0.16], dtype=np.float64),
 }
+# V2 keeps the same affected object and stage semantics while making each
+# shift local enough that the ID policy can reach the affected capability
+# boundary before failing. V1 remains the default for reproducibility.
+_OOD_SHIFTS_V2 = {
+    "stage1_ood": np.asarray([0.045, 0.045], dtype=np.float64),
+    "stage2_ood": np.asarray([0.060, 0.050], dtype=np.float64),
+    "stage3_ood": np.asarray([0.060, -0.080], dtype=np.float64),
+}
 _REGISTERED = False
+
+
+def stackpyramid_geometry_version() -> str:
+    return os.environ.get("STACKPYRAMID_OOD_GEOMETRY", "v1")
+
+
+def stackpyramid_ood_shifts() -> dict[str, np.ndarray]:
+    version = stackpyramid_geometry_version()
+    if version == "v1":
+        return _OOD_SHIFTS_V1
+    if version == "v2":
+        return _OOD_SHIFTS_V2
+    raise ValueError(f"unknown STACKPYRAMID_OOD_GEOMETRY={version!r}")
 
 
 def sample_stackpyramid_xy(rng: Any, count: int, *, split: str) -> np.ndarray:
@@ -40,7 +62,7 @@ def sample_stackpyramid_xy(rng: Any, count: int, *, split: str) -> np.ndarray:
     centers = np.broadcast_to(_ID_CENTERS, (count, 3, 2)).copy()
     if split != "id":
         target = {"stage1_ood": 0, "stage2_ood": 1, "stage3_ood": 2}[split]
-        centers[:, target] += _OOD_SHIFTS[split]
+        centers[:, target] += stackpyramid_ood_shifts()[split]
     return centers + jitter
 
 
@@ -73,6 +95,7 @@ def reset_metadata(env: Any, *, split: str) -> dict[str, Any]:
         },
         "robot_qpos": array(base.agent.robot.get_qpos()),
         "affected_object": {"id": None, "stage1_ood": "red", "stage2_ood": "green", "stage3_ood": "blue"}[split],
+        "ood_geometry": stackpyramid_geometry_version(),
         "max_episode_steps": 250,
     }
 
