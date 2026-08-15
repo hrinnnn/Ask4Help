@@ -24,6 +24,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--xvla-root", type=Path, required=True)
+    parser.add_argument("--task-root", type=Path, default=Path("/data/zhaozhixuan/xvla_stackcube_data"))
     parser.add_argument("--audit", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--split", choices=("stage1_ood", "stage2_ood", "stage3_ood"), required=True)
@@ -43,7 +44,8 @@ def main() -> None:
     args.output.mkdir(parents=True)
 
     root = Path(__file__).resolve().parents[1]
-    sys.path[:0] = [str(root), str(args.xvla_root)]
+    task_root = args.task_root if args.task_root.is_dir() else root
+    sys.path[:0] = [str(task_root), str(root), str(args.xvla_root)]
     from tools.collect_stackpyramid_xvla_dagger import (
         ACTION_HORIZON,
         EXECUTE_HORIZON,
