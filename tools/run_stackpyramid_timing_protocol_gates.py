@@ -15,6 +15,28 @@ from pathlib import Path
 SPLITS = ("id", "stage1_ood", "stage2_ood", "stage3_ood")
 
 
+def _write_seed_manifest(root: Path) -> Path:
+    manifest = {
+        "format": "stackpyramid_timing_protocol_seed_manifest_v1",
+        "declared_before_execution": True,
+        "oracle": {
+            "id": list(range(70000, 70100)),
+            "stage1_ood": list(range(71000, 71100)),
+            "stage2_ood": list(range(72000, 72100)),
+            "stage3_ood": list(range(73000, 73100)),
+        },
+        "base_policy": {
+            "id": {"start": 74000, "count": 100},
+            "stage1_ood": {"start": 75000, "count": 100},
+            "stage2_ood": {"start": 76000, "count": 100},
+            "stage3_ood": {"start": 77000, "count": 100},
+        },
+    }
+    path = root / "seed_manifest.json"
+    path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
 def _run_pair(commands: list[tuple[list[str], Path, str]]) -> None:
     processes: list[tuple[subprocess.Popen[bytes], Path, str]] = []
     for command, log_path, label in commands:
@@ -62,8 +84,8 @@ def _run_oracle_gates(args: argparse.Namespace, root: Path) -> dict[str, dict[st
     script = args.repo_root / "tools" / "run_stackpyramid_oracle_gate.py"
     output = root / "oracle_gate"
     output.mkdir(parents=True, exist_ok=True)
-    starts = {"id": 91000, "stage1_ood": 92000, "stage2_ood": 93000, "stage3_ood": 94000}
     results: dict[str, dict[str, object]] = {}
+    seed_manifest = root / "seed_manifest.json"
     for pair in (("id", "stage1_ood"), ("stage2_ood", "stage3_ood")):
         commands: list[tuple[list[str], Path, str]] = []
         for gpu_index, split in enumerate(pair):
@@ -82,9 +104,10 @@ def _run_oracle_gates(args: argparse.Namespace, root: Path) -> dict[str, dict[st
                     "--output", str(split_output),
                     "--split", split,
                     "--episodes", "100",
-                    "--start-seed", str(starts[split]),
-                    "--sim-backend", "gpu",
-                    "--render-backend", "gpu",
+                    "--start-seed", "0",
+                    "--seed-manifest", str(seed_manifest),
+                    "--sim-backend", "cpu",
+                    "--render-backend", "cpu",
                 ],
             )
             commands.append((command, root / "logs" / f"oracle_{split}.log", f"oracle_{split}"))
@@ -107,7 +130,7 @@ def _run_base_policy_gates(args: argparse.Namespace, root: Path) -> dict[str, di
     script = args.repo_root / "tools" / "evaluate_stackpyramid_xvla.py"
     output = root / "base_policy"
     output.mkdir(parents=True, exist_ok=True)
-    starts = {"id": 95000, "stage1_ood": 96000, "stage2_ood": 97000, "stage3_ood": 98000}
+    starts = {"id": 74000, "stage1_ood": 75000, "stage2_ood": 76000, "stage3_ood": 77000}
     results: dict[str, dict[str, object]] = {}
     for pair in (("id", "stage1_ood"), ("stage2_ood", "stage3_ood")):
         commands: list[tuple[list[str], Path, str]] = []
@@ -132,8 +155,8 @@ def _run_base_policy_gates(args: argparse.Namespace, root: Path) -> dict[str, di
                     "--execute-horizon", "5",
                     "--flow-steps", "5",
                     "--device", "cuda",
-                    "--sim-backend", "gpu",
-                    "--render-backend", "gpu",
+                    "--sim-backend", "cpu",
+                    "--render-backend", "cpu",
                 ],
             )
             commands.append((command, root / "logs" / f"base_{split}.log", f"base_{split}"))
@@ -164,8 +187,16 @@ def main() -> None:
     if root.exists():
         raise FileExistsError(root)
     root.mkdir(parents=True)
+    seed_manifest = _write_seed_manifest(root)
     (root / "pipeline_state.json").write_text(
-        json.dumps({"phase": "oracle", "updated_at": time.time()}, indent=2) + "\n"
+        json.dumps(
+            {
+                "phase": "oracle",
+                "seed_manifest": str(seed_manifest.resolve()),
+                "updated_at": time.time(),
+            },
+            indent=2,
+        ) + "\n"
     )
     oracle = _run_oracle_gates(args, root)
     (root / "pipeline_state.json").write_text(

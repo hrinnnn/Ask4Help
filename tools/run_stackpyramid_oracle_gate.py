@@ -25,13 +25,26 @@ def main() -> None:
     parser.add_argument("--split", choices=("id", "stage1_ood", "stage2_ood", "stage3_ood"), required=True)
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--start-seed", type=int, required=True)
-    parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="gpu")
-    parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="gpu")
+    parser.add_argument("--seed-manifest", type=Path)
+    parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="cpu")
+    parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="cpu")
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
     args.output.mkdir(parents=True)
     sys.path[:0] = [str(args.repo_root), str(args.xvla_root)]
+
+    manifest = None
+    if args.seed_manifest is not None:
+        manifest = json.loads(args.seed_manifest.read_text(encoding="utf-8"))
+        seeds = manifest["oracle"][args.split]
+        if len(seeds) != args.episodes:
+            raise ValueError(
+                f"seed manifest has {len(seeds)} seeds for {args.split}, "
+                f"expected {args.episodes}"
+            )
+    else:
+        seeds = [args.start_seed + index for index in range(args.episodes)]
 
     import gymnasium as gym
     import mani_skill.envs  # noqa: F401
@@ -55,7 +68,7 @@ def main() -> None:
     rows: list[dict[str, object]] = []
     try:
         for index in range(args.episodes):
-            seed = args.start_seed + index
+            seed = int(seeds[index])
             env.reset(seed=seed)
             error = None
             try:
@@ -84,6 +97,9 @@ def main() -> None:
         "episodes": len(rows),
         "strict_successes": sum(int(row["strict_success"]) for row in rows),
         "success_rate": sum(int(row["strict_success"]) for row in rows) / len(rows),
+        "seed_manifest": str(args.seed_manifest.resolve()) if args.seed_manifest else None,
+        "sim_backend": args.sim_backend,
+        "render_backend": args.render_backend,
         "rows": rows,
     }
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
