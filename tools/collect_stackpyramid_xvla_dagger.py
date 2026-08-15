@@ -201,7 +201,7 @@ class StackPyramidOracle:
         if need_move_a_b:
             # Keep the official ManiSkill order and retain the red cube until
             # the blue-cube reach phase, where the official solver releases it.
-            self.planner.close_gripper()
+            self.planner.open_gripper()
             grasp_pose = base.agent.build_grasp_pose(
                 approaching, closing, moving_cube.pose.sp.p
             )
