@@ -168,6 +168,13 @@ PY
     exit 0
   fi
   if [ "$result" -eq 10 ]; then
+    if [ "$step" -ge 4000 ]; then
+      stop_training
+      printf '%s\n' "ID base failed the required >=80% independent ID gate at step $step; no OOD or gated update may start." \
+        > "$RUN/ID_BASE_PROTOCOL_FAILED"
+      echo "$(date -Is) id_base_step_rejected_final step=$step; stopping_diagnostic" >> "$LOG"
+      exit 10
+    fi
     echo "$(date -Is) id_base_step_rejected step=$step; continuing" >> "$LOG"
     continue
   fi
