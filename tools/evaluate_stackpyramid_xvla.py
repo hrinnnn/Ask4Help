@@ -168,7 +168,8 @@ def stage_events(env: Any, initial_z: dict[str, float]) -> dict[str, bool]:
     )
     # Blue grasping is only a valid event after the red placement event;
     # this prevents a transient reset contact from becoming a stage event.
-    blue_grasped = red_placed and (
+    red_placed_history = "red_placed" in getattr(env, "event_first_steps", {})
+    blue_grasped = (red_placed or red_placed_history) and (
         blue_contact or (gripper_closed and float(np.linalg.norm(blue - tcp)) <= 0.05)
     )
     return {

@@ -197,7 +197,10 @@ class StackPyramidOracle:
         moving_position = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
         target_position = target_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
         distance = float(np.linalg.norm(moving_position - target_position))
-        need_move_a_b = distance > 0.07
+        # The v4 event contract requires the same explicit grasp--lift--place
+        # sequence on every split, including ID where the reset is already
+        # near the red placement target.
+        need_move_a_b = distance > 0.07 or stackpyramid_geometry_version() == "v4"
         if need_move_a_b:
             # Keep the official ManiSkill order and retain the red cube until
             # the blue-cube reach phase, where the official solver releases it.
@@ -215,9 +218,22 @@ class StackPyramidOracle:
             self.planner.move_to_pose_with_screw(lift_pose)
             self.planner.move_to_pose_with_screw(grasp_pose)
             self.planner.close_gripper()
-            goal_pose = self.sapien.Pose(
-                target_cube.pose.sp.p * 0.8, grasp_pose.q
+            # Place red next to green with a small non-overlapping margin.
+            # Scaling the absolute target pose (the upstream demo shortcut)
+            # can put the cubes on top of each other in the v4 ID geometry.
+            target_xy = target_position[:2]
+            direction = moving_position[:2] - target_xy
+            direction_norm = float(np.linalg.norm(direction))
+            if direction_norm < 1e-6:
+                direction = np.asarray([-1.0, 0.0], dtype=np.float64)
+                direction_norm = 1.0
+            # Leave a small geometric margin inside the task's placement
+            # tolerance; the diagonal cube-size threshold is about 0.0616 m.
+            goal_xy = target_xy + 0.050 * direction / direction_norm
+            goal_p = np.asarray(
+                [goal_xy[0], goal_xy[1], target_position[2] + 0.04], dtype=np.float64
             )
+            goal_pose = self.sapien.Pose(goal_p, grasp_pose.q)
             self.planner.move_to_pose_with_screw(goal_pose)
 
         moving_cube = base.cubeC
@@ -243,6 +259,15 @@ class StackPyramidOracle:
             # required by the staged event contract: otherwise the subsequent
             # reach to the blue cube carries the red cube away from its goal.
             self.planner.open_gripper()
+            red_retreat_pose = self.sapien.Pose(
+                [goal_xy[0], goal_xy[1], target_position[2] + 0.15], grasp_pose.q
+            )
+            self.planner.move_to_pose_with_screw(red_retreat_pose)
+        # Move above the tabletop before translating to the blue cube.  The
+        # direct low sweep can disturb the freshly placed red/green pair in
+        # the tightly separated ID geometry.
+        safe_pose = self.sapien.Pose([0, 0, 0.15]) * grasp_pose
+        self.planner.move_to_pose_with_screw(safe_pose)
         reach_pose = grasp_pose * self.sapien.Pose([0, 0, -0.05])
         self.planner.move_to_pose_with_screw(reach_pose)
         self.planner.move_to_pose_with_screw(grasp_pose)
@@ -252,10 +277,23 @@ class StackPyramidOracle:
         goal_pose_a = base.cubeA.pose * self.sapien.Pose([0, 0, base.cube_half_size[2] * 2])
         goal_pose_b = base.cubeB.pose * self.sapien.Pose([0, 0, base.cube_half_size[2] * 2])
         goal_p = (goal_pose_a.p + goal_pose_b.p) / 2
-        offset = (goal_p - base.cubeC.pose.p).cpu().numpy()[0]
-        align_pose = self.sapien.Pose(lift_pose.p + offset, lift_pose.q)
-        self.planner.move_to_pose_with_screw(align_pose)
+        goal_p_np = goal_p.detach().cpu().numpy().reshape(-1, 3)[0]
+        # Translate at a high clearance, then descend to the actual stacking
+        # height.  A single lifted-pose translation can undershoot the final
+        # z target and disturb the adjacent red/green pair in ID.
+        high_goal_pose = self.sapien.Pose(
+            [goal_p_np[0], goal_p_np[1], goal_p_np[2] + 0.10], lift_pose.q
+        )
+        self.planner.move_to_pose_with_screw(high_goal_pose)
+        place_pose = self.sapien.Pose(
+            [goal_p_np[0], goal_p_np[1], goal_p_np[2] + 0.03], lift_pose.q
+        )
+        self.planner.move_to_pose_with_screw(place_pose)
         self.planner.open_gripper()
+        retreat_pose = self.sapien.Pose(
+            [goal_p_np[0], goal_p_np[1], goal_p_np[2] + 0.10], lift_pose.q
+        )
+        self.planner.move_to_pose_with_screw(retreat_pose)
 
 
 def _load_asset(path: Path, device: torch.device):
