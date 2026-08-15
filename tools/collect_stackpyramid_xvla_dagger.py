@@ -229,12 +229,9 @@ class StackPyramidOracle:
             obb, approaching=approaching, target_closing=target_closing, depth=finger_length
         )
         closing, center = grasp_info["closing"], grasp_info["center"]
-        # ``compute_grasp_info_by_obb`` returns a grasp center in the OBB
-        # frame; use the actor pose for the world-space target expected by
-        # Panda's grasp-pose helper.
-        grasp_pose = base.agent.build_grasp_pose(
-            approaching, closing, moving_cube.pose.sp.p
-        )
+        # Match the official ManiSkill StackPyramid oracle: the OBB grasp
+        # center is the world-space target expected by Panda's helper.
+        grasp_pose = base.agent.build_grasp_pose(approaching, closing, center)
         angles = np.arange(0, np.pi * 2 / 3, np.pi / 2)
         angles = np.repeat(angles, 2)
         angles[1::2] *= -1
