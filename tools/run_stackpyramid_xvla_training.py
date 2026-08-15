@@ -209,7 +209,16 @@ def _make_optimizer(model: Any, learning_rate: float, learning_coef: float, weig
     )
 
 
-def _set_learning_rates(optimizer: AdamW, step: int, total_steps: int, learning_rate: float, learning_coef: float, freeze_steps: int, warmup_steps: int) -> None:
+def _set_learning_rates(
+    optimizer: AdamW,
+    step: int,
+    total_steps: int,
+    learning_rate: float,
+    learning_coef: float,
+    freeze_steps: int,
+    warmup_steps: int,
+    freeze_vlm: bool,
+) -> None:
     def schedule(base: float) -> float:
         if step < freeze_steps:
             return 0.0
@@ -226,6 +235,8 @@ def _set_learning_rates(optimizer: AdamW, step: int, total_steps: int, learning_
         "soft_prompts": schedule(learning_rate * learning_coef),
         "action_heads": schedule(learning_rate),
     }
+    if freeze_vlm:
+        values["vlm"] = 0.0
     if step < freeze_steps:
         values["soft_prompts"] = learning_rate * learning_coef
         values["action_heads"] = learning_rate
@@ -233,9 +244,9 @@ def _set_learning_rates(optimizer: AdamW, step: int, total_steps: int, learning_
         group["lr"] = values[group["name"]]
 
 
-def _set_backbone_trainable(model: Any, trainable: bool) -> None:
+def _set_backbone_trainable(model: Any, trainable: bool, freeze_vlm: bool = False) -> None:
     for parameter in model.vlm.parameters():
-        parameter.requires_grad = trainable
+        parameter.requires_grad = trainable and not freeze_vlm
     for parameter in model.transformer.parameters():
         parameter.requires_grad = True
 
@@ -317,7 +328,7 @@ def run_training(args: argparse.Namespace) -> None:
     optimizer = _make_optimizer(model, args.learning_rate, args.learning_coef, args.weight_decay)
     model, optimizer, loader = accelerator.prepare(model, optimizer, loader)
     model.train()
-    _set_backbone_trainable(model, False)
+    _set_backbone_trainable(model, False, freeze_vlm=args.freeze_vlm)
     iterator = iter(loader)
     started = time.time()
     for step in range(args.steps):
@@ -328,8 +339,17 @@ def run_training(args: argparse.Namespace) -> None:
             batch = next(iterator)
         batch = {key: value.to(accelerator.device, non_blocking=True) if isinstance(value, torch.Tensor) else value for key, value in batch.items()}
         if step == args.freeze_steps:
-            _set_backbone_trainable(model, True)
-        _set_learning_rates(optimizer, step, args.steps, args.learning_rate, args.learning_coef, args.freeze_steps, args.warmup_steps)
+            _set_backbone_trainable(model, True, freeze_vlm=args.freeze_vlm)
+        _set_learning_rates(
+            optimizer,
+            step,
+            args.steps,
+            args.learning_rate,
+            args.learning_coef,
+            args.freeze_steps,
+            args.warmup_steps,
+            args.freeze_vlm,
+        )
         with accelerator.autocast():
             loss = masked_flow_loss(model, batch)
         accelerator.backward(loss)
@@ -370,6 +390,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning-coef", type=float, default=0.1)
     parser.add_argument("--weight-decay", type=float, default=0.0)
     parser.add_argument("--freeze-steps", type=int, default=1000)
+    parser.add_argument(
+        "--freeze-vlm",
+        action="store_true",
+        help="Keep VLM parameters frozen while allowing transformer-core updates after freeze-steps.",
+    )
     parser.add_argument("--warmup-steps", type=int, default=2000)
     parser.add_argument("--log-interval", type=int, default=20)
     parser.add_argument("--seed", type=int, default=5100)
