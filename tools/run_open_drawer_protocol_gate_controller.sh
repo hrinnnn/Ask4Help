@@ -39,7 +39,17 @@ while [ ! -f "$ID_BASE_RUN/ID_BASE_VALIDATED" ]; do
   sleep 1800
 done
 
-BASE_CKPT=$CKPT/checkpoints/global_step_10000
+BASE_STEP="$($PY - "$ID_BASE_RUN/ID_BASE_VALIDATED" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text())
+print(int(payload.get("base_step", 10000)))
+PY
+)" || exit 1
+BASE_CKPT=$CKPT/checkpoints/global_step_${BASE_STEP}
+echo "$(date -Is) id_base_validated_step=$BASE_STEP checkpoint=$BASE_CKPT" >> "$LOG"
 for path in "$BASE_CKPT" "$NORM" "$PI05" "$ID_DATA"; do
   [ -e "$path" ] || { echo "$(date -Is) missing_input=$path" >> "$LOG"; exit 2; }
 done
