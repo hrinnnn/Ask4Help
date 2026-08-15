@@ -17,6 +17,46 @@ import numpy as np
 SPLITS = ("id", "stage1_ood", "stage2_ood", "stage3_ood")
 
 
+EXPECTED_PREDICATES = {
+    "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},
+    "stage2_ood": {"prefix": "red_lifted", "target": "red_placed"},
+    "stage3_ood": {"prefix": "red_placed", "target": "blue_lifted"},
+}
+
+
+def _seed_values(spec: object, episodes: int) -> list[int]:
+    """Expand a declared contiguous seed range or an explicit seed list."""
+    if isinstance(spec, dict):
+        start = int(spec["start"])
+        count = int(spec["count"])
+        if count != episodes:
+            raise ValueError(f"seed manifest count {count} != requested episodes {episodes}")
+        return [start + index for index in range(count)]
+    values = [int(value) for value in spec]
+    if len(values) != episodes:
+        raise ValueError(f"seed manifest list has {len(values)} values, expected {episodes}")
+    return values
+
+
+def _load_seed_manifest(args: argparse.Namespace) -> dict | None:
+    if args.seed_manifest is None:
+        return None
+    manifest = json.loads(args.seed_manifest.read_text(encoding="utf-8"))
+    expected_format = f"stackpyramid_timing_protocol_seed_manifest_{args.geometry}"
+    if manifest.get("format") != expected_format:
+        raise ValueError(f"seed manifest format does not match geometry: {manifest.get('format')}")
+    if manifest.get("geometry") != args.geometry or not manifest.get("declared_before_execution"):
+        raise ValueError("seed manifest must declare the selected geometry before execution")
+    if not manifest.get("paired_reset", {}).get("enabled"):
+        raise ValueError("seed manifest must enable paired reset")
+    if manifest.get("stage_predicate") != EXPECTED_PREDICATES:
+        raise ValueError("seed manifest stage predicates do not match the frozen contract")
+    for group in ("oracle", "base_policy"):
+        for split in SPLITS:
+            _seed_values(manifest.get(group, {}).get(split), args.episodes)
+    return manifest
+
+
 def run_oracle_split(args: argparse.Namespace, split: str, output: Path) -> dict:
     from tools.collect_stackpyramid_xvla_dagger import (
         StackPyramidOracle,
@@ -45,8 +85,11 @@ def run_oracle_split(args: argparse.Namespace, split: str, output: Path) -> dict
     ))
     rows = []
     try:
-        for index in range(args.episodes):
-            seed = args.seed + SPLITS.index(split) * 2000 + index
+        if args.seed_manifest_data is not None:
+            seeds = _seed_values(args.seed_manifest_data["oracle"][split], args.episodes)
+        else:
+            seeds = [args.seed + SPLITS.index(split) * 2000 + index for index in range(args.episodes)]
+        for index, seed in enumerate(seeds):
             env.reset(seed=seed)
             error = None
             try:
@@ -98,7 +141,11 @@ def run_policy_split(args: argparse.Namespace, split: str, output: Path) -> dict
         "--output", str(output),
         "--split", split,
         "--episodes", str(args.episodes),
-        "--start-seed", str(args.seed + 10000 + SPLITS.index(split) * 2000),
+        "--start-seed", str(
+            _seed_values(args.seed_manifest_data["base_policy"][split], args.episodes)[0]
+            if args.seed_manifest_data is not None
+            else args.seed + 10000 + SPLITS.index(split) * 2000
+        ),
         "--max-episode-steps", str(args.max_episode_steps),
         "--execute-horizon", "5",
         "--flow-steps", str(args.flow_steps),
@@ -133,12 +180,14 @@ def main() -> None:
     parser.add_argument("--oracle-render-backend", choices=("cpu", "gpu"), default="cpu")
     parser.add_argument("--policy-sim-backend", choices=("cpu", "gpu"), default="gpu")
     parser.add_argument("--policy-render-backend", choices=("cpu", "gpu"), default="gpu")
-    parser.add_argument("--geometry", choices=("v1", "v2"), default="v2")
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3"), default="v2")
+    parser.add_argument("--seed-manifest", type=Path)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
     args.output.mkdir(parents=True)
     os.environ["STACKPYRAMID_OOD_GEOMETRY"] = args.geometry
+    args.seed_manifest_data = _load_seed_manifest(args)
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     sys.path.insert(0, str(args.xvla_root.resolve()))
     oracle = {}
@@ -156,6 +205,8 @@ def main() -> None:
         "format": "stackpyramid_protocol_audit_v1",
         "checkpoint": str(args.checkpoint.resolve()),
         "geometry": args.geometry,
+        "seed_manifest": str(args.seed_manifest.resolve()) if args.seed_manifest else None,
+        "benchmark_version": (args.seed_manifest_data or {}).get("benchmark_version"),
         "episodes_per_split": args.episodes,
         "oracle": oracle,
         "base_policy": policy,

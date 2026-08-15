@@ -55,7 +55,8 @@ def main() -> None:
     parser.add_argument("--cpu-set", default="80-99")
     parser.add_argument("--locality-gpus", nargs=2, default=("4", "5"))
     parser.add_argument("--locality-cpu-sets", nargs=2, default=("80-99", "100-119"))
-    parser.add_argument("--geometry", choices=("v1", "v2"), default="v2")
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3"), default="v2")
+    parser.add_argument("--seed-manifest", type=Path)
     args = parser.parse_args()
     os.environ["STACKPYRAMID_OOD_GEOMETRY"] = args.geometry
     root = args.output_root
@@ -79,6 +80,8 @@ def main() -> None:
             time.sleep(60)
 
         audit = json.loads((args.audit_root / "audit.json").read_text())
+        if audit.get("geometry") != args.geometry:
+            raise RuntimeError(f"audit geometry mismatch: {audit.get('geometry')} != {args.geometry}")
         if not all(audit.get("gates", {}).values()):
             raise RuntimeError(f"audit gates are not all true: {audit.get('gates')}")
         write_state(stage="pca_calibration")
@@ -114,8 +117,8 @@ def main() -> None:
         write_state(stage="stage_locality_gate", pca_calibration=str(pca_json), diff_calibration=str(diff_json))
         locality = allocate(root / "stage_locality_gate", "STAGE_LOCALITY_GATE_COMPLETE")
         if not (locality / "STAGE_LOCALITY_GATE_COMPLETE").is_file():
-            seed_manifest = root / "stage_locality_seed_manifest.json"
-            if not seed_manifest.is_file():
+            seed_manifest = args.seed_manifest or (root / "stage_locality_seed_manifest.json")
+            if args.seed_manifest is None and not seed_manifest.is_file():
                 seed_manifest.write_text(json.dumps({
                     "format": "stackpyramid_stage_locality_seed_manifest_v2",
                     "declared_before_execution": True,
@@ -213,7 +216,7 @@ def main() -> None:
         (root / "protocol_gate_report.json").write_text(json.dumps(audit_report, indent=2) + "\n", encoding="utf-8")
         if not all(audit_report["gates"].values()):
             raise RuntimeError(f"protocol gate report failed: {audit_report['gates']}")
-        write_state(stage="preflight_complete", pca_pilot=str(pilot), locality_gate=str(locality), gate_report=str(root / "protocol_gate_report.json"))
+        write_state(stage="preflight_complete", pca_pilot=str(pilot), locality_gate=str(locality), gate_report=str(root / "protocol_gate_report.json"), shared_seed_manifest=str(args.seed_manifest) if args.seed_manifest else None)
         (root / "PREFLIGHT_COMPLETE").write_text("complete\n")
     except Exception as exc:
         write_state(stage="failed", error=repr(exc))

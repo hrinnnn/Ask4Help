@@ -26,7 +26,7 @@ def main() -> None:
     parser.add_argument("--cpu-sets", default="80-99,100-119")
     parser.add_argument("--training-steps", type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=8)
-    parser.add_argument("--geometry", choices=("v1", "v2"), default="v2")
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3"), default="v2")
     args = parser.parse_args()
 
     root = args.output_root

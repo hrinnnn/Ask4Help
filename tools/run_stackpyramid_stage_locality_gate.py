@@ -58,7 +58,7 @@ def main() -> None:
     (root / "seed_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     if manifest.get("geometry") != args.geometry or not manifest.get("paired_reset", {}).get("enabled"):
         raise ValueError("locality audit requires the declared geometry and paired_reset")
-    if manifest.get("format", "").endswith("_v2"):
+    if manifest.get("format", "").endswith(("_v2", "_v3")):
         if manifest.get("stage_predicate") != EXPECTED_PREDICATES:
             raise ValueError("seed manifest stage_predicate does not match the frozen evaluator contract")
     starts = {
