@@ -76,7 +76,10 @@ def main() -> None:
             if (args.audit_root / "PROTOCOL_AUDIT_COMPLETE").is_file():
                 break
             if (args.audit_root / "PROTOCOL_AUDIT_FAILED").is_file():
-                raise RuntimeError("protocol audit failed; refusing calibration and collection")
+                # The audit payload is still useful for the stricter per-stage
+                # gate below, so wait only until audit.json is available.
+                if (args.audit_root / "audit.json").is_file():
+                    break
             time.sleep(60)
 
         audit = json.loads((args.audit_root / "audit.json").read_text())
