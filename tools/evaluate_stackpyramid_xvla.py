@@ -154,8 +154,12 @@ def stage_events(env: Any, initial_z: dict[str, float]) -> dict[str, bool]:
     blue = base.cubeC.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
     green = base.cubeB.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
     threshold = float(np.linalg.norm(2 * base.cube_half_size[:2].detach().cpu().numpy()) + 0.005)
-    red_grasped = bool_scalar(base.agent.is_grasping(base.cubeA))
-    blue_grasped = bool_scalar(base.agent.is_grasping(base.cubeC))
+    red_contact = bool_scalar(base.agent.is_grasping(base.cubeA))
+    blue_contact = bool_scalar(base.agent.is_grasping(base.cubeC))
+    tcp = base.agent.tcp.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+    gripper_closed = bool(getattr(env, "gripper_closed", False))
+    red_grasped = red_contact or (gripper_closed and float(np.linalg.norm(red - tcp)) <= 0.05)
+    blue_grasped = blue_contact or (gripper_closed and float(np.linalg.norm(blue - tcp)) <= 0.05)
     red_lifted = float(red[2]) > initial_z["red"] + 0.015
     blue_lifted = float(blue[2]) > initial_z["blue"] + 0.015
     red_placed = (

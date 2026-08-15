@@ -77,6 +77,7 @@ class StepRecorder:
         self.sources: list[str] = []
         self.frames: list[np.ndarray] = []
         self.current_source = "policy"
+        self.gripper_closed = False
         self.initial_z: dict[str, float] = {}
         self.reset_invariants: dict[str, bool] = {}
         self.event_first_steps: dict[str, int] = {}
@@ -92,6 +93,7 @@ class StepRecorder:
         self.actions = []
         self.sources = []
         self.frames = []
+        self.gripper_closed = False
         base = self.env.unwrapped
         self.initial_z = {
             "red": float(base.cubeA.pose.p.detach().cpu().numpy().reshape(-1, 3)[0][2]),
@@ -114,7 +116,10 @@ class StepRecorder:
     def step(self, action: Any):
         raw_obs, reward, terminated, truncated, info = self.env.step(action)
         value = action.detach().cpu().numpy() if isinstance(action, torch.Tensor) else np.asarray(action)
-        self.actions.append(np.asarray(value, dtype=np.float32).reshape(-1).copy())
+        value = np.asarray(value, dtype=np.float32).reshape(-1).copy()
+        self.actions.append(value)
+        if value.size:
+            self.gripper_closed = bool(value[-1] < 0.0)
         self.sources.append(self.current_source)
         self.records.append(_record(raw_obs))
         self._capture()
@@ -202,8 +207,11 @@ class StackPyramidOracle:
             self.planner.move_to_pose_with_screw(reach_pose)
             self.planner.move_to_pose_with_screw(grasp_pose)
             self.planner.close_gripper()
-            goal_pose = self.sapien.Pose(target_cube.pose.sp.p * 0.8, grasp_pose.q)
+            lift_pose = self.sapien.Pose([0, 0, 0.1]) * grasp_pose
+            self.planner.move_to_pose_with_screw(lift_pose)
+            goal_pose = self.sapien.Pose(target_cube.pose.sp.p * 0.8, lift_pose.q)
             self.planner.move_to_pose_with_screw(goal_pose)
+            self.planner.open_gripper()
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
