@@ -11,6 +11,24 @@ from pathlib import Path
 import numpy as np
 
 
+REQUIRED_EVENT_ORDER = ("red_grasped", "red_lifted", "red_placed", "blue_lifted")
+
+
+def _event_order(recorder: object) -> dict[str, object]:
+    first_steps = dict(getattr(recorder, "event_first_steps", {}))
+    observed = [name for name in REQUIRED_EVENT_ORDER if name in first_steps]
+    order_pass = observed == list(REQUIRED_EVENT_ORDER) and all(
+        first_steps[previous] < first_steps[current]
+        for previous, current in zip(REQUIRED_EVENT_ORDER, REQUIRED_EVENT_ORDER[1:])
+    )
+    return {
+        "required_events": list(REQUIRED_EVENT_ORDER),
+        "first_event_steps": first_steps,
+        "observed_order": observed,
+        "event_order_pass": order_pass,
+    }
+
+
 def _bool(value: object) -> bool:
     if hasattr(value, "detach"):
         value = value.detach().cpu().numpy()
@@ -93,6 +111,9 @@ def main() -> None:
                     "actions": len(env.actions),
                     "strict_success": success,
                     "oracle_error": error,
+                    "reset_invariants": dict(env.reset_invariants),
+                    "reset_invariant_pass": not any(env.reset_invariants.values()),
+                    "event_order": _event_order(env),
                 }
             )
             print(json.dumps(rows[-1]), flush=True)
@@ -108,10 +129,17 @@ def main() -> None:
         "seed_manifest": str(args.seed_manifest.resolve()) if args.seed_manifest else None,
         "sim_backend": args.sim_backend,
         "render_backend": args.render_backend,
+        "reset_invariant_failures": sum(not row["reset_invariant_pass"] for row in rows),
+        "event_order_failures": sum(not row["event_order"]["event_order_pass"] for row in rows),
         "rows": rows,
     }
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
-    if summary["episodes"] != args.episodes or summary["success_rate"] < 0.90:
+    if (
+        summary["episodes"] != args.episodes
+        or summary["success_rate"] < 0.90
+        or summary["reset_invariant_failures"]
+        or summary["event_order_failures"]
+    ):
         raise RuntimeError(f"Oracle gate failed: {summary}")
     (args.output / "ORACLE_GATE_COMPLETE").write_text("complete\n", encoding="utf-8")
 

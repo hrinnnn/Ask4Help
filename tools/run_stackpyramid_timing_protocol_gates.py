@@ -242,6 +242,8 @@ def main() -> None:
     seed_manifest = _write_seed_manifest(root, args.seed_manifest)
     if args.seed_manifest is not None:
         _validate_versioned_manifest(seed_manifest)
+    manifest_geometry = json.loads(seed_manifest.read_text(encoding="utf-8")).get("geometry", "v1")
+    os.environ["STACKPYRAMID_OOD_GEOMETRY"] = str(manifest_geometry)
     (root / "pipeline_state.json").write_text(
         json.dumps(
             {

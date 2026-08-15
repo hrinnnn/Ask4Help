@@ -25,8 +25,14 @@ from tools.evaluate_stackpyramid_xvla import (  # noqa: E402
     REAL_ACTION_DIM,
     frame_array,
     image_array,
+    stage_events,
 )
-from tools.stackpyramid_task import register_stackpyramid_splits, stackpyramid_env_id  # noqa: E402
+from tools.stackpyramid_task import (  # noqa: E402
+    register_stackpyramid_splits,
+    stackpyramid_env_id,
+    stackpyramid_geometry_version,
+    stackpyramid_reset_invariants,
+)
 
 
 TASK = "stack the red cube next to the green cube and place the blue cube on top"
@@ -71,6 +77,10 @@ class StepRecorder:
         self.sources: list[str] = []
         self.frames: list[np.ndarray] = []
         self.current_source = "policy"
+        self.initial_z: dict[str, float] = {}
+        self.reset_invariants: dict[str, bool] = {}
+        self.event_first_steps: dict[str, int] = {}
+        self.event_history: list[dict[str, bool]] = []
 
     @property
     def unwrapped(self) -> Any:
@@ -82,7 +92,18 @@ class StepRecorder:
         self.actions = []
         self.sources = []
         self.frames = []
+        base = self.env.unwrapped
+        self.initial_z = {
+            "red": float(base.cubeA.pose.p.detach().cpu().numpy().reshape(-1, 3)[0][2]),
+            "blue": float(base.cubeC.pose.p.detach().cpu().numpy().reshape(-1, 3)[0][2]),
+        }
+        self.reset_invariants = stackpyramid_reset_invariants(self)
+        if stackpyramid_geometry_version() == "v4" and any(self.reset_invariants.values()):
+            raise RuntimeError(f"StackPyramid v4 reset invariant failed: {self.reset_invariants}")
+        self.event_first_steps = {}
+        self.event_history = []
         self._capture()
+        self._update_events()
         return raw_obs, info
 
     def _capture(self) -> None:
@@ -97,7 +118,16 @@ class StepRecorder:
         self.sources.append(self.current_source)
         self.records.append(_record(raw_obs))
         self._capture()
+        self._update_events()
         return raw_obs, reward, terminated, truncated, info
+
+    def _update_events(self) -> None:
+        events = stage_events(self, self.initial_z)
+        step = len(self.actions)
+        self.event_history.append(events)
+        for name, reached in events.items():
+            if reached and name not in self.event_first_steps:
+                self.event_first_steps[name] = step
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.env, name)
