@@ -243,11 +243,6 @@ class StackPyramidOracle:
             if self.planner.move_to_pose_with_screw(grasp_pose2, dry_run=True) != -1:
                 grasp_pose = grasp_pose2
                 break
-        blue_position = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
-        safe_pose = self.sapien.Pose(
-            [blue_position[0], blue_position[1], 0.20], grasp_pose.q
-        )
-        self.planner.move_to_pose_with_screw(safe_pose)
         reach_pose = grasp_pose * self.sapien.Pose([0, 0, -0.05])
         self.planner.move_to_pose_with_screw(reach_pose)
         if need_move_a_b:
