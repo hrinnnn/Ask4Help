@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 
 
-METHODS = (
+DEFAULT_METHODS = (
     "offline_oracle_sft_10000_from_id2000_retry2",
     "failure_recovery_sft_10000_from_id2000_retry1",
     "robot_gated_sft_10000_from_id2000_retry1",
@@ -29,6 +29,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gpu", type=int, required=True)
     parser.add_argument("--cpu-set", required=True)
     parser.add_argument("--poll-seconds", type=int, default=1800)
+    parser.add_argument(
+        "--methods",
+        nargs="+",
+        default=list(DEFAULT_METHODS),
+        help="Matched-update method directory names, in evaluation order.",
+    )
     return parser.parse_args()
 
 
@@ -63,6 +69,7 @@ def valid_split(output: Path, episodes: int) -> bool:
 
 def main() -> None:
     args = parse_args()
+    methods = tuple(args.methods)
     args.result_root.mkdir(parents=True, exist_ok=True)
     state_path = args.result_root / "pipeline_state.json"
     env = os.environ.copy()
@@ -80,7 +87,7 @@ def main() -> None:
         }
     )
     methods_dir = args.result_root.parent
-    for method in METHODS:
+    for method in methods:
         checkpoint = wait_for_checkpoint(args, method)
         output = args.result_root / method
         if (output / "EVAL_COMPLETE").is_file() and all(
@@ -149,7 +156,7 @@ def main() -> None:
         )
 
     comparison: dict[str, object] = {"checkpoint_step": args.checkpoint_step, "methods": {}}
-    for method in METHODS:
+    for method in methods:
         method_output = args.result_root / method
         rows: dict[str, object] = {}
         for split in ("id", "handle_ood", "grasp_ood", "goal_ood"):
