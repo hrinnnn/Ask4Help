@@ -156,7 +156,7 @@ class Controller:
             "--render-backend", "cpu",
         )
         if method == "bridge_pca":
-            command += ["--asset", str(self.args.pca_asset), "--pca-threshold", str(self.pca_threshold)]
+            command += ["--asset", str(self.args.pca_asset), "--pca-threshold", str(self.pca_threshold), "--min-ood-fraction", str(self.args.pca_min_ood_fraction)]
         elif method == "diffdagger":
             command += ["--diff-threshold", str(threshold)]
         self.run_process(f"collect_{stage}_{method}", command, gpu, cpu_set)
@@ -206,7 +206,7 @@ class Controller:
             "--render-backend", "cpu",
         )
         if method == "bridge_pca":
-            command += ["--asset", str(self.args.pca_asset), "--pca-threshold", str(self.pca_threshold)]
+            command += ["--asset", str(self.args.pca_asset), "--pca-threshold", str(self.pca_threshold), "--min-ood-fraction", str(self.args.pca_min_ood_fraction)]
         elif method == "diffdagger":
             command += ["--diff-threshold", str(threshold)]
         return command
@@ -218,15 +218,19 @@ class Controller:
             accepted = summary.get("accepted_by_split", {})
             total = int(summary.get("accepted_total", 0))
             ood = int(accepted.get(stage, 0))
-            if total != 100 or ood / max(1, total) < self.args.min_ood_fraction:
+            required = self.args.pca_min_ood_fraction if method == "bridge_pca" else None
+            if total != 100 or (required is not None and ood / max(1, total) < required):
                 raise RuntimeError(
                     f"{stage}/{method} failed OOD-dominant selection gate: "
                     f"accepted={total}, accepted_by_split={accepted}, "
-                    f"required_ood_fraction={self.args.min_ood_fraction}"
+                    f"required_ood_fraction={required}"
                 )
             metrics = summary.get("selection_metrics", {})
             if not metrics.get("alternating_stream") or not metrics.get("selection_is_not_forced_50_50"):
                 raise RuntimeError(f"{stage}/{method} missing corrected selection protocol metrics")
+            gate = summary.get("selection_gate", {})
+            if required is not None and gate.get("pass") is not True:
+                raise RuntimeError(f"{stage}/{method} missing passing method-specific selection gate: {gate}")
 
     def prepare_stage(self, stage: str, source_paths: dict[str, Path]) -> Path:
         self.write_state(stage=stage, phase="budget_selection")
@@ -485,6 +489,7 @@ def main() -> None:
     parser.add_argument("--pca-threshold", type=float)
     parser.add_argument("--pca-calibration", type=Path)
     parser.add_argument("--protocol-audit", type=Path, required=True)
+    parser.add_argument("--pca-min-ood-fraction", type=float, default=0.80)
     parser.add_argument("--gpus", default="4,5")
     parser.add_argument("--cpu-sets", default="80-99,100-119")
     parser.add_argument("--training-steps", type=int, default=2000)

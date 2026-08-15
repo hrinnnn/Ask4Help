@@ -118,6 +118,7 @@ def main() -> None:
                  "--asset", str(args.pca_asset), "--pca-threshold", str(pca_threshold),
                  "--output-dir", str(pilot), "--split", "stage1_ood", "--target", "20",
                  "--id-seed", "91000", "--ood-seed", "92000", "--max-attempts", "200",
+                 "--min-ood-fraction", "0.80",
                  "--flow-steps", "5", "--sim-backend", "cpu", "--render-backend", "cpu"],
                 args.gpu, args.cpu_set, log,
             )
@@ -126,7 +127,7 @@ def main() -> None:
             summary = json.loads((pilot / "summary.json").read_text())
             accepted = summary.get("accepted_by_split", {})
             fraction = int(accepted.get("stage1_ood", 0)) / max(1, int(summary.get("accepted_total", 0)))
-            if int(summary.get("accepted_total", 0)) != 20 or fraction < 0.60:
+            if int(summary.get("accepted_total", 0)) != 20 or fraction < 0.80:
                 raise RuntimeError(f"PCA pilot is not OOD-dominant: {accepted}")
             (pilot / "PILOT_COMPLETE").write_text("complete\n")
         write_state(stage="preflight_complete", pca_pilot=str(pilot))

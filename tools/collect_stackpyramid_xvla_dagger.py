@@ -309,6 +309,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--id-seed", type=int, default=70000)
     parser.add_argument("--ood-seed", type=int, default=80000)
     parser.add_argument("--max-attempts", type=int, default=500)
+    parser.add_argument("--min-ood-fraction", type=float)
     parser.add_argument("--flow-steps", type=int, default=5)
     parser.add_argument("--diff-timesteps", type=int, default=16)
     parser.add_argument("--diff-patience", type=int, default=2)
@@ -492,7 +493,20 @@ def main() -> None:
             "selection_is_not_forced_50_50": True,
         },
     }
+    ood_fraction = accepted_counts.get(args.split, 0) / max(1, len(accepted))
+    selection_gate = {
+        "required_ood_fraction": args.min_ood_fraction,
+        "actual_ood_fraction": ood_fraction,
+        "pass": None if args.min_ood_fraction is None else ood_fraction >= args.min_ood_fraction,
+        "gate_scope": "method_specific",
+    }
+    summary["selection_gate"] = selection_gate
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    if selection_gate["pass"] is False:
+        raise RuntimeError(
+            f"selection gate failed: required OOD fraction {args.min_ood_fraction}, "
+            f"actual {ood_fraction}, accepted_by_split={accepted_counts}"
+        )
     (args.output_dir / "COLLECTION_COMPLETE").write_text("complete\n", encoding="utf-8")
 
 
