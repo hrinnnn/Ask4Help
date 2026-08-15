@@ -1,6 +1,6 @@
 # X-VLA StackPyramid 全阶段 OOD 计划
 
-**状态：已完成 H20 X-VLA 原生环境、任务审计、oracle gate、正式 ID/Stage-1/2/3 OOD 采集、ID SFT、Bridge-PCA gated DAgger、timing 诊断和六 split 最终评测。完整多介入时机 sweep 仍作为后续独立实验。**
+**状态：部分完成。H20 X-VLA 原生环境、任务审计、oracle gate、ID base policy，以及 Stage-1/2/3 的 Internal-Feature PCA 收集、训练和评测已完成；Diff-DAgger、Failure-Recovery、Offline BC 尚未在三个 Stage 上完成对应的独立收集、matched-budget 训练和共同评测，因此本任务不能标记为完整完成。完整多介入时机 sweep 仍是后续独立实验。**
 
 ## 1. 目标
 
@@ -60,10 +60,29 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 
 1. 纯 policy rollout 与 failure-detection benchmark。
 2. 记录任务阶段、首次报警和失败阶段。
-3. 运行该阶段的受控 timing sweep。
-4. 使用 matched expert-action budget 训练各 timing condition。
-5. 在 100 ID、100 对应 Stage OOD 上评测。
-6. 最后增加混合 ID/Stage-1/Stage-2/Stage-3 部署流，检验 gate 的实际数据选择。
+3. 使用同一 base policy 和冻结的该 Stage OOD seeds，分别收集四组 OOD expert 数据：
+   `Internal-Feature PCA`、`Diff-DAgger`、`Failure-Recovery`、`Offline BC`。
+4. 四组各自形成独立训练 dataset。前三组保存各自规则触发后的成功 expert suffix；Offline BC
+   保存完整 OOD oracle trajectory。不得把 PCA suffix 复用于 Diff-DAgger，也不得用完整 oracle
+   trajectory 冒充 gated suffix。
+5. 以低层 expert actions 选择四组共同可达预算；四组分别使用 `128 ID + 本组 OOD expert`
+   的 `1:1 source-balanced` 数据，从相同 `ckpt-10000` 独立更新。
+6. 在共同 checkpoint 上，对四个更新后策略分别运行 100 ID、100 对应 Stage OOD 评测。
+7. 最后增加混合 ID/Stage-1/Stage-2/Stage-3 部署流，检验 gate 的实际数据选择。
+8. 另行运行该阶段的受控 timing sweep，并使用 matched expert-action budget 训练各 timing
+   condition；该 sweep 不替代上述四方法比较。
+
+### 每个 Stage 的方法完成矩阵
+
+| 方法 | OOD 收集 | 独立训练 | 100 ID + 100 OOD 评测 | 当前状态 |
+|---|---|---|---|---|
+| Internal-Feature PCA | 成功 expert suffix | ID + PCA suffix | 必须完成 | Stage 1/2/3 已完成 |
+| Diff-DAgger | Diff 信号触发后的成功 expert suffix | ID + Diff suffix | 必须完成 | 待完成 |
+| Failure-Recovery | 语义失败后的成功 recovery suffix | ID + recovery suffix | 必须完成 | 待完成 |
+| Offline BC | 完整 OOD oracle demonstrations | ID + offline OOD demos | 必须完成 | 正式 oracle 数据已有，预算选择、独立训练和评测待完成 |
+
+只有三个 Stage 的四行全部完成，StackPyramid 的“四方法 robot-gated DAgger 比较”才算完成。
+当前已有的三组 Bridge-PCA policy 只是矩阵第一行在三个 Stage 上的结果，不是完整任务。
 
 ## 7. 产物结构
 
@@ -76,7 +95,9 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 
 本轮采集验收：ID `128/128`，三个 Stage OOD 均 `100/100`，所有 split raw attempts 均严格成功，视频分别为 `138/110/110/110`。H5 loader 已验证所有 action-bearing observation 均作为 anchor，ID 128 条轨迹共 `10579` anchors，尾部 anchors `1152`，最终 observation 恰有 1 个有效 target；2-step checkpoint reload/forward smoke 已通过。
 
-本轮 Bridge-PCA stage-localized gated DAgger 已完成；完整多介入时机 sweep 仍需单独建立 matched timing conditions，不能由本轮 DCA/EAS/DCE 诊断代理替代。
+本轮只完成了 Internal-Feature PCA 这一方法分支在三个 Stage 上的 stage-localized gated
+DAgger。Diff-DAgger、Failure-Recovery 和 Offline BC 的对应分支仍需补齐；完整多介入时机
+sweep 也需单独建立 matched timing conditions，不能由本轮 DCA/EAS/DCE 诊断代理替代。
 
 ## 8. 当前基线结果
 
@@ -87,9 +108,9 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 `0/100, 0/100`。四个 split 的 400 个评测视频和完整 summary 保存在
 `/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_baseline_eval_ckpt10000_v1/`。
 
-## 9. Bridge-PCA gated DAgger 修正版结果
+## 9. Internal-Feature PCA 分支的修正版结果
 
-正式主结果使用固定 ID base policy `ckpt-10000`、`assets_retry2/bridge_pca.pt` 和 ID25
+当前已完成分支使用固定 ID base policy `ckpt-10000`、`assets_retry2/bridge_pca.pt` 和 ID25
 校准阈值 `0.95207279920578`。三个 stage 各收集 100 条非空 expert suffix；收集根为
 `/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_v1/bridge_pca_collection_v3/`。
 
@@ -119,6 +140,29 @@ Stage 1 `0.0249633`、Stage 2 `0.1409179`、Stage 3 `0.0281246`。修正版训�
 Timing 目录中的 DCA/EAS/DCE 仍是诊断代理；完整 paired state-snapshot timing utility 和多时机
 对照仍需单独实验。
 
+以上结果只代表四方法矩阵中的 Internal-Feature PCA 分支。它可以作为已核实的中间结果，
+但在 Diff-DAgger、Failure-Recovery、Offline BC 三个分支补齐前，不得称为 StackPyramid
+完整主实验或完整 baseline comparison。
+
 ## 10. 运行位置
 
 优先复用 5090 上已核实的 X-VLA 环境。若 5090 在我们的配额内没有足够空闲卡，不等待卡位，直接按《环境与存储》的回退规则在阿里云 H20 建立原生 X-VLA 环境、同步冻结资产并完成 smoke。两处运行必须使用相同源码版本、数据、base checkpoint、norm、seed manifest 和成功定义。
+
+## 11. 四方法 gated-DAgger 对照执行记录
+
+本节是文章和后续 agent 共用的执行记录。该对照由
+`codex-stackpyramid-four-method-comparison` 接管；另一个 agent 的独立多介入 timing sweep 不属于本节，不能互相替代。
+
+当前持久化总控输出根：
+`/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_four_method_comparison_v1_retry1_retry2/`。
+它按 `calibration -> 每个 Stage 的四组收集 -> common expert-action budget -> 2-step smoke -> 2000-step training -> 100 ID/100 对应 Stage OOD evaluation -> summary` 顺序推进；总控状态在 `pipeline_state.json`，活动阶段日志在 `logs/`。
+
+冻结协议：
+
+- 同一 immutable ID base `stackpyramid_id_sft_10000_v1/formal_id_sft/ckpt-10000`，ID 数据为已验收的 128 条 asset subset。
+- 每个 Stage 使用同一组交替 raw attempt seed：偶数 attempt 为 ID，奇数 attempt 为该 Stage OOD；四种方法各收 100 条成功轨迹，Offline BC 从 reset 开始收完整 oracle，前三种方法只保留各自 gate 触发后的成功 suffix。
+- Internal-Feature Bridge-PCA 使用已验收的 PCA asset 与固定阈值 `0.95207279920578`；Diff-DAgger 使用独立成功 ID calibration 的 `q=.95` trajectory-maximum threshold、16 个 diff timesteps；Failure-Recovery 固定在 50 个低层 policy steps 后接管。
+- 四种方法收集完成后，以四组各自可达的最大共同 expert action 总量选择子集；训练仍保持 `128 ID + 本组 expert` 的 1:1 source-balanced sampler、正确 temporal action mask、batch 8、2000 steps、每 500 保存。
+- 评测统一使用 checkpoint-2000、纯 policy、100 条固定 ID 与 100 条对应 Stage OOD、`execute_horizon=5`、`max_episode_steps=250`；主表同时保留 ever grasped、base completion 和 strict success。
+
+当前状态（2026-08-15）：Diff calibration 已写出 25 条成功 ID 轨迹的阈值资产；Stage 1 Bridge-PCA 与 Offline-Oracle 正在收集，随后自动启动 Failure-Recovery 与 Diff-DAgger。四方法收集、训练、评测和 `comparison.json/.md` 完成前，本任务仍标记为“进行中”；任何中间 PCA 结果都不能称为完整四方法比较。
