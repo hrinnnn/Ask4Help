@@ -496,7 +496,7 @@ def main() -> None:
     parser.add_argument("--training-steps", type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--seed", type=int, default=8200)
-    parser.add_argument("--geometry", choices=("v1", "v2", "v3"), default="v2")
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3", "v4"), default="v2")
     args = parser.parse_args()
     controller = Controller(args)
     try:

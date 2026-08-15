@@ -180,7 +180,7 @@ def main() -> None:
     parser.add_argument("--oracle-render-backend", choices=("cpu", "gpu"), default="cpu")
     parser.add_argument("--policy-sim-backend", choices=("cpu", "gpu"), default="gpu")
     parser.add_argument("--policy-render-backend", choices=("cpu", "gpu"), default="gpu")
-    parser.add_argument("--geometry", choices=("v1", "v2", "v3"), default="v2")
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3", "v4"), default="v2")
     parser.add_argument("--seed-manifest", type=Path)
     args = parser.parse_args()
     if args.output.exists():

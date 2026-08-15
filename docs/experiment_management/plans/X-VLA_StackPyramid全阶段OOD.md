@@ -1,6 +1,6 @@
 # X-VLA StackPyramid 全阶段 OOD 计划
 
-**状态：v2 协议审计恢复中。H20 X-VLA 原生环境、任务审计、oracle gate、ID base policy，以及旧版 Stage-1/2/3 Internal-Feature PCA 结果已保存；旧 v1 几何和旧四方法总控结果只作诊断，不能进入正式训练。唯一冻结的 v2 几何、paired reset 和阶段 predicate 见《StackPyramid v2 冻结任务规范》，Timing 与四方法必须共用 `tools/stackpyramid_task.py` 和同一源码版本。正式设计要求 ID base 只训练一次，Stage-1/2/3 各自从同一 immutable ID ckpt-10000 独立收集、匹配预算和训练。**
+**状态：v1/v2/v3 均已降级为 diagnostic，v4 任务几何重建中。v3 审计发现 ID reset 时红块与绿块距离约为 0.04，小于 `next_to` 判定阈值约 0.0616，导致 `red_placed` 在 episode 开始时已成立，Stage 1/2 不是真实的连续阶段。因此 v3 ID demonstrations、norm、ckpt-10000、timing 与四方法产物不得进入正式实验。Timing 与四方法必须共用唯一的 v4 `task_spec.json`、实现和源码版本；通过几何、阶段时序和 Oracle 门禁后，重新收集 ID demonstrations、重算 norm 并重训唯一 ID base。**
 
 ## 1. 目标
 
@@ -14,7 +14,7 @@
 2. **Stage 2：构建红绿底座**。机器人把红块运输到绿块旁边并正确放置。
 3. **Stage 3：放置蓝块**。机器人抓取蓝块并将其放到红绿底座上方。
 
-正式实现前必须用实际 ManiSkill 环境和 oracle smoke 核实颜色、成功几何和上述执行顺序。核实后的物体名称、ID/OOD 位置范围、阶段 predicate、成功条件、failure reason、oracle 接口、base checkpoint 和 norm 全部写入 `task_spec.json`。本轮已完成 paired-reset 审计、20/20 四 split oracle gate 和正式采集；旧的官方单轨迹失败记录只保留为诊断证据。
+正式实现前必须用实际 ManiSkill 环境和 oracle smoke 核实颜色、成功几何和上述执行顺序。核实后的物体名称、ID/OOD 位置范围、阶段 predicate、成功条件、failure reason、oracle 接口、base checkpoint 和 norm 全部写入 `task_spec.json`。v4 必须重新执行 paired-reset、四 split oracle、base-policy 和 stage-locality 门禁；门禁通过前不得开始正式采集。旧版收集与单轨迹失败记录只保留为诊断证据。
 
 ## 3. 固定 ID 分布
 
@@ -36,10 +36,8 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 
 主实验分别测试这三个单变量 OOD，不把三块同时移动。三者可以在最终 mixed deployment stream 中随机交替出现，但每个 episode 仍只激活一个 OOD 因素。三块同时变化属于复合 OOD，只能作为额外泛化实验，不能替代主 timing study。
 
-当前正式候选统一使用 `STACKPYRAMID_OOD_GEOMETRY=v2` 的局部 OOD 几何。Timing sweep 与四方法
-比较必须引用同一份冻结 `task_spec.json` 和同一源码版本；不得分别维护两个含义不同的 v2。
-旧 v1 大位移导致 Stage-1/2 prefix completion 为零，只保留为 diagnostic。v2 在进入任何正式
-collection 前必须重新完成 paired-reset、四 split oracle、base-policy 和 stage-locality 门禁。
+当前正式候选为 `STACKPYRAMID_OOD_GEOMETRY=v4`，唯一规范见 `configs/stackpyramid_v4_task_spec.json` 和 `configs/stackpyramid_timing_v4_seed_manifest.json`。v4 必须先保证 ID reset 中红绿块明确分离、无物理干涉，且 reset 时 `red_grasped`、`red_lifted`、`red_placed`、`blue_lifted` 全部为 false。Oracle 轨迹必须真实按 grasp、lift、place、blue-lift/place 顺序触发阶段事件。候选坐标只能在 reset invariant、物理可解性和 Oracle smoke 同时通过后写入共享 task spec。Timing sweep 与四方法比较不得分别维护两套 v4。
+旧 v1 大位移、v2 Stage 3 物理干涉、v3 reset 阶段语义错误的所有产物均只保留为 diagnostic。
 
 ### 可见性与阶段相关性
 

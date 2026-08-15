@@ -1,8 +1,12 @@
 # StackPyramid v3 冻结任务规范
 
+> **已废止：diagnostic only。** v3 的 ID 红绿块初始距离小于 `next_to` 阈值，导致 `red_placed` 在 reset 后立即成立。不得继续使用 v3 的 checkpoint、数据、norm、calibration、collection 或 training；唯一后续设计见《StackPyramid v4 冻结任务规范》。
+
 ## 唯一几何与来源
 
-StackPyramid v3 是当前唯一允许进入正式 gated-DAgger 流程的几何版本。共享 seed/config 文件为
+> **已失效，仅作 diagnostic。** v3 的 ID 红绿块初始距离小于 `next_to` 阈值，导致 `red_placed` 在 reset 后立即成立，Stage 1/2 时序无效。不得继续使用 v3 demonstrations、norm、checkpoint 或门禁结果开展正式实验；正式后续转入 v4 重建。
+
+StackPyramid v3 原共享 seed/config 文件为
 `configs/stackpyramid_timing_v3_seed_manifest.json`，实现为 `tools/stackpyramid_task.py`；Timing
 Sweep 与四方法流程必须使用同一份文件、同一源码提交和 `STACKPYRAMID_OOD_GEOMETRY=v3`。
 

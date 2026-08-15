@@ -27,8 +27,8 @@ def _validate_versioned_manifest(path: Path) -> None:
     manifest = json.loads(path.read_text(encoding="utf-8"))
     geometry = manifest.get("geometry")
     expected_format = f"stackpyramid_timing_protocol_seed_manifest_{geometry}"
-    if geometry not in {"v2", "v3"} or manifest.get("format") != expected_format:
-        raise ValueError("versioned recovery requires a frozen v2 or v3 seed manifest")
+    if geometry not in {"v2", "v3", "v4"} or manifest.get("format") != expected_format:
+        raise ValueError("versioned recovery requires a frozen v2, v3, or v4 seed manifest")
     if not manifest.get("declared_before_execution"):
         raise ValueError("versioned manifest must be declared before execution")
     if not manifest.get("paired_reset", {}).get("enabled"):

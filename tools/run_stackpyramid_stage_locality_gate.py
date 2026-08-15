@@ -48,7 +48,7 @@ def main() -> None:
     parser.add_argument("--seed-manifest", type=Path, required=True)
     parser.add_argument("--gpus", nargs=2, default=("0", "1"))
     parser.add_argument("--cpu-sets", nargs=2, default=("0-7", "8-15"))
-    parser.add_argument("--geometry", choices=("v1", "v2", "v3"), default="v2")
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3", "v4"), default="v2")
     args = parser.parse_args()
     root = args.output_root
     if root.exists():
@@ -58,7 +58,7 @@ def main() -> None:
     (root / "seed_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     if manifest.get("geometry") != args.geometry or not manifest.get("paired_reset", {}).get("enabled"):
         raise ValueError("locality audit requires the declared geometry and paired_reset")
-    if manifest.get("format", "").endswith(("_v2", "_v3")):
+    if manifest.get("format", "").endswith(("_v2", "_v3", "_v4")):
         if manifest.get("stage_predicate") != EXPECTED_PREDICATES:
             raise ValueError("seed manifest stage_predicate does not match the frozen evaluator contract")
     starts = {

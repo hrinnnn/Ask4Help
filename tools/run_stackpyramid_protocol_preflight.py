@@ -55,7 +55,7 @@ def main() -> None:
     parser.add_argument("--cpu-set", default="80-99")
     parser.add_argument("--locality-gpus", nargs=2, default=("4", "5"))
     parser.add_argument("--locality-cpu-sets", nargs=2, default=("80-99", "100-119"))
-    parser.add_argument("--geometry", choices=("v1", "v2", "v3"), default="v2")
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3", "v4"), default="v2")
     parser.add_argument("--seed-manifest", type=Path)
     args = parser.parse_args()
     os.environ["STACKPYRAMID_OOD_GEOMETRY"] = args.geometry

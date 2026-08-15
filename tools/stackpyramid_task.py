@@ -14,6 +14,7 @@ STACKPYRAMID_STAGE2_ENV_ID = "Ask4HelpStackPyramidStage2OOD-v1"
 STACKPYRAMID_STAGE3_ENV_ID = "Ask4HelpStackPyramidStage3OOD-v1"
 STACKPYRAMID_SPLITS = ("id", "stage1_ood", "stage2_ood", "stage3_ood")
 STACKPYRAMID_TASK = "stack the red cube next to the green cube and place the blue cube on top"
+STACKPYRAMID_RESET_INVARIANTS = ("red_grasped", "red_lifted", "red_placed", "blue_lifted")
 
 # Positions are deliberately narrow and separated. OOD offsets remain on the table.
 _ID_CENTERS = np.asarray(
@@ -38,6 +39,18 @@ _OOD_SHIFTS_V3 = {
     "stage2_ood": np.asarray([0.060, 0.050], dtype=np.float64),
     "stage3_ood": np.asarray([0.100, -0.120], dtype=np.float64),
 }
+
+# V1-V3 are diagnostic. V4 separates the base cubes so that every intended
+# stage predicate is false at reset and remains physically valid after the
+# designated single-object shift, including the full reset-jitter envelope.
+_ID_CENTERS_V4 = np.asarray(
+    [[-0.080, -0.080], [0.080, -0.080], [0.000, 0.120]], dtype=np.float64
+)
+_OOD_SHIFTS_V4 = {
+    "stage1_ood": np.asarray([0.120, 0.100], dtype=np.float64),
+    "stage2_ood": np.asarray([-0.120, 0.100], dtype=np.float64),
+    "stage3_ood": np.asarray([0.170, -0.180], dtype=np.float64),
+}
 _REGISTERED = False
 
 
@@ -53,7 +66,16 @@ def stackpyramid_ood_shifts() -> dict[str, np.ndarray]:
         return _OOD_SHIFTS_V2
     if version == "v3":
         return _OOD_SHIFTS_V3
+    if version == "v4":
+        return _OOD_SHIFTS_V4
     raise ValueError(f"unknown STACKPYRAMID_OOD_GEOMETRY={version!r}")
+
+
+def stackpyramid_id_centers() -> np.ndarray:
+    """Return the frozen ID centers for the selected benchmark version."""
+    if stackpyramid_geometry_version() == "v4":
+        return _ID_CENTERS_V4
+    return _ID_CENTERS
 
 
 def sample_stackpyramid_xy(rng: Any, count: int, *, split: str) -> np.ndarray:
@@ -67,7 +89,7 @@ def sample_stackpyramid_xy(rng: Any, count: int, *, split: str) -> np.ndarray:
         jitter = jitter[None, ...]
     if jitter.shape[0] != count:
         raise ValueError(f"unexpected StackPyramid jitter shape {jitter.shape} for {count} environments")
-    centers = np.broadcast_to(_ID_CENTERS, (count, 3, 2)).copy()
+    centers = np.broadcast_to(stackpyramid_id_centers(), (count, 3, 2)).copy()
     if split != "id":
         target = {"stage1_ood": 0, "stage2_ood": 1, "stage3_ood": 2}[split]
         centers[:, target] += stackpyramid_ood_shifts()[split]
@@ -75,12 +97,42 @@ def sample_stackpyramid_xy(rng: Any, count: int, *, split: str) -> np.ndarray:
 
 
 def stackpyramid_env_id(split: str) -> str:
-    return {
+    env_ids = {
         "id": STACKPYRAMID_ID_ENV_ID,
         "stage1_ood": STACKPYRAMID_STAGE1_ENV_ID,
         "stage2_ood": STACKPYRAMID_STAGE2_ENV_ID,
         "stage3_ood": STACKPYRAMID_STAGE3_ENV_ID,
-    }[split]
+    }
+    if stackpyramid_geometry_version() == "v4":
+        return env_ids[split].replace("-v1", "-v4")
+    return env_ids[split]
+
+
+def _scalar_bool(value: Any) -> bool:
+    if hasattr(value, "detach"):
+        value = value.detach().cpu().numpy()
+    return bool(np.asarray(value).reshape(-1)[0])
+
+
+def stackpyramid_reset_invariants(env: Any) -> dict[str, bool]:
+    """Check that reset starts before every controlled task stage."""
+    base = env.unwrapped
+    red = np.asarray(base.cubeA.pose.p.detach().cpu().numpy()).reshape(-1, 3)[0]
+    green = np.asarray(base.cubeB.pose.p.detach().cpu().numpy()).reshape(-1, 3)[0]
+    blue = np.asarray(base.cubeC.pose.p.detach().cpu().numpy()).reshape(-1, 3)[0]
+    threshold = float(np.linalg.norm(2 * base.cube_half_size[:2].detach().cpu().numpy()) + 0.005)
+    resting_z = float(base.cube_half_size[2].detach().cpu().numpy())
+    red_grasped = _scalar_bool(base.agent.is_grasping(base.cubeA))
+    return {
+        "red_grasped": red_grasped,
+        "red_lifted": float(red[2]) > resting_z + 0.015,
+        "red_placed": (
+            float(np.linalg.norm((red - green)[:2])) <= threshold
+            and not red_grasped
+            and float(red[2]) <= resting_z + 0.03
+        ),
+        "blue_lifted": float(blue[2]) > resting_z + 0.015,
+    }
 
 
 def reset_metadata(env: Any, *, split: str) -> dict[str, Any]:
@@ -93,6 +145,9 @@ def reset_metadata(env: Any, *, split: str) -> dict[str, Any]:
 
     cubes = (base.cubeA, base.cubeB, base.cubeC)
     positions = [array(cube.pose.p) for cube in cubes]
+    reset_invariants = stackpyramid_reset_invariants(env)
+    if stackpyramid_geometry_version() == "v4" and any(reset_invariants.values()):
+        raise RuntimeError(f"StackPyramid v4 reset invariant failed: {reset_invariants}")
     return {
         "split": split,
         "task": STACKPYRAMID_TASK,
@@ -104,6 +159,8 @@ def reset_metadata(env: Any, *, split: str) -> dict[str, Any]:
         "robot_qpos": array(base.agent.robot.get_qpos()),
         "affected_object": {"id": None, "stage1_ood": "red", "stage2_ood": "green", "stage3_ood": "blue"}[split],
         "ood_geometry": stackpyramid_geometry_version(),
+        "reset_invariants": reset_invariants,
+        "reset_invariant_pass": not any(reset_invariants.values()),
         "max_episode_steps": 250,
     }
 

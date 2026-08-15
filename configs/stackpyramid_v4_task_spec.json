@@ -1,0 +1,59 @@
+{
+  "format": "stackpyramid_task_spec_v4",
+  "benchmark_version": "stackpyramid_stage_localized_v4",
+  "geometry": "v4",
+  "implementation": "tools/stackpyramid_task.py",
+  "runtime_selector": "STACKPYRAMID_OOD_GEOMETRY=v4",
+  "task": "stack the red cube next to the green cube and place the blue cube on top",
+  "objects": {
+    "red": "cubeA",
+    "green": "cubeB",
+    "blue": "cubeC"
+  },
+  "id_xy_centers_m": [
+    [-0.080, -0.080],
+    [0.080, -0.080],
+    [0.000, 0.120]
+  ],
+  "id_xy_jitter_m": [-0.008, 0.008],
+  "ood_single_object_xy_shifts_m": {
+    "stage1_ood": {"object": "red", "shift": [0.120, 0.100]},
+    "stage2_ood": {"object": "green", "shift": [-0.120, 0.100]},
+    "stage3_ood": {"object": "blue", "shift": [0.170, -0.180]}
+  },
+  "stage_predicates": {
+    "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},
+    "stage2_ood": {"prefix": "red_lifted", "target": "red_placed"},
+    "stage3_ood": {"prefix": "red_placed", "target": "blue_lifted"}
+  },
+  "reset_invariants": {
+    "paired_reset": true,
+    "all_stage_predicates_false_at_reset": true,
+    "max_independent_xy_jitter_m": 0.008,
+    "minimum_pairwise_center_distance_with_jitter_m": 0.074,
+    "minimum_expected_next_to_threshold_m": 0.0616,
+    "red_green_initial_distance_m": 0.160,
+    "note": "The minimum pairwise distance includes the full independent reset-jitter envelope and remains above the measured next_to threshold. This must be rechecked from the live ManiSkill environment before any collection."
+  },
+  "event_order": [
+    "red_grasped",
+    "red_lifted",
+    "red_placed",
+    "blue_grasped",
+    "blue_lifted"
+  ],
+  "success": {
+    "predicate": "ManiSkill StackPyramidEnv.evaluate()[success]",
+    "max_episode_steps": 250,
+    "execute_horizon": 5,
+    "flow_steps": 5
+  },
+  "gate_requirements": {
+    "oracle_each_split_minimum": 0.90,
+    "base_id_minimum": 0.80,
+    "base_ood_maximum": 0.50,
+    "prefix_completion_minimum": 0.80,
+    "target_stage_reach_positive": true
+  },
+  "status": "design_only_until_reset_and_oracle_gates_pass"
+}
