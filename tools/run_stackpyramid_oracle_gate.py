@@ -1,115 +1,97 @@
 #!/usr/bin/env python3
-"""Restart-tolerant four-split StackPyramid oracle gate controller."""
+"""Audit StackPyramid Oracle success on one controlled split."""
 
 from __future__ import annotations
 
 import argparse
 import json
-import shutil
-import subprocess
 import sys
-import time
 from pathlib import Path
 
+import numpy as np
 
-SPLITS = ("id", "stage1_ood", "stage2_ood", "stage3_ood")
 
-
-def write_state(path: Path, state: dict) -> None:
-    state["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    path.write_text(json.dumps(state, indent=2, ensure_ascii=True) + "\n", encoding="utf-8")
+def _bool(value: object) -> bool:
+    if hasattr(value, "detach"):
+        value = value.detach().cpu().numpy()
+    return bool(np.asarray(value).reshape(-1)[0])
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--local-root", type=Path, required=True)
-    parser.add_argument("--persistent-root", type=Path, required=True)
     parser.add_argument("--repo-root", type=Path, required=True)
-    parser.add_argument("--episodes", type=int, default=20)
-    parser.add_argument("--min-successes", type=int, default=19)
-    parser.add_argument("--gpu", type=str, default="1")
+    parser.add_argument("--xvla-root", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--split", choices=("id", "stage1_ood", "stage2_ood", "stage3_ood"), required=True)
+    parser.add_argument("--episodes", type=int, default=100)
+    parser.add_argument("--start-seed", type=int, required=True)
+    parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="gpu")
+    parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="gpu")
     args = parser.parse_args()
-    if args.episodes <= 0 or not 0 < args.min_successes <= args.episodes:
-        raise ValueError("invalid oracle gate counts")
-    if args.local_root.exists() or args.persistent_root.exists():
-        raise FileExistsError("oracle gate requires new local and persistent roots")
+    if args.output.exists():
+        raise FileExistsError(args.output)
+    args.output.mkdir(parents=True)
+    sys.path[:0] = [str(args.repo_root), str(args.xvla_root)]
 
-    args.local_root.mkdir(parents=True)
-    state_path = args.local_root / "pipeline_state.json"
-    state = {
-        "format": "stackpyramid_oracle_gate_controller_v1",
-        "stage": "pending",
-        "splits": {split: "pending" for split in SPLITS},
-        "episodes_per_split": args.episodes,
-        "minimum_successes_per_split": args.min_successes,
-        "persistent_root": str(args.persistent_root),
-        "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-    }
-    write_state(state_path, state)
-
-    for index, split in enumerate(SPLITS):
-        state["stage"] = split
-        state["splits"][split] = "running"
-        write_state(state_path, state)
-        stage_root = args.local_root / split
-        log_path = args.local_root / f"{split}.log"
-        command = [
-            sys.executable,
-            str(args.repo_root / "tools/collect_stackpyramid_oracle.py"),
-            "--output",
-            str(stage_root),
-            "--split",
-            split,
-            "--episodes",
-            str(args.episodes),
-            "--start-seed",
-            str(16000 + index * 1000),
-            "--sim-backend",
-            "cpu",
-            "--render-backend",
-            "gpu",
-        ]
-        env = dict(**__import__("os").environ)
-        env["CUDA_VISIBLE_DEVICES"] = args.gpu
-        env["PYTHONPATH"] = str(args.repo_root)
-        with log_path.open("w", encoding="utf-8") as log:
-            result = subprocess.run(command, cwd=args.repo_root, env=env, stdout=log, stderr=subprocess.STDOUT)
-        summary_path = stage_root / f"oracle_summary_{split}.json"
-        if result.returncode != 0 or not summary_path.exists():
-            state["splits"][split] = "failed"
-            state["failure"] = {"split": split, "returncode": result.returncode, "log": str(log_path)}
-            write_state(state_path, state)
-            raise RuntimeError(f"oracle collection failed for {split}; see {log_path}")
-        summary = json.loads(summary_path.read_text(encoding="utf-8"))
-        if summary["episodes"] != args.episodes or summary["strict_successes"] < args.min_successes:
-            state["splits"][split] = "gate_failed"
-            state["failure"] = {"split": split, "summary": summary}
-            write_state(state_path, state)
-            raise RuntimeError(f"oracle gate failed for {split}: {summary['strict_successes']}/{summary['episodes']}")
-        motion_dir = stage_root / summary["env_id"] / "motionplanning"
-        if not list(motion_dir.glob("*.h5")) or not list(motion_dir.glob("*.mp4")):
-            state["splits"][split] = "artifact_failed"
-            state["failure"] = {"split": split, "motion_dir": str(motion_dir)}
-            write_state(state_path, state)
-            raise RuntimeError(f"oracle artifacts missing for {split}: {motion_dir}")
-
-        persistent_stage = args.persistent_root / split
-        persistent_stage.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(stage_root, persistent_stage)
-        shutil.copy2(log_path, args.persistent_root / f"{split}.log")
-        state["splits"][split] = "passed"
-        state.setdefault("summaries", {})[split] = summary
-        write_state(state_path, state)
-
-    args.persistent_root.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(state_path, args.persistent_root / "pipeline_state.json")
-    (args.persistent_root / "ORACLE_GATE_COMPLETE").write_text(
-        "All four StackPyramid splits passed the strict oracle gate.\n", encoding="utf-8"
+    import gymnasium as gym
+    import mani_skill.envs  # noqa: F401
+    from tools.collect_stackpyramid_xvla_dagger import (
+        StackPyramidOracle,
+        StepRecorder,
+        _install_rrt_fallback,
     )
-    state["stage"] = "complete"
-    state["completed_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
-    write_state(state_path, state)
-    shutil.copy2(state_path, args.persistent_root / "pipeline_state.json")
+    from tools.stackpyramid_task import register_stackpyramid_splits, stackpyramid_env_id
+
+    register_stackpyramid_splits()
+    _install_rrt_fallback()
+    env = StepRecorder(
+        gym.make(
+            stackpyramid_env_id(args.split),
+            obs_mode="rgb+state",
+            control_mode="pd_joint_pos",
+            render_mode="rgb_array",
+            sim_backend=args.sim_backend,
+            render_backend=args.render_backend,
+        )
+    )
+    rows: list[dict[str, object]] = []
+    try:
+        for index in range(args.episodes):
+            seed = args.start_seed + index
+            env.reset(seed=seed)
+            error = None
+            try:
+                StackPyramidOracle(env).run()
+            except Exception as exc:  # retain failed audit attempts
+                error = repr(exc)
+            evaluation = env.unwrapped.evaluate()
+            success = _bool(evaluation["success"] if isinstance(evaluation, dict) else evaluation)
+            rows.append(
+                {
+                    "episode_index": index,
+                    "seed": seed,
+                    "split": args.split,
+                    "actions": len(env.actions),
+                    "strict_success": success,
+                    "oracle_error": error,
+                }
+            )
+            print(json.dumps(rows[-1]), flush=True)
+    finally:
+        env.env.close()
+
+    summary = {
+        "format": "stackpyramid_oracle_gate_v2",
+        "split": args.split,
+        "episodes": len(rows),
+        "strict_successes": sum(int(row["strict_success"]) for row in rows),
+        "success_rate": sum(int(row["strict_success"]) for row in rows) / len(rows),
+        "rows": rows,
+    }
+    (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    if summary["episodes"] != args.episodes or summary["success_rate"] < 0.90:
+        raise RuntimeError(f"Oracle gate failed: {summary}")
+    (args.output / "ORACLE_GATE_COMPLETE").write_text("complete\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

@@ -59,8 +59,8 @@ def _summary(path: Path) -> dict[str, object]:
 
 
 def _run_oracle_gates(args: argparse.Namespace, root: Path) -> dict[str, dict[str, object]]:
-    script = args.repo_root / "tools" / "collect_stackpyramid_oracle.py"
-    output = root / "oracle"
+    script = args.repo_root / "tools" / "run_stackpyramid_oracle_gate.py"
+    output = root / "oracle_gate"
     output.mkdir(parents=True, exist_ok=True)
     starts = {"id": 91000, "stage1_ood": 92000, "stage2_ood": 93000, "stage3_ood": 94000}
     results: dict[str, dict[str, object]] = {}
@@ -88,7 +88,7 @@ def _run_oracle_gates(args: argparse.Namespace, root: Path) -> dict[str, dict[st
             commands.append((command, root / "logs" / f"oracle_{split}.log", f"oracle_{split}"))
         _run_pair(commands)
         for split in pair:
-            summary = _summary(output / split / "motionplanning")
+            summary = _summary(output / split)
             success_rate = float(summary["success_rate"])
             if success_rate < 0.90:
                 raise RuntimeError(f"oracle success gate failed for {split}: {success_rate}")
@@ -96,7 +96,7 @@ def _run_oracle_gates(args: argparse.Namespace, root: Path) -> dict[str, dict[st
                 "episodes": int(summary["episodes"]),
                 "strict_successes": int(summary["strict_successes"]),
                 "success_rate": success_rate,
-                "summary": str((output / split / f"oracle_summary_{split}.json").resolve()),
+                "summary": str((output / split / "summary.json").resolve()),
             }
     return results
 
