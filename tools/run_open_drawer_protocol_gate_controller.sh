@@ -23,7 +23,7 @@ LOG_DIR=$RUN/logs
 PID_DIR=$RUN/pids
 LOG=$LOG_DIR/gate_controller.log
 
-mkdir -p "$LOG_DIR" "$PID_DIR" "$ORACLE" "$ASSET" "$PCA_CAL"
+mkdir -p "$LOG_DIR" "$PID_DIR" "$ORACLE" "$ASSET" "$PCA_CAL" "$RUN/protocol_gates"
 
 alive() {
   [ -s "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null
