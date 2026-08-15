@@ -77,9 +77,11 @@ def main() -> None:
     from tools.collect_stackpyramid_xvla_dagger import (
         StackPyramidOracle,
         StepRecorder,
+        _install_rrt_fallback,
     )
     from tools.stackpyramid_task import register_stackpyramid_splits, stackpyramid_env_id
 
+    _install_rrt_fallback()
     register_stackpyramid_splits()
     env = StepRecorder(
         gym.make(
