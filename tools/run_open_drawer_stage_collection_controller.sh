@@ -73,7 +73,10 @@ wait_job() {
 
 echo "$(date -Is) controller_started" >> "$LOG"
 OLD_PCA="$SIDE/pids/pca_only_collection_v1.pid"
-OLD_DIFF="$SIDE/pids/diffdagger_collection_successful_id_v1.pid"
+OLD_DIFF_PIDS=(
+  "$SIDE/pids/diffdagger_collection_successful_id_v1.pid"
+  "$SIDE/pids/diffdagger_collection_retry1.pid"
+)
 
 # The aggregate DiffDAgger run can be long.  Start the stage PCA as soon as
 # the aggregate PCA releases GPU4, then let it overlap with the tail of the
@@ -81,6 +84,27 @@ OLD_DIFF="$SIDE/pids/diffdagger_collection_successful_id_v1.pid"
 # without duplicating a stage or touching the main training GPUs.
 while alive "$OLD_PCA"; do sleep 300; done
 echo "$(date -Is) aggregate_pca_exited" >> "$LOG"
+
+wait_old_diff() {
+  local old
+  for old in "${OLD_DIFF_PIDS[@]}"; do
+    while alive "$old"; do sleep 300; done
+  done
+}
+
+active_stage_output() {
+  local base=$1 out name pidfile
+  for out in "${base}"_retry*; do
+    [ -d "$out" ] || continue
+    name=$(basename "$out")
+    pidfile="$PID_DIR/${name}.pid"
+    if alive "$pidfile"; then
+      printf '%s' "$out"
+      return 0
+    fi
+  done
+  return 1
+}
 
 stage_index=0
 for split in handle_ood grasp_ood goal_ood; do
@@ -90,16 +114,21 @@ for split in handle_ood grasp_ood goal_ood; do
   id_seed=$((100000 + stage_index * 4000))
   ood_seed=$((110000 + stage_index * 4000))
 
-  pca_out=$(next_out "$stage/pca_only")
+  if pca_out=$(active_stage_output "$stage/pca_only"); then
+    pca_name=$(basename "$pca_out")
+    echo "$(date -Is) resuming name=$pca_name output=$pca_out" >> "$LOG"
+  else
+    pca_out=$(next_out "$stage/pca_only")
+    pca_name=$(basename "$pca_out")
+    run_collector "$pca_name" 4 40-59 pca_only "$split" "$id_seed" "$ood_seed" "$pca_out"
+  fi
   diff_out=$(next_out "$stage/diffdagger")
-  pca_name=$(basename "$pca_out")
   diff_name=$(basename "$diff_out")
-  run_collector "$pca_name" 4 40-59 pca_only "$split" "$id_seed" "$ood_seed" "$pca_out"
   echo "$(date -Is) stage_pca_started_before_aggregate_diff_exit split=$split" >> "$LOG"
 
-  # GPU5 remains occupied by the aggregate DiffDAgger until it exits.  The
-  # stage PCA above continues independently while this wait is in progress.
-  while alive "$OLD_DIFF"; do sleep 300; done
+  # GPU5 remains occupied by all aggregate DiffDAgger runs until they exit.
+  # The stage PCA above continues independently while this wait is in progress.
+  wait_old_diff
   echo "$(date -Is) aggregate_diff_exited split=$split" >> "$LOG"
   run_collector "$diff_name" 5 60-79 diffdagger "$split" "$((id_seed + 1000))" "$((ood_seed + 1000))" "$diff_out"
   wait_job "$pca_name" "$pca_out" || exit 1
