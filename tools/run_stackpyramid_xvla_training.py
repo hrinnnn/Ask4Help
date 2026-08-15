@@ -28,7 +28,9 @@ from torch.utils.data import DataLoader, Dataset
 from tools.xvla_stackcube_temporal_mask import padded_action_chunk
 
 
-TASK = "stack the red cube on the green cube and place the blue cube on top"
+# Keep the training instruction identical to the canonical StackPyramid task
+# and evaluator. The red cube is placed next to the green cube.
+TASK = "stack the red cube next to the green cube and place the blue cube on top"
 REAL_ACTION_DIM = 8
 MODEL_ACTION_DIM = 20
 ACTION_HORIZON = 10
