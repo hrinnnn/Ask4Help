@@ -5,19 +5,25 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from tools.collect_stackcube_xvla_dagger import exact_budget_subset
-
-
 METHODS = ("pca_only", "diffdagger", "failure_recovery", "offline_oracle")
+
+
+def exact_budget_subset(lengths: list[int], budget: int) -> list[int] | None:
+    reachable: dict[int, tuple[int, ...]] = {0: ()}
+    for index, length in enumerate(lengths):
+        for total, chosen in list(reachable.items())[::-1]:
+            candidate = total + length
+            if candidate <= budget and candidate not in reachable:
+                reachable[candidate] = (*chosen, index)
+        if budget in reachable:
+            return list(reachable[budget])
+    return None
 
 
 def read_jsonl(path: Path) -> list[dict]:
