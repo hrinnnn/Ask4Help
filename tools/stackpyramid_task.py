@@ -31,7 +31,7 @@ _OOD_SHIFTS_V1 = {
 # clearance for the blue-cube grasp.
 _OOD_SHIFTS_V2 = {
     "stage1_ood": np.asarray([0.045, 0.045], dtype=np.float64),
-    "stage2_ood": np.asarray([0.060, 0.050], dtype=np.float64),
+    "stage2_ood": np.asarray([0.040, 0.030], dtype=np.float64),
     "stage3_ood": np.asarray([0.060, -0.080], dtype=np.float64),
 }
 _OOD_SHIFTS_V3 = {

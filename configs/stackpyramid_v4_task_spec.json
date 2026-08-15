@@ -18,7 +18,7 @@
   "id_xy_jitter_m": [-0.008, 0.008],
   "ood_single_object_xy_shifts_m": {
     "stage1_ood": {"object": "red", "shift": [0.120, 0.100]},
-    "stage2_ood": {"object": "green", "shift": [0.060, 0.050]},
+    "stage2_ood": {"object": "green", "shift": [0.040, 0.030]},
     "stage3_ood": {"object": "blue", "shift": [0.100, -0.120]}
   },
   "oracle_red_placement": {
