@@ -119,7 +119,7 @@ for step in "${CHECKPOINT_STEPS[@]}"; do
   if [ ! -f "$eval_dir/summary.json" ] && ! alive "$eval_pidfile"; then
     export PYTHONPATH=$RL
     export ASK4HELP_RLINF_ROOT=$RL
-    taskset -c 140-159 env CUDA_VISIBLE_DEVICES=${OPEN_DRAWER_EVAL_GPU:-7} \
+    taskset -c 140-159 env CUDA_VISIBLE_DEVICES=${OPEN_DRAWER_EVAL_GPU:-6} \
       PYTHONPATH=$PYTHONPATH ASK4HELP_RLINF_ROOT=$ASK4HELP_RLINF_ROOT \
       nohup "$PY" "$EVALUATOR" \
         --checkpoint "$(ckpt "$step")" --pi05-base "$PI05" --norm-stats "$NORM" \
