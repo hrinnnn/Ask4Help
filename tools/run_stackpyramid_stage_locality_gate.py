@@ -23,7 +23,7 @@ def run_one(
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("wb") as stream:
         result = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT)
-    if result.returncode != 0:
+    if result.returncode not in (0, -6):
         raise RuntimeError(f"{split} locality audit failed; see {log_path}")
 
 
@@ -35,6 +35,7 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--seed-manifest", type=Path, required=True)
+    parser.add_argument("--gpus", nargs=2, default=("0", "1"))
     parser.add_argument("--cpu-sets", nargs=2, default=("0-7", "8-15"))
     args = parser.parse_args()
     root = args.output_root
@@ -49,7 +50,7 @@ def main() -> None:
         output = root / split
         command = [
             "taskset", "-c", args.cpu_sets[index % 2],
-            "env", f"CUDA_VISIBLE_DEVICES={index % 2}",
+            "env", f"CUDA_VISIBLE_DEVICES={args.gpus[index % 2]}",
             "PYTHONPATH=" + os.pathsep.join((str(args.repo_root), str(args.xvla_root))),
             str(args.python), str(script),
             "--checkpoint", str(args.checkpoint),

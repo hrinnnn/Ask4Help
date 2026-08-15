@@ -53,6 +53,8 @@ def main() -> None:
     parser.add_argument("--pca-asset", type=Path, required=True)
     parser.add_argument("--gpu", type=int, default=4)
     parser.add_argument("--cpu-set", default="80-99")
+    parser.add_argument("--locality-gpus", nargs=2, default=("4", "5"))
+    parser.add_argument("--locality-cpu-sets", nargs=2, default=("80-99", "100-119"))
     args = parser.parse_args()
     root = args.output_root
     root.mkdir(parents=True, exist_ok=True)
@@ -107,7 +109,30 @@ def main() -> None:
             )
             (diff_dir / "DIFF_CALIBRATION_COMPLETE").write_text("complete\n")
 
-        write_state(stage="pca_mixed_stream_pilot", pca_calibration=str(pca_json), diff_calibration=str(diff_json))
+        write_state(stage="stage_locality_gate", pca_calibration=str(pca_json), diff_calibration=str(diff_json))
+        locality = allocate(root / "stage_locality_gate", "STAGE_LOCALITY_GATE_COMPLETE")
+        if not (locality / "STAGE_LOCALITY_GATE_COMPLETE").is_file():
+            seed_manifest = root / "stage_locality_seed_manifest.json"
+            if not seed_manifest.is_file():
+                seed_manifest.write_text(json.dumps({
+                    "id": 74000,
+                    "stage1_ood": 75000,
+                    "stage2_ood": 76000,
+                    "stage3_ood": 77000,
+                }, indent=2) + "\n", encoding="utf-8")
+            run_stage(
+                "stage_locality_gate",
+                [str(args.python), str(args.worktree / "tools/run_stackpyramid_stage_locality_gate.py"),
+                 "--output-root", str(locality), "--repo-root", str(args.worktree),
+                 "--xvla-root", str(args.xvla_root), "--checkpoint", str(args.checkpoint),
+                 "--python", str(args.python), "--seed-manifest", str(seed_manifest),
+                 "--gpus", *args.locality_gpus, "--cpu-sets", *args.locality_cpu_sets],
+                args.gpu, args.cpu_set, log,
+            )
+            if not (locality / "STAGE_LOCALITY_GATE_COMPLETE").is_file():
+                raise RuntimeError("stage locality gate did not produce STAGE_LOCALITY_GATE_COMPLETE")
+
+        write_state(stage="pca_mixed_stream_pilot", pca_calibration=str(pca_json), diff_calibration=str(diff_json), locality_gate=str(locality))
         pca_threshold = float(json.loads(pca_json.read_text())["threshold"])
         pilot = allocate(root / "pca_mixed_stream_pilot", "PILOT_COMPLETE")
         if not (pilot / "PILOT_COMPLETE").is_file():
@@ -130,7 +155,51 @@ def main() -> None:
             if int(summary.get("accepted_total", 0)) != 20 or fraction < 0.80:
                 raise RuntimeError(f"PCA pilot is not OOD-dominant: {accepted}")
             (pilot / "PILOT_COMPLETE").write_text("complete\n")
-        write_state(stage="preflight_complete", pca_pilot=str(pilot))
+        summary = json.loads((pilot / "summary.json").read_text())
+        accepted = summary.get("accepted_by_split", {})
+        fraction = int(accepted.get("stage1_ood", 0)) / max(1, int(summary.get("accepted_total", 0)))
+        locality_report = json.loads((locality / "stage_locality_gate.json").read_text())
+        audit_report = {
+            "format": "stackpyramid_protocol_gate_report_v1",
+            "audit": str((args.audit_root / "audit.json").resolve()),
+            "oracle": {
+                split: {
+                    "episodes": int(value["episodes"]),
+                    "strict_success": int(value["strict_success"]),
+                    "success_rate": int(value["strict_success"]) / max(1, int(value["episodes"])),
+                    "summary": str((args.audit_root / "oracle" / split / "summary.json").resolve()),
+                }
+                for split, value in audit["oracle"].items()
+            },
+            "base_policy": {
+                split: {
+                    "episodes": int(value["episodes"]),
+                    "strict_success": int(value["strict_success"]),
+                    "success_rate": int(value["strict_success"]) / max(1, int(value["episodes"])),
+                    "summary": str((args.audit_root / "policy" / split / "summary.json").resolve()),
+                }
+                for split, value in audit["base_policy"].items()
+            },
+            "stage_locality": locality_report,
+            "pca_pilot": {
+                "accepted_total": int(summary["accepted_total"]),
+                "accepted_by_split": summary.get("accepted_by_split", {}),
+                "required_ood_fraction": 0.80,
+                "actual_ood_fraction": fraction,
+                "pass": int(summary["accepted_total"]) == 20 and fraction >= 0.80,
+                "summary": str((pilot / "summary.json").resolve()),
+            },
+            "gates": {
+                "oracle_pass": bool(audit["gates"]["oracle_pass"]),
+                "base_policy_pass": bool(audit["gates"]["base_policy_pass"]),
+                "stage_locality_pass": bool(locality_report["passed"]),
+                "pca_pilot_pass": int(summary["accepted_total"]) == 20 and fraction >= 0.80,
+            },
+        }
+        (root / "protocol_gate_report.json").write_text(json.dumps(audit_report, indent=2) + "\n", encoding="utf-8")
+        if not all(audit_report["gates"].values()):
+            raise RuntimeError(f"protocol gate report failed: {audit_report['gates']}")
+        write_state(stage="preflight_complete", pca_pilot=str(pilot), locality_gate=str(locality), gate_report=str(root / "protocol_gate_report.json"))
         (root / "PREFLIGHT_COMPLETE").write_text("complete\n")
     except Exception as exc:
         write_state(stage="failed", error=repr(exc))
