@@ -48,7 +48,7 @@
   ],
   "success": {
     "predicate": "ManiSkill StackPyramidEnv.evaluate()[success]",
-    "max_episode_steps": 250,
+    "max_episode_steps": 300,
     "execute_horizon": 5,
     "flow_steps": 5
   },

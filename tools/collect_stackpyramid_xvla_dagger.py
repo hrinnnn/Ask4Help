@@ -37,7 +37,7 @@ from tools.stackpyramid_task import (  # noqa: E402
 
 TASK = "stack the red cube next to the green cube and place the blue cube on top"
 EXECUTE_HORIZON = 5
-MAX_EPISODE_STEPS = 250
+MAX_EPISODE_STEPS = 300
 
 
 def _scalar(value: Any) -> Any:
@@ -220,6 +220,7 @@ class StackPyramidOracle:
             goal_pose = self.sapien.Pose(target_position, lift_pose.q)
             self.planner.move_to_pose_with_screw(goal_pose)
             self.planner.open_gripper()
+            self.planner.move_to_pose_with_screw(goal_pose * self.sapien.Pose([0, 0, 0.08]))
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
