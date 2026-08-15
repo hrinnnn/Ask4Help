@@ -242,19 +242,21 @@ def _set_backbone_trainable(model: Any, trainable: bool) -> None:
 
 def masked_flow_loss(model: Any, batch: dict[str, torch.Tensor]) -> torch.Tensor:
     enc = model.forward_vlm(batch["input_ids"], batch["image_input"], batch["image_mask"])
-    action = batch["action"]
-    batch_size = action.shape[0]
-    t = (torch.rand(1, device=action.device) + torch.arange(batch_size, device=action.device) / batch_size) % (1 - 1e-5)
-    action_noisy = torch.randn_like(action) * t.view(-1, 1, 1) + action * (1 - t).view(-1, 1, 1)
-    proprio_m, action_noisy_m = model.action_space.preprocess(batch["proprio"], action_noisy)
+    # Match inference: the flow latent must use the model-facing width before
+    # noise is sampled.  Padding after noise would leave dummy dimensions
+    # deterministic in training but random during iterative inference.
+    proprio_m, action_target = model.action_space.preprocess(batch["proprio"], batch["action"])
+    batch_size = action_target.shape[0]
+    t = (torch.rand(1, device=action_target.device) + torch.arange(batch_size, device=action_target.device) / batch_size) % (1 - 1e-5)
+    action_noisy = torch.randn_like(action_target) * t.view(-1, 1, 1) + action_target * (1 - t).view(-1, 1, 1)
     predicted = model.transformer(
         domain_id=batch["domain_id"],
-        action_with_noise=action_noisy_m,
+        action_with_noise=action_noisy,
         t=t,
         proprio=proprio_m,
         **enc,
     )
-    element_loss = (predicted[..., :REAL_ACTION_DIM] - action[..., :REAL_ACTION_DIM]).square()
+    element_loss = (predicted[..., :REAL_ACTION_DIM] - action_target[..., :REAL_ACTION_DIM]).square()
     mask = batch["action_valid_mask"].to(device=element_loss.device, dtype=element_loss.dtype).unsqueeze(-1)
     denominator = mask.sum() * REAL_ACTION_DIM
     if float(denominator.item()) <= 0:
