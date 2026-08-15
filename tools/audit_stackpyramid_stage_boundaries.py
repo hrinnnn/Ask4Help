@@ -91,6 +91,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--episodes", type=int, default=8)
     parser.add_argument("--start-seed", type=int, default=62000)
+    parser.add_argument("--seed-manifest", type=Path)
     parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="cpu")
     parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="cpu")
     args = parser.parse_args()
@@ -100,6 +101,11 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     task_root = args.task_root if args.task_root.is_dir() else root
     sys.path[:0] = [str(task_root), str(root), str(args.xvla_root)]
+    if args.seed_manifest is not None:
+        manifest = json.loads(args.seed_manifest.read_text(encoding="utf-8"))
+        seeds = manifest["oracle"]
+    else:
+        seeds = None
     from tools.collect_stackpyramid_xvla_dagger import StackPyramidOracle
     from tools.stackpyramid_task import register_stackpyramid_splits, stackpyramid_env_id
 
@@ -122,7 +128,13 @@ def main() -> None:
         )
         try:
             for episode in range(args.episodes):
-                seed = args.start_seed + (episode * 10) + (0 if split == "stage1_ood" else 1 if split == "stage2_ood" else 2)
+                if seeds is None:
+                    seed = args.start_seed + (episode * 10) + (0 if split == "stage1_ood" else 1 if split == "stage2_ood" else 2)
+                else:
+                    split_seeds = seeds["id" if split == "id" else split]
+                    if episode >= len(split_seeds):
+                        raise ValueError(f"seed manifest is too short for {split}: {len(split_seeds)}")
+                    seed = int(split_seeds[episode])
                 env.reset(seed=seed)
                 oracle_error = None
                 try:
@@ -172,6 +184,10 @@ def main() -> None:
             "rows": subset,
         }
     args.output.mkdir(parents=True)
+    if args.seed_manifest is not None:
+        (args.output / "seed_manifest.json").write_text(
+            args.seed_manifest.read_text(encoding="utf-8"), encoding="utf-8"
+        )
     (args.output / "boundary_audit.json").write_text(
         json.dumps({"format": "stackpyramid_stage_boundary_audit_v1", "summaries": summaries}, indent=2) + "\n",
         encoding="utf-8",
