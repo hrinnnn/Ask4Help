@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 
-REQUIRED_EVENT_ORDER = ("red_grasped", "red_lifted", "red_placed", "blue_lifted")
+REQUIRED_EVENT_ORDER = ("red_grasped", "red_lifted", "red_placed", "blue_grasped", "blue_lifted")
 
 
 def _event_order(recorder: object) -> dict[str, object]:
