@@ -23,8 +23,7 @@
   },
   "oracle_red_placement": {
     "center_offset_from_green_m": 0.040,
-    "release_height_above_table_m": 0.060,
-    "post_release_retreat_m": 0.080
+    "release_height_above_table_m": 0.060
   },
   "stage_predicates": {
     "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},

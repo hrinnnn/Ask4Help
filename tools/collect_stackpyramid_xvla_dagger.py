@@ -220,7 +220,6 @@ class StackPyramidOracle:
             goal_pose = self.sapien.Pose(target_position, lift_pose.q)
             self.planner.move_to_pose_with_screw(goal_pose)
             self.planner.open_gripper()
-            self.planner.move_to_pose_with_screw(goal_pose * self.sapien.Pose([0, 0, 0.08]))
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
