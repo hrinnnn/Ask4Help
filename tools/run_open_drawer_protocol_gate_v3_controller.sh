@@ -120,23 +120,12 @@ for split in splits:
         "id_success_rate": sum(bool(row.get("success")) for row in id_rows) / max(1, len(id_rows)),
         "ood_success_rate": sum(bool(row.get("success")) for row in ood_rows) / max(1, len(ood_rows)),
     }
-id_rows = [
-    json.loads(line)
-    for line in (oracle / "handle_ood" / "raw_attempts.jsonl").read_text().splitlines()
-    if line and json.loads(line).get("source") == "id"
-]
-reports["id_reference"] = {
-    "attempts": len(id_rows),
-    "success_rate": sum(bool(row.get("success")) for row in id_rows) / max(1, len(id_rows)),
-}
-passed = (
-    len(id_rows) >= 100
-    and reports["id_reference"]["success_rate"] >= 0.90
-    and all(
-        reports[split]["ood_attempts"] >= 100
-        and reports[split]["ood_success_rate"] >= 0.90
-        for split in splits
-    )
+passed = all(
+    reports[split]["id_attempts"] >= 100
+    and reports[split]["id_success_rate"] >= 0.90
+    and reports[split]["ood_attempts"] >= 100
+    and reports[split]["ood_success_rate"] >= 0.90
+    for split in splits
 )
 (run / "oracle_gate_summary.json").write_text(json.dumps(reports, indent=2, sort_keys=True) + "\n")
 if not passed:
