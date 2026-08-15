@@ -277,6 +277,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-attempts", type=int, default=400)
     parser.add_argument("--id-seed-start", type=int, default=81000)
     parser.add_argument("--ood-seed-start", type=int, default=82000)
+    parser.add_argument(
+        "--ood-split",
+        choices=OOD_SPLITS,
+        default=None,
+        help="Keep every OOD attempt in one frozen stage instead of rotating stages.",
+    )
     parser.add_argument("--execute-horizon", type=int, default=5)
     parser.add_argument("--max-policy-steps", type=int, default=240)
     parser.add_argument("--sim-backend", choices=("physx_cpu", "gpu"), default="physx_cpu")
@@ -340,7 +346,7 @@ def main() -> None:
     try:
         while attempts < args.max_attempts and min(counts.values()) < args.target_per_source:
             source = "id" if attempts % 2 == 0 else "ood"
-            split = "id" if source == "id" else OOD_SPLITS[(attempts // 2) % len(OOD_SPLITS)]
+            split = "id" if source == "id" else (args.ood_split or OOD_SPLITS[(attempts // 2) % len(OOD_SPLITS)])
             seed = (args.id_seed_start if source == "id" else args.ood_seed_start) + (attempts // 2)
             attempts += 1
             raw_row: dict[str, Any] = {"attempt_index": attempts - 1, "source": source, "split": split, "seed": seed, "method": args.method}
