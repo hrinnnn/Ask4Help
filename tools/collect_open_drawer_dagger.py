@@ -314,6 +314,8 @@ def main() -> None:
             }
             if not detectors:
                 raise ValueError(f"no PCA detector found for layer {args.pca_layer}")
+        elif args.method == "diffdagger":
+            detectors = {}
         if args.method in ("robot_gated", "failure_recovery", "pca_only"):
             payload = json.loads(args.thresholds.read_text())
             thresholds = {
