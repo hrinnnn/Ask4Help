@@ -6,7 +6,7 @@ set -u
 ROOT=${OPEN_DRAWER_ROOT:-/data/zhaozhixuan/Ask4Help-open-drawer}
 RL=$ROOT/RLinf
 PY=${OPEN_DRAWER_PYTHON:-/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python}
-RUN=$ROOT/results/open_drawer_failure_detection_v1/id_base_protocol_v2
+RUN=${OPEN_DRAWER_ID_BASE_RUN:-$ROOT/results/open_drawer_failure_detection_v1/id_base_protocol_v2}
 TRAIN=$RUN/sft_10000
 EVAL=$RUN/eval_id_100
 LOG_DIR=$RUN/logs
@@ -61,7 +61,7 @@ if [ ! -f "$(ckpt)" ]; then
     nohup "$PY" "$RL/examples/sft/train_vla_sft.py" \
       --config-path "$RL/examples/sft/config" \
       --config-name open_drawer_retrieve_place_id_sft_openpi_pi05 \
-      runner.max_steps=10000 runner.save_interval=500 runner.resume_dir=null \
+      runner.max_steps=10000 runner.save_interval=500 \
       >"$LOG_DIR/sft_10000.log" 2>&1 < /dev/null &
   echo $! > "$PID_DIR/sft_10000.pid"
   sleep 30
@@ -124,4 +124,3 @@ if summary.get("episodes") != 100 or summary.get("successes", 0) < 80:
 PY
 printf 'fresh ID base passed independent 100-ID validation.\n' > "$RUN/ID_BASE_VALIDATED"
 echo "$(date -Is) id_base_validated" >> "$LOG"
-
