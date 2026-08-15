@@ -211,10 +211,17 @@ class StackPyramidOracle:
             self.planner.close_gripper()
             lift_pose = self.sapien.Pose([0, 0, 0.1]) * grasp_pose
             self.planner.move_to_pose_with_screw(lift_pose)
-            goal_pose = self.sapien.Pose(
-                target_cube.pose.sp.p * 0.8, grasp_pose.q
+            target_xy = target_cube.pose.sp.p.detach().cpu().numpy().reshape(-1, 3)[0]
+            goal_high = self.sapien.Pose(
+                np.array([target_xy[0] * 0.8, target_xy[1] * 0.8, 0.10]),
+                lift_pose.q,
             )
-            self.planner.move_to_pose_with_screw(goal_pose)
+            goal_low = self.sapien.Pose(
+                np.array([target_xy[0] * 0.8, target_xy[1] * 0.8, target_xy[2]]),
+                lift_pose.q,
+            )
+            self.planner.move_to_pose_with_screw(goal_high)
+            self.planner.move_to_pose_with_screw(goal_low)
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
