@@ -213,7 +213,7 @@ class StackPyramidOracle:
             red_position = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
             direction = red_position[:2] - target_position[:2]
             direction /= max(float(np.linalg.norm(direction)), 1e-6)
-            target_position[:2] += 0.040 * direction
+            target_position[:2] += 0.020 * direction
             # Release above the tabletop so the open fingers do not sweep
             # through the green cube while descending to the contact plane.
             target_position[2] += 0.060

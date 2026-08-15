@@ -22,7 +22,7 @@
     "stage3_ood": {"object": "blue", "shift": [0.100, -0.120]}
   },
   "oracle_red_placement": {
-    "center_offset_from_green_m": 0.040,
+    "center_offset_from_green_m": 0.020,
     "release_height_above_table_m": 0.060
   },
   "stage_predicates": {
