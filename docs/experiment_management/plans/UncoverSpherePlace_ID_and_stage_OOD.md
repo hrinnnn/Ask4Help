@@ -1,6 +1,6 @@
 # UncoverSpherePlace ID 与阶段 OOD 审计
 
-**状态：formal candidate 的 3x3 Oracle gate、9/9 中间状态续接审计、三 split 正式采集与 temporal-mask 验收均已通过；ID base policy 已完成 10000 步训练，但 checkpoint selection 在 2000/4000/6000/8000/10000 均为 0/20 ID success，已写出 `BASE_POLICY_NOT_ACCEPTED`，因此下游 detector、gated collection、更新训练与最终评测尚未启动。**
+**状态：formal candidate 的 3x3 Oracle gate、9/9 中间状态续接审计、三 split 正式采集与 temporal-mask 验收均已通过；ID base policy 已完成 10000 步训练。新的 `post_training_pipeline_v1_retry2/checkpoint_selection/` 已对 2000/4000/6000/8000/10000 逐一完成 20 条独立 ID 验证，结果全部为 0/20，并写出 `BASE_POLICY_NOT_ACCEPTED`；因此下游 detector、gated collection、更新训练与最终评测尚未启动。**
 
 ## 任务定义
 
@@ -20,7 +20,7 @@ paired reset 审计已在相同 seed 上完成：`handle_ood` 只改变 cover ya
 
 LeRobot 运行依赖已在固定环境中完成导入 smoke。三 split collection smoke 位于 `outputs/collection_smoke_stage_localized_v1_retry4/`：ID、Handle OOD、Goal OOD 均为 3/3 成功，所有 episode 均保持 action/observation 对齐，9 个 side-by-side 视频均可解码。该 smoke 只用于验收 collector，不作为正式训练数据。
 
-正式采集输出为 `/data/zhaozhixuan/Ask4Help-uncover-sphere-place/outputs/collection_formal_stage_localized_v1_retry5/`，三个 split 各 128 条成功轨迹。`collection_validation.json` 已验证 action/observation 对齐、双视角图像、视频可解码、完整 episode 尾部 anchor 与 temporal validity mask；每个 split 的最后 observation 均保留且只有一个有效 target。2-step SFT 与 checkpoint reload/forward smoke 输出为 `id_sft_smoke_2_retry1/`，均已通过。正式 ID base policy 从 X-VLA 预训练基座启动于 `id_sft_10000_retry4/`，使用物理 GPU4/5、每 500 步保存；训练 marker 和 `ckpt-500` 至 `ckpt-10000` 均已生成。原 `post_training_pipeline_v1/` 在完整写出 checkpoint-2000 的 20 条评测后因底层库退出清理的 `free(): invalid pointer` 返回 -6；该输出已保留追溯。修复后的 `post_training_pipeline_v1_retry1/` 对完整输出进行验收后继续完成五个 checkpoint 的 20 条 ID selection，结果全部为 `0/20`，最终写出 `checkpoint_selection/BASE_POLICY_NOT_ACCEPTED` 并按协议停止。该阶段没有启动 detector、gated suffix collection、matched-budget 更新训练或最终 OOD 评测。
+正式采集输出为 `/data/zhaozhixuan/Ask4Help-uncover-sphere-place/outputs/collection_formal_stage_localized_v1_retry5/`，三个 split 各 128 条成功轨迹。`collection_validation.json` 已验证 action/observation 对齐、双视角图像、视频可解码、完整 episode 尾部 anchor 与 temporal validity mask；每个 split 的最后 observation 均保留且只有一个有效 target。2-step SFT 与 checkpoint reload/forward smoke 输出为 `id_sft_smoke_2_retry1/`，均已通过。正式 ID base policy 从 X-VLA 预训练基座启动于 `id_sft_10000_retry4/`，使用物理 GPU4/5、每 500 步保存；训练 marker 和 `ckpt-500` 至 `ckpt-10000` 均已生成。原 `post_training_pipeline_v1/` 在完整写出 checkpoint-2000 的 20 条评测后因底层库退出清理的 `free(): invalid pointer` 返回 -6；该输出已保留追溯。`post_training_pipeline_v1_retry1/` 和全新 `post_training_pipeline_v1_retry2/` 均对五个 checkpoint 完成完整输出验收；retry2 的五个独立 ID selection 结果全部为 `0/20`，最终写出 `checkpoint_selection/BASE_POLICY_NOT_ACCEPTED` 并按协议停止。该阶段没有启动 detector、gated suffix collection、matched-budget 更新训练或最终 OOD 评测。
 
 追加诊断：正式 ID 数据包含约 `141462` 个动作锚点；双卡 batch 8、`10000` 个 optimizer steps 约等于 `1.1` 个数据集遍历。训练日志无 NaN/OOM/Traceback，数据 schema、8D action、9D proprio、双视角和 temporal mask 均已核对一致。因此当前证据更支持长轨迹闭环训练预算不足，而不是数据边界或输入映射错误。该诊断不改变正式门槛，也不将任何新训练结果写入主结果。
 
