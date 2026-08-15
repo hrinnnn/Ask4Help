@@ -40,6 +40,44 @@ for split in handle_ood grasp_ood goal_ood; do
   done
 done
 
+if ! "$PY" - "$RUN" "$TRAIN" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+run = Path(sys.argv[1])
+train = Path(sys.argv[2])
+bad = []
+for split in ("handle_ood", "grasp_ood", "goal_ood"):
+    for method in ("pca_only", "diffdagger", "failure_recovery", "offline_oracle"):
+        base = run / split / method
+        parts = [Path(line.strip()) for line in (base / "collection_parts.txt").read_text().splitlines() if line.strip()]
+        summaries = [json.loads((part / "summary.json").read_text()) for part in parts]
+        accepted = sum(int(item.get("accepted", 0)) for item in summaries)
+        accepted_id = sum(int(item.get("accepted_id", 0)) for item in summaries)
+        accepted_ood = sum(int(item.get("accepted_ood", 0)) for item in summaries)
+        if accepted != 100:
+            bad.append({"split": split, "method": method, "reason": "accepted_not_100", "accepted": accepted})
+        if method == "offline_oracle":
+            if accepted_ood != 100 or accepted_id != 0:
+                bad.append({"split": split, "method": method, "reason": "offline_not_ood_only", "accepted_id": accepted_id, "accepted_ood": accepted_ood})
+        elif accepted_ood <= accepted_id:
+            bad.append({"split": split, "method": method, "reason": "not_ood_dominant", "accepted_id": accepted_id, "accepted_ood": accepted_ood})
+        for part in parts:
+            rows = [json.loads(line) for line in (part / "raw_attempts.jsonl").read_text().splitlines() if line]
+            sources = [row.get("source") for row in rows]
+            if method != "offline_oracle" and any(sources[i] == sources[i + 1] for i in range(len(sources) - 1)):
+                bad.append({"split": split, "method": method, "reason": "raw_stream_not_alternating", "part": str(part)})
+if bad:
+    (train / "OOD_DOMINANCE_REJECTED").write_text(json.dumps({"violations": bad}, indent=2) + "\n")
+    raise SystemExit(json.dumps(bad))
+(train / "COLLECTION_PROTOCOL_VALIDATED").write_text("all collection counts, split roles, and alternating streams validated\n")
+PY
+then
+  echo "$(date -Is) collection_protocol_rejected" >> "$LOG"
+  exit 1
+fi
+
 for split in handle_ood grasp_ood goal_ood; do
   output="$TRAIN/budget_prepared/$split"
   if [ ! -f "$output/budget_manifest.json" ]; then
