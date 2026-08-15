@@ -165,4 +165,4 @@ Timing 目录中的 DCA/EAS/DCE 仍是诊断代理；完整 paired state-snapsho
 - 四种方法收集完成后，以四组各自可达的最大共同 expert action 总量选择子集；训练仍保持 `128 ID + 本组 expert` 的 1:1 source-balanced sampler、正确 temporal action mask、batch 8、2000 steps、每 500 保存。
 - 评测统一使用 checkpoint-2000、纯 policy、100 条固定 ID 与 100 条对应 Stage OOD、`execute_horizon=5`、`max_episode_steps=250`；主表同时保留 ever grasped、base completion 和 strict success。
 
-当前状态（2026-08-15）：Diff calibration 已写出 25 条成功 ID 轨迹的阈值资产；Stage 1 Bridge-PCA 与 Offline-Oracle 已分别完成 100/100，Failure-Recovery 与 Diff-DAgger 正在收集。四方法收集、训练、评测和 `comparison.json/.md` 完成前，本任务仍标记为“进行中”；任何中间 PCA 结果都不能称为完整四方法比较。
+当前状态（2026-08-15）：Diff calibration 已写出 25 条成功 ID 轨迹的阈值资产；Stage 1 Bridge-PCA、Offline-Oracle、Failure-Recovery 已完成 100/100。原始 Diff 目录仅完成 73/100，未进入训练；当前正在全新 `collections/stage1_ood/diffdagger_retry2/` 中恢复采集，完成标记通过后由持久恢复器自动继续预算对齐、训练和评测。四方法收集、训练、评测和 `comparison.json/.md` 完成前，本任务仍标记为“进行中”；任何中间 PCA 结果都不能称为完整四方法比较。
