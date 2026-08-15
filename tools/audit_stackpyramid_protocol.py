@@ -133,10 +133,12 @@ def main() -> None:
     parser.add_argument("--oracle-render-backend", choices=("cpu", "gpu"), default="cpu")
     parser.add_argument("--policy-sim-backend", choices=("cpu", "gpu"), default="gpu")
     parser.add_argument("--policy-render-backend", choices=("cpu", "gpu"), default="gpu")
+    parser.add_argument("--geometry", choices=("v1", "v2"), default="v2")
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
     args.output.mkdir(parents=True)
+    os.environ["STACKPYRAMID_OOD_GEOMETRY"] = args.geometry
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     sys.path.insert(0, str(args.xvla_root.resolve()))
     oracle = {}
@@ -153,6 +155,7 @@ def main() -> None:
     audit = {
         "format": "stackpyramid_protocol_audit_v1",
         "checkpoint": str(args.checkpoint.resolve()),
+        "geometry": args.geometry,
         "episodes_per_split": args.episodes,
         "oracle": oracle,
         "base_policy": policy,

@@ -26,6 +26,7 @@ def main() -> None:
     parser.add_argument("--cpu-sets", default="80-99,100-119")
     parser.add_argument("--training-steps", type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument("--geometry", choices=("v1", "v2"), default="v2")
     args = parser.parse_args()
 
     root = args.output_root
@@ -63,8 +64,10 @@ def main() -> None:
             "--pca-asset", str(args.pca_asset), "--pca-calibration", str(pca_calibration),
             "--protocol-audit", str(args.audit_root), "--gpus", args.gpus, "--cpu-sets", args.cpu_sets,
             "--training-steps", str(args.training_steps), "--batch-size", str(args.batch_size),
+            "--geometry", args.geometry,
         ]
         env = os.environ.copy()
+        env["STACKPYRAMID_OOD_GEOMETRY"] = args.geometry
         env["PYTHONPATH"] = os.pathsep.join([str(args.worktree), str(args.xvla_root)])
         with log.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps({"command": command}) + "\n")

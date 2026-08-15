@@ -97,6 +97,7 @@ class Controller:
     def command_env(self, gpu: int) -> dict[str, str]:
         env = os.environ.copy()
         env["CUDA_VISIBLE_DEVICES"] = str(gpu)
+        env["STACKPYRAMID_OOD_GEOMETRY"] = self.args.geometry
         env["PYTHONPATH"] = os.pathsep.join([str(self.args.repo_root), str(self.args.xvla_root)])
         return env
 
@@ -495,6 +496,7 @@ def main() -> None:
     parser.add_argument("--training-steps", type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--seed", type=int, default=8200)
+    parser.add_argument("--geometry", choices=("v1", "v2"), default="v2")
     args = parser.parse_args()
     controller = Controller(args)
     try:
