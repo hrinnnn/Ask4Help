@@ -177,3 +177,14 @@ done
 
 printf 'Protocol-v2 stage collections complete.\n' > "$RUN/STAGE_COLLECTIONS_COMPLETE"
 echo "$(date -Is) all_stage_collections_complete" >> "$LOG"
+
+TRAIN_CONTROLLER=${OPEN_DRAWER_TRAINING_CONTROLLER:-$TOOLS/run_open_drawer_protocol_training_v2_controller.sh}
+TRAIN_PID=$PID_DIR/protocol_training_v2_controller.pid
+if ! alive "$TRAIN_PID" && [ ! -f "$RUN/matched_budget_training_v2/TRAINING_COMPLETE" ]; then
+  env OPEN_DRAWER_ROOT="$ROOT" OPEN_DRAWER_PYTHON="$PY" OPEN_DRAWER_TOOLS="$TOOLS" \
+    OPEN_DRAWER_PROTOCOL_CKPT="$CKPT" OPEN_DRAWER_PROTOCOL_NORM="$NORM" \
+    OPEN_DRAWER_PROTOCOL_TRAINING_STEPS=10000 \
+    nohup bash "$TRAIN_CONTROLLER" >"$LOG_DIR/protocol_training_v2_controller_stdout.log" 2>&1 < /dev/null &
+  echo $! > "$TRAIN_PID"
+  echo "$(date -Is) training_controller_started pid=$(cat "$TRAIN_PID")" >> "$LOG"
+fi
