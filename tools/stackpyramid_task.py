@@ -49,7 +49,9 @@ _ID_CENTERS_V4 = np.asarray(
 _OOD_SHIFTS_V4 = {
     "stage1_ood": np.asarray([0.120, 0.100], dtype=np.float64),
     "stage2_ood": np.asarray([-0.120, 0.100], dtype=np.float64),
-    "stage3_ood": np.asarray([0.170, -0.180], dtype=np.float64),
+    # Keep the blue target inside the known-solvable tabletop corridor while
+    # preserving a distinct blue-only distribution shift.
+    "stage3_ood": np.asarray([0.100, -0.120], dtype=np.float64),
 }
 _REGISTERED = False
 

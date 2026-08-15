@@ -19,7 +19,7 @@
   "ood_single_object_xy_shifts_m": {
     "stage1_ood": {"object": "red", "shift": [0.120, 0.100]},
     "stage2_ood": {"object": "green", "shift": [-0.120, 0.100]},
-    "stage3_ood": {"object": "blue", "shift": [0.170, -0.180]}
+    "stage3_ood": {"object": "blue", "shift": [0.100, -0.120]}
   },
   "stage_predicates": {
     "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},

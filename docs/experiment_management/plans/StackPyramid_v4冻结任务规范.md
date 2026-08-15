@@ -31,7 +31,7 @@ ID 中心为：
 |---|---|---|
 | Stage1 | red | `[0.120, 0.100]` |
 | Stage2 | green | `[-0.120, 0.100]` |
-| Stage3 | blue | `[0.170, -0.180]` |
+| Stage3 | blue | `[0.100, -0.120]` |
 
 按最大独立 jitter 计算，所有 split 的最小预计物体中心距离约为 `0.074 m`，高于此前测得的 `next_to` 阈值约 `0.0616 m`。这个静态裕量不是成功证明；必须用实际 ManiSkill reset smoke 读取 live threshold，并确认 reset 时所有 stage predicate 均为 false。
 
