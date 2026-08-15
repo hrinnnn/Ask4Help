@@ -198,8 +198,8 @@ def main() -> None:
         policy[split] = run_policy_split(args, split, args.output / "policy" / split)
     oracle_pass = all(summary["strict_success"] / args.episodes >= 0.90 for summary in oracle.values())
     base_policy_pass = (
-        policy["id"]["strict_success"] / args.episodes >= 0.90
-        and all(policy[split]["strict_success"] / args.episodes < 0.90 for split in SPLITS[1:])
+        policy["id"]["strict_success"] / args.episodes >= 0.80
+        and all(policy[split]["strict_success"] / args.episodes <= 0.50 for split in SPLITS[1:])
     )
     audit = {
         "format": "stackpyramid_protocol_audit_v1",
@@ -213,8 +213,8 @@ def main() -> None:
         "gates": {"oracle_pass": oracle_pass, "base_policy_pass": base_policy_pass},
         "rules": {
             "oracle_strict_success_minimum": 0.90,
-            "base_policy_id_strict_success_minimum": 0.90,
-            "base_policy_ood_strict_success_maximum": 0.90,
+            "base_policy_id_strict_success_minimum": 0.80,
+            "base_policy_ood_strict_success_maximum": 0.50,
         },
     }
     (args.output / "audit.json").write_text(json.dumps(audit, indent=2) + "\n", encoding="utf-8")

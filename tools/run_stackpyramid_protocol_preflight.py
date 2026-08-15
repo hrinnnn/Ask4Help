@@ -82,8 +82,25 @@ def main() -> None:
         audit = json.loads((args.audit_root / "audit.json").read_text())
         if audit.get("geometry") != args.geometry:
             raise RuntimeError(f"audit geometry mismatch: {audit.get('geometry')} != {args.geometry}")
-        if not all(audit.get("gates", {}).values()):
-            raise RuntimeError(f"audit gates are not all true: {audit.get('gates')}")
+        base_policy = audit.get("base_policy", {})
+        strict_base_gate = {
+            "id_minimum": 0.80,
+            "ood_maximum": 0.50,
+            "id_success_rate": int(base_policy["id"]["strict_success"]) / max(1, int(base_policy["id"]["episodes"])),
+            "ood_success_rates": {
+                split: int(base_policy[split]["strict_success"]) / max(1, int(base_policy[split]["episodes"]))
+                for split in ("stage1_ood", "stage2_ood", "stage3_ood")
+            },
+        }
+        strict_base_gate["pass"] = (
+            strict_base_gate["id_success_rate"] >= strict_base_gate["id_minimum"]
+            and all(rate <= strict_base_gate["ood_maximum"] for rate in strict_base_gate["ood_success_rates"].values())
+        )
+        (root / "base_policy_stage_gate.json").write_text(json.dumps(strict_base_gate, indent=2) + "\n", encoding="utf-8")
+        if not strict_base_gate["pass"] or not all(audit.get("gates", {}).values()):
+            write_state(stage="failed", base_policy_stage_gate=strict_base_gate)
+            (root / "PREFLIGHT_FAILED").write_text(json.dumps({"audit_gates": audit.get("gates"), "base_policy_stage_gate": strict_base_gate}, indent=2) + "\n", encoding="utf-8")
+            raise RuntimeError(f"strict base-policy stage gate failed: {strict_base_gate}")
         write_state(stage="pca_calibration")
         pca_dir = allocate(root / "calibration" / "bridge_pca", "PCA_CALIBRATION_COMPLETE")
         pca_json = pca_dir / "calibration.json"
