@@ -23,14 +23,14 @@ ID 中心为：
 |---|---|
 | red | `[-0.080, -0.080]` |
 | green | `[0.080, -0.080]` |
-| blue | `[0.000, 0.120]` |
+| blue | `[0.000, 0.100]` |
 
 每个物体独立加入 `[-0.008, 0.008] m` 的 xy jitter。OOD 只移动指定物体：
 
 | split | 物体 | shift（m） |
 |---|---|---|
 | Stage1 | red | `[0.120, 0.100]` |
-| Stage2 | green | `[-0.120, 0.100]` |
+| Stage2 | green | `[0.040, 0.030]` |
 | Stage3 | blue | `[0.100, -0.120]` |
 
 按最大独立 jitter 计算，所有 split 的最小预计物体中心距离约为 `0.074 m`，高于此前测得的 `next_to` 阈值约 `0.0616 m`。这个静态裕量不是成功证明；必须用实际 ManiSkill reset smoke 读取 live threshold，并确认 reset 时所有 stage predicate 均为 false。
@@ -47,7 +47,7 @@ ID 中心为：
 
 ## 执行顺序
 
-1. 只用 v4 source 做 20 条 reset smoke，逐 split 检查物体距离、predicate 初值和事件顺序。
+1. 只用 v4 source 做 reset/oracle smoke，逐 split 检查物体距离、predicate 初值和事件顺序；正式 rollout 上限为 300 个环境动作。
 2. 通过 smoke 后，按 v4 manifest 完成 ID 与 Stage1/2/3 Oracle gate；每 split 至少 `90/100` 严格成功。
 3. 重新采集 v4 ID demonstrations，重新计算并冻结 v4 ID norm，从预训练 base 重新训练唯一 v4 ID policy。禁止使用 v3 checkpoint。
 4. 用新 v4 ID checkpoint 做 100 条 ID 与三种 OOD base-policy gate：ID 至少 `80/100`，每个 OOD 不超过 `50/100`，并通过 prefix/locality gate。
