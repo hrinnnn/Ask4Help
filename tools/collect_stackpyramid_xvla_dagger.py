@@ -260,7 +260,8 @@ class StackPyramidOracle:
         # gives the blue cube time to settle before ManiSkill evaluates static
         # placement, without changing the task geometry or success predicate.
         release_z = float(max(goal_center[2], 0.0) + 0.035)
-        high_z = max(float(lift_pose.p[0, 2]), release_z + 0.08)
+        lift_center = np.asarray(lift_pose.p).reshape(-1, 3)[0]
+        high_z = max(float(lift_center[2]), release_z + 0.08)
         high_pose = self.sapien.Pose(
             np.array([goal_center[0], goal_center[1], high_z]), lift_pose.q
         )
