@@ -163,7 +163,7 @@ def reset_metadata(env: Any, *, split: str) -> dict[str, Any]:
         "ood_geometry": stackpyramid_geometry_version(),
         "reset_invariants": reset_invariants,
         "reset_invariant_pass": not any(reset_invariants.values()),
-        "max_episode_steps": 250,
+        "max_episode_steps": 300,
     }
 
 
@@ -236,7 +236,7 @@ def register_stackpyramid_splits() -> None:
             if env_id in gym.registry:
                 continue
 
-            @register_env(env_id, max_episode_steps=250)
+            @register_env(env_id, max_episode_steps=300)
             class ControlledStackPyramidEnv(StackPyramidEnv):
                 def _initialize_episode(
                     self, env_idx, options: dict, _initialize=initialize_fn
