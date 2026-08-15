@@ -297,7 +297,7 @@ def main() -> None:
     manifest_path = args.output_root / "raw_attempts.jsonl"
     accepted_path = args.output_root / "accepted_experts.jsonl"
     dataset = None
-    planner = PandaPosePlannerClient()
+    planner = PandaPosePlannerClient() if args.method == "offline_oracle" else None
     model = None
     detectors: dict[str, tuple[str, str, Any]] = {}
     thresholds: dict[str, float] = {}
@@ -382,11 +382,18 @@ def main() -> None:
                         expert_actions,
                         delta_bounds=_joint_delta_arm_bounds(policy_env),
                     )
-                    expert_result = continue_episode(proxy, planner, seed=seed)
-                    success = bool(expert_result.get("success", False))
-                    full_records = prefix_records + expert_records[1:]
-                    full_actions = prefix_actions + expert_actions
-                    metadata["expert_result"] = expert_result
+                    try:
+                        if planner is None:
+                            planner = PandaPosePlannerClient()
+                        expert_result = continue_episode(proxy, planner, seed=seed)
+                        success = bool(expert_result.get("success", False))
+                        full_records = prefix_records + expert_records[1:]
+                        full_actions = prefix_actions + expert_actions
+                        metadata["expert_result"] = expert_result
+                    except Exception as exc:  # keep the raw attempt auditable and continue collection
+                        metadata["planner_error"] = repr(exc)
+                        full_records = prefix_records
+                        full_actions = prefix_actions
                 else:
                     full_records, full_actions = prefix_records, prefix_actions
                 policy_env.close()
@@ -434,7 +441,8 @@ def main() -> None:
     finally:
         if dataset is not None and getattr(dataset, "image_writer", None) is not None:
             dataset.image_writer.wait_until_done()
-        planner.close()
+        if planner is not None:
+            planner.close()
         if model is not None:
             del model
             torch.cuda.empty_cache()
