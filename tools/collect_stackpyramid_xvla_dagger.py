@@ -214,6 +214,9 @@ class StackPyramidOracle:
             direction = red_position[:2] - target_position[:2]
             direction /= max(float(np.linalg.norm(direction)), 1e-6)
             target_position[:2] += 0.060 * direction
+            # Release above the tabletop so the open fingers do not sweep
+            # through the green cube while descending to the contact plane.
+            target_position[2] += 0.060
             goal_pose = self.sapien.Pose(target_position, lift_pose.q)
             self.planner.move_to_pose_with_screw(goal_pose)
             self.planner.open_gripper()
