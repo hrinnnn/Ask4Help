@@ -202,7 +202,7 @@ def _run_base_policy_gates(args: argparse.Namespace, root: Path) -> dict[str, di
                     "--split", split,
                     "--episodes", "100",
                     "--start-seed", str(starts[split]),
-                    "--max-episode-steps", "250",
+                    "--max-episode-steps", "300",
                     "--execute-horizon", "5",
                     "--flow-steps", "5",
                     "--device", "cuda",

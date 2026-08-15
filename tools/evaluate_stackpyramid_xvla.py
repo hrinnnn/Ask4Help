@@ -191,7 +191,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--split", choices=("id", "stage1_ood", "stage2_ood", "stage3_ood"), required=True)
     parser.add_argument("--episodes", type=int, default=100)
     parser.add_argument("--start-seed", type=int, required=True)
-    parser.add_argument("--max-episode-steps", type=int, default=250)
+    parser.add_argument("--max-episode-steps", type=int, default=300)
     parser.add_argument("--execute-horizon", type=int, default=5)
     parser.add_argument("--flow-steps", type=int, default=5)
     parser.add_argument("--device", default="cuda")
