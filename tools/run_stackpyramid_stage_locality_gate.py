@@ -11,7 +11,7 @@ import subprocess
 from pathlib import Path
 
 
-SPLITS = ("id", "stage1_ood", "stage2_ood", "stage3_ood")
+SPLITS = ("stage1_ood", "stage2_ood", "stage3_ood")
 STARTS = {"id": 74000, "stage1_ood": 75000, "stage2_ood": 76000, "stage3_ood": 77000}
 
 
@@ -73,20 +73,23 @@ def main() -> None:
             for future in futures:
                 future.result()
 
-    report: dict[str, object] = {"format": "stackpyramid_stage_locality_gate_v1", "splits": {}}
+    report: dict[str, object] = {
+        "format": "stackpyramid_stage_locality_gate_v1",
+        "id_base_summary": str((root.parent / "base_policy" / "id" / "summary.json").resolve()),
+        "splits": {},
+    }
     failures: list[str] = []
     for split in SPLITS:
         summary_path = root / split / "summary.json"
         summary = json.loads(summary_path.read_text(encoding="utf-8"))
         if int(summary.get("episodes", -1)) != 100:
             failures.append(f"{split}: expected 100 episodes")
-        if split != "id":
-            prefix_rate = float(summary["prefix_completion_rate"])
-            target_rate = float(summary["target_stage_reached_rate"])
-            if prefix_rate < 0.80:
-                failures.append(f"{split}: prefix completion {prefix_rate:.3f} < 0.80")
-            if target_rate <= 0.0:
-                failures.append(f"{split}: target-stage reach is zero")
+        prefix_rate = float(summary["prefix_completion_rate"])
+        target_rate = float(summary["target_stage_reached_rate"])
+        if prefix_rate < 0.80:
+            failures.append(f"{split}: prefix completion {prefix_rate:.3f} < 0.80")
+        if target_rate <= 0.0:
+            failures.append(f"{split}: target-stage reach is zero")
         report["splits"][split] = {
             "episodes": int(summary["episodes"]),
             "strict_success": int(summary["strict_success"]),
