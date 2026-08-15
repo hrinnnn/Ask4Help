@@ -116,3 +116,13 @@ done
 
 printf 'All three OpenDrawer OOD splits and four matched-budget methods trained.\n' > "$TRAIN/TRAINING_COMPLETE"
 echo "$(date -Is) protocol_training_complete" >> "$LOG"
+
+EVAL_CONTROLLER=${OPEN_DRAWER_FINAL_EVAL_CONTROLLER:-$TOOLS/run_open_drawer_protocol_final_eval_v2_controller.sh}
+EVAL_PID=$PID_DIR/final_eval_v2_controller.pid
+if ! alive "$EVAL_PID" && [ ! -f "$RUN/final_evaluation_v2/FINAL_EVAL_COMPLETE" ]; then
+  env OPEN_DRAWER_ROOT="$ROOT" OPEN_DRAWER_PYTHON="$PY" OPEN_DRAWER_TOOLS="$TOOLS" \
+    OPEN_DRAWER_PROTOCOL_TRAINING_STEPS="$STEPS" \
+    nohup bash "$EVAL_CONTROLLER" >"$LOG_DIR/final_eval_controller_stdout.log" 2>&1 < /dev/null &
+  echo $! > "$EVAL_PID"
+  echo "$(date -Is) final_eval_controller_started pid=$(cat "$EVAL_PID")" >> "$LOG"
+fi
