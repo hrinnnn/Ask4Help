@@ -15,7 +15,7 @@ from pathlib import Path
 SPLITS = ("id", "stage1_ood", "stage2_ood", "stage3_ood")
 
 
-def _write_seed_manifest(root: Path) -> Path:
+def _write_seed_manifest(root: Path, source: Path | None = None) -> Path:
     manifest = {
         "format": "stackpyramid_timing_protocol_seed_manifest_v1",
         "declared_before_execution": True,
@@ -33,7 +33,10 @@ def _write_seed_manifest(root: Path) -> Path:
         },
     }
     path = root / "seed_manifest.json"
-    path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    if source is not None:
+        path.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    else:
+        path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return path
 
 
@@ -130,7 +133,13 @@ def _run_base_policy_gates(args: argparse.Namespace, root: Path) -> dict[str, di
     script = args.repo_root / "tools" / "evaluate_stackpyramid_xvla.py"
     output = root / "base_policy"
     output.mkdir(parents=True, exist_ok=True)
-    starts = {"id": 74000, "stage1_ood": 75000, "stage2_ood": 76000, "stage3_ood": 77000}
+    manifest = json.loads((root / "seed_manifest.json").read_text(encoding="utf-8"))
+    starts = {
+        split: int(manifest["base_policy"][split]["start"])
+        if isinstance(manifest["base_policy"][split], dict)
+        else int(manifest["base_policy"][split][0])
+        for split in SPLITS
+    }
     results: dict[str, dict[str, object]] = {}
     for pair in (("id", "stage1_ood"), ("stage2_ood", "stage3_ood")):
         commands: list[tuple[list[str], Path, str]] = []
@@ -182,12 +191,13 @@ def main() -> None:
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--cpu-sets", nargs=2, default=("0-7", "8-15"))
+    parser.add_argument("--seed-manifest", type=Path)
     args = parser.parse_args()
     root = args.output_root
     if root.exists():
         raise FileExistsError(root)
     root.mkdir(parents=True)
-    seed_manifest = _write_seed_manifest(root)
+    seed_manifest = _write_seed_manifest(root, args.seed_manifest)
     (root / "pipeline_state.json").write_text(
         json.dumps(
             {
