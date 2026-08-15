@@ -1,6 +1,6 @@
 # X-VLA StackPyramid 全阶段 OOD 计划
 
-**状态：协议审计中。H20 X-VLA 原生环境、任务审计、oracle gate、ID base policy，以及旧版 Stage-1/2/3 Internal-Feature PCA 结果已保存；旧四方法总控因 Diff 阈值未通过审计而停止，旧结果只作诊断，不能进入正式训练。正式设计要求 ID base 只训练一次，Stage-1/2/3 各自从同一 immutable ID ckpt-10000 独立收集、匹配预算和训练。**
+**状态：v2 协议审计恢复中。H20 X-VLA 原生环境、任务审计、oracle gate、ID base policy，以及旧版 Stage-1/2/3 Internal-Feature PCA 结果已保存；旧 v1 几何和旧四方法总控结果只作诊断，不能进入正式训练。唯一冻结的 v2 几何、paired reset 和阶段 predicate 见《StackPyramid v2 冻结任务规范》，Timing 与四方法必须共用 `tools/stackpyramid_task.py` 和同一源码版本。正式设计要求 ID base 只训练一次，Stage-1/2/3 各自从同一 immutable ID ckpt-10000 独立收集、匹配预算和训练。**
 
 ## 1. 目标
 
@@ -35,6 +35,11 @@ ID demonstrations 中红、绿、蓝三块的初始位置都限制在各自狭�
 Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变红块本身的获取难度。Stage 3 的蓝块变化只在红绿底座完成后引入新的获取路径；底座几何和最终堆叠定义保持不变。
 
 主实验分别测试这三个单变量 OOD，不把三块同时移动。三者可以在最终 mixed deployment stream 中随机交替出现，但每个 episode 仍只激活一个 OOD 因素。三块同时变化属于复合 OOD，只能作为额外泛化实验，不能替代主 timing study。
+
+当前正式候选统一使用 `STACKPYRAMID_OOD_GEOMETRY=v2` 的局部 OOD 几何。Timing sweep 与四方法
+比较必须引用同一份冻结 `task_spec.json` 和同一源码版本；不得分别维护两个含义不同的 v2。
+旧 v1 大位移导致 Stage-1/2 prefix completion 为零，只保留为 diagnostic。v2 在进入任何正式
+collection 前必须重新完成 paired-reset、四 split oracle、base-policy 和 stage-locality 门禁。
 
 ### 可见性与阶段相关性
 
