@@ -29,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--num-episodes", type=int, default=20)
     parser.add_argument("--seed-start", type=int, default=91000)
+    parser.add_argument("--seed-list", type=Path)
     parser.add_argument("--execute-horizon", type=int, default=5)
     parser.add_argument("--max-policy-steps", type=int, default=240)
     parser.add_argument("--timesteps", type=int, default=16)
@@ -42,16 +43,26 @@ def main() -> None:
     if args.output.exists():
         raise FileExistsError(f"refusing to overwrite {args.output}")
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.seed_list is not None:
+        episode_seeds = [
+            int(line.strip())
+            for line in args.seed_list.read_text().splitlines()
+            if line.strip()
+        ]
+        if not episode_seeds:
+            raise ValueError(f"seed list is empty: {args.seed_list}")
+    else:
+        episode_seeds = [args.seed_start + index for index in range(args.num_episodes)]
     model = _load_model(args.checkpoint, args.norm_stats, args.pi05_base)
     scores: list[float] = []
     episodes: list[dict[str, object]] = []
     low = None
     high = None
     try:
-        for episode in range(args.num_episodes):
+        for episode, seed in enumerate(episode_seeds):
             env = _build_split_env("id", args, control_mode="pd_joint_delta_pos")
             try:
-                raw_obs, _info = env.reset(seed=args.seed_start + episode)
+                raw_obs, _info = env.reset(seed=seed)
                 reset = reset_metadata(env, split="id")
                 if low is None:
                     low = np.asarray(env.action_space.low).reshape(-1)
@@ -94,7 +105,7 @@ def main() -> None:
                         break
                 episodes.append({
                     "episode": episode,
-                    "seed": args.seed_start + episode,
+                    "seed": seed,
                     "actions": actions,
                     "scores": episode_scores,
                     "max_score": max(episode_scores) if episode_scores else None,
@@ -104,7 +115,7 @@ def main() -> None:
                     "reset": reset,
                 })
                 print(
-                    f"[open-drawer-diff-calibration] episode={episode + 1}/{args.num_episodes} "
+                    f"[open-drawer-diff-calibration] episode={episode + 1}/{len(episode_seeds)} "
                     f"actions={actions} scores={len(episode_scores)} success={int(ever_success)}",
                     flush=True,
                 )
@@ -118,8 +129,9 @@ def main() -> None:
         "checkpoint": str(args.checkpoint),
         "norm_stats": str(args.norm_stats),
         "split": "id",
-        "num_episodes": args.num_episodes,
+        "num_episodes": len(episode_seeds),
         "seed_start": args.seed_start,
+        "seeds": episode_seeds,
         "timesteps": args.timesteps,
         "noise_samples": args.noise_samples,
         "scores": scores,
