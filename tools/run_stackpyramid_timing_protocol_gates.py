@@ -77,6 +77,8 @@ def _run_oracle_gates(args: argparse.Namespace, root: Path) -> dict[str, dict[st
                 str(gpu_index),
                 args.cpu_sets[gpu_index],
                 [
+                    "--repo-root", str(args.repo_root),
+                    "--xvla-root", str(args.xvla_root),
                     "--output", str(split_output),
                     "--split", split,
                     "--episodes", "100",
