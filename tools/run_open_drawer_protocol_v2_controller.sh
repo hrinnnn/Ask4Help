@@ -49,6 +49,9 @@ run_collector() {
     --output-root "$out" --target-total-accepted "$target" --max-attempts "$MAX_ATTEMPTS"
     --attempt-offset "$offset" --id-seed-start "$id_seed" --ood-seed-start "$ood_seed"
     --ood-split "$split" --execute-horizon 5 --max-policy-steps 240)
+  if [ "$method" = "offline_oracle" ]; then
+    cmd+=(--single-source-split "$split")
+  fi
   if [ "$method" = "diffdagger" ]; then
     cmd+=(--detector-assets "$DET" --diff-calibration "$DIFF_CAL"
       --diff-alpha 0.95 --diff-patience 2 --diff-timesteps 16 --diff-noise-samples 1)
@@ -174,4 +177,3 @@ done
 
 printf 'Protocol-v2 stage collections complete.\n' > "$RUN/STAGE_COLLECTIONS_COMPLETE"
 echo "$(date -Is) all_stage_collections_complete" >> "$LOG"
-

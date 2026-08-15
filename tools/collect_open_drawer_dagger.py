@@ -305,6 +305,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Keep every OOD attempt in one frozen stage instead of rotating stages.",
     )
+    parser.add_argument(
+        "--single-source-split",
+        choices=("id",) + OOD_SPLITS,
+        help="Use only this split for every raw attempt; intended for offline OOD oracle data.",
+    )
     parser.add_argument("--execute-horizon", type=int, default=5)
     parser.add_argument("--max-policy-steps", type=int, default=240)
     parser.add_argument("--sim-backend", choices=("physx_cpu", "gpu"), default="physx_cpu")
@@ -321,6 +326,8 @@ def main() -> None:
         raise ValueError("choose only one of --raw-attempt-budget and --target-total-accepted")
     if args.attempt_offset < 0:
         raise ValueError("--attempt-offset must be non-negative")
+    if args.single_source_split is not None and args.raw_attempt_budget is None and args.target_total_accepted is None:
+        raise ValueError("single-source collection requires an explicit stopping rule")
     if args.output_root.exists() and any(args.output_root.iterdir()):
         raise FileExistsError(f"refusing to overwrite {args.output_root}")
     if args.method in ("robot_gated", "failure_recovery", "pca_only") and (
@@ -383,9 +390,14 @@ def main() -> None:
             or (total_target is None and min(counts.values()) < args.target_per_source)
         ):
             stream_index = args.attempt_offset + attempts
-            source = "id" if stream_index % 2 == 0 else "ood"
-            split = "id" if source == "id" else (args.ood_split or OOD_SPLITS[(stream_index // 2) % len(OOD_SPLITS)])
-            seed = (args.id_seed_start if source == "id" else args.ood_seed_start) + (stream_index // 2)
+            if args.single_source_split is not None:
+                source = "id" if args.single_source_split == "id" else "ood"
+                split = args.single_source_split
+                seed = (args.id_seed_start if source == "id" else args.ood_seed_start) + attempts
+            else:
+                source = "id" if stream_index % 2 == 0 else "ood"
+                split = "id" if source == "id" else (args.ood_split or OOD_SPLITS[(stream_index // 2) % len(OOD_SPLITS)])
+                seed = (args.id_seed_start if source == "id" else args.ood_seed_start) + (stream_index // 2)
             attempts += 1
             raw_row: dict[str, Any] = {"attempt_index": stream_index, "source": source, "split": split, "seed": seed, "method": args.method}
             full_records: list[Any] | None = None
@@ -499,6 +511,7 @@ def main() -> None:
         "target_per_source": args.target_per_source, "accepted": accepted,
         "accepted_id": counts["id"], "accepted_ood": counts["ood"], "attempts": attempts,
         "target_total_accepted": total_target, "attempt_offset": args.attempt_offset,
+        "single_source_split": args.single_source_split,
         "raw_attempt_budget": raw_budget,
         "stop_rule": (
             "raw_attempt_budget" if raw_budget is not None
