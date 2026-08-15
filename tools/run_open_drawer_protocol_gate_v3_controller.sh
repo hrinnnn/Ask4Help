@@ -31,9 +31,9 @@ alive() {
 
 echo "$(date -Is) gate_controller_started" >> "$LOG"
 while [ ! -f "$ID_BASE_RUN/ID_BASE_VALIDATED" ]; do
-  if [ -f "$ID_BASE_RUN/ID_BASE_REJECTED" ]; then
-    echo "$(date -Is) id_base_rejected" >> "$LOG"
-    exit 1
+  if [ -f "$ID_BASE_RUN/ID_BASE_REJECTED" ] || [ -f "$ID_BASE_RUN/ID_BASE_PROTOCOL_FAILED" ]; then
+    echo "$(date -Is) id_base_protocol_failed; stopping_before_ood" >> "$LOG"
+    exit 10
   fi
   echo "$(date -Is) waiting_for_id_base path=$ID_BASE_RUN/ID_BASE_VALIDATED" >> "$LOG"
   sleep 1800
