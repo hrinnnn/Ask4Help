@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect OpenDrawer Offline, Failure-Recovery, or Robot-Gated expert data."""
+"""Collect OpenDrawer expert data for offline, recovery, gate, PCA, or DiffDAgger."""
 
 from __future__ import annotations
 
@@ -25,6 +25,10 @@ from rlinf.algorithms.vla_fail import (  # noqa: E402
     knn_score,
     llmd_score,
     pca_residual_score,
+)
+from rlinf.algorithms.diffdagger import (  # noqa: E402
+    DiffDAggerQueryGate,
+    load_calibration_scores,
 )
 from rlinf.envs.maniskill.open_drawer_retrieve_place_spec import (  # noqa: E402
     ENV_IDS,
@@ -153,7 +157,8 @@ def _oracle_full(solver_env: Any, replay_env: Any, seed: int, planner: PandaPose
 
 def _policy_until_trigger(*, env: Any, model: Any, prior: torch.Tensor, detectors: dict[str, tuple[str, str, Any]],
                           thresholds: dict[str, float], seed: int, method: str, execute_horizon: int,
-                          max_policy_steps: int):
+                          max_policy_steps: int, diff_gate: DiffDAggerQueryGate | None = None,
+                          diff_timesteps: int = 16, diff_noise_samples: int = 1):
     raw_obs, _info = env.reset(seed=seed)
     initial_metadata = reset_metadata(env, split=env.unwrapped.rlinf_split)
     prefix_records = [_extract_record(raw_obs)]
@@ -162,6 +167,8 @@ def _policy_until_trigger(*, env: Any, model: Any, prior: torch.Tensor, detector
     ever_opened = ever_grasped = ever_lifted = False
     trigger: dict[str, Any] | None = None
     alarm_streak = 0
+    if diff_gate is not None:
+        diff_gate.reset()
     low = np.asarray(env.action_space.low).reshape(-1)
     high = np.asarray(env.action_space.high).reshape(-1)
     while len(prefix_actions) < max_policy_steps:
@@ -173,14 +180,38 @@ def _policy_until_trigger(*, env: Any, model: Any, prior: torch.Tensor, detector
             predicted, _ = model.predict_action_batch(env_obs=env_obs, mode="eval", compute_values=False)
         scores = {name: _score(features[layer], kind, stats) for name, (layer, kind, stats) in detectors.items()}
         alarms = {name: score >= thresholds[name] for name, score in scores.items()}
+        diff_decision = None
+        if diff_gate is not None:
+            diff_score = model.compute_diffdagger_uncertainty(
+                env_obs,
+                predicted,
+                num_timesteps=diff_timesteps,
+                num_noise_samples=diff_noise_samples,
+            )
+            diff_decision = diff_gate.decide(diff_score)
+            scores["diffdagger_flow"] = float(diff_decision.scores[0].item())
+            alarms["diffdagger_flow"] = bool(diff_decision.query_mask[0].item())
         alarmed = any(alarms.values())
         alarm_streak = alarm_streak + 1 if alarmed else 0
-        timeline.append({"decision_index": len(timeline), "env_step": len(prefix_actions), "scores": scores, "alarms": alarms})
+        timeline_row = {
+            "decision_index": len(timeline), "env_step": len(prefix_actions),
+            "scores": scores, "alarms": alarms,
+        }
+        if diff_decision is not None:
+            timeline_row["diffdagger_cdf"] = float(diff_decision.cdf_values[0].item())
+            timeline_row["diffdagger_threshold"] = float(diff_decision.threshold)
+            timeline_row["diffdagger_exceedance"] = bool(diff_decision.exceedances[0].item())
+        timeline.append(timeline_row)
         explicit_failure = (
             (ever_grasped and not _bool(env.unwrapped.agent.is_grasping(env.unwrapped.obj)))
             or (len(prefix_actions) >= 80 and not ever_lifted)
         )
-        if (method == "robot_gated" and alarm_streak >= 2) or (method == "failure_recovery" and explicit_failure):
+        diff_trigger = diff_decision is not None and bool(diff_decision.query_mask[0].item())
+        if (
+            (method in ("robot_gated", "pca_only") and alarm_streak >= 2)
+            or (method == "failure_recovery" and explicit_failure)
+            or (method == "diffdagger" and diff_trigger)
+        ):
             trigger = {
                 "method": method,
                 "env_step": len(prefix_actions),
@@ -190,6 +221,13 @@ def _policy_until_trigger(*, env: Any, model: Any, prior: torch.Tensor, detector
                 "scores": scores,
                 "alarms": alarms,
             }
+            if diff_decision is not None:
+                trigger.update({
+                    "diffdagger_score": float(diff_decision.scores[0].item()),
+                    "diffdagger_cdf": float(diff_decision.cdf_values[0].item()),
+                    "diffdagger_threshold": float(diff_decision.threshold),
+                    "diffdagger_exceedance": bool(diff_decision.exceedances[0].item()),
+                })
             break
         chunk = np.clip(predicted.detach().float().cpu().numpy()[0][:execute_horizon], low, high).astype(np.float32)
         for action in chunk:
@@ -216,12 +254,22 @@ def _write_video(records: list[Any], actions: list[np.ndarray], out: Path, index
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--method", choices=("offline_oracle", "failure_recovery", "robot_gated"), required=True)
+    parser.add_argument(
+        "--method",
+        choices=("offline_oracle", "failure_recovery", "robot_gated", "pca_only", "diffdagger"),
+        required=True,
+    )
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--pi05-base", type=Path, required=True)
     parser.add_argument("--norm-stats", type=Path, required=True)
     parser.add_argument("--detector-assets", type=Path)
     parser.add_argument("--thresholds", type=Path)
+    parser.add_argument("--pca-layer", default="vlm_bridge_final_mean")
+    parser.add_argument("--diff-calibration", type=Path)
+    parser.add_argument("--diff-alpha", type=float, default=0.95)
+    parser.add_argument("--diff-patience", type=int, default=2)
+    parser.add_argument("--diff-timesteps", type=int, default=16)
+    parser.add_argument("--diff-noise-samples", type=int, default=1)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--target-per-source", type=int, default=50)
     parser.add_argument("--max-attempts", type=int, default=400)
@@ -237,8 +285,12 @@ def main() -> None:
     args = parse_args()
     if args.output_root.exists() and any(args.output_root.iterdir()):
         raise FileExistsError(f"refusing to overwrite {args.output_root}")
-    if args.method != "offline_oracle" and (args.detector_assets is None or args.thresholds is None):
-        raise ValueError("gated and failure-recovery collection require detector assets and thresholds")
+    if args.method in ("robot_gated", "failure_recovery", "pca_only") and (
+        args.detector_assets is None or args.thresholds is None
+    ):
+        raise ValueError("detector-based collection requires detector assets and thresholds")
+    if args.method == "diffdagger" and args.diff_calibration is None:
+        raise ValueError("DiffDAgger collection requires --diff-calibration")
     args.output_root.mkdir(parents=True, exist_ok=True)
     (args.output_root / "raw_videos").mkdir()
     (args.output_root / "pids").mkdir(exist_ok=True)
@@ -250,14 +302,33 @@ def main() -> None:
     detectors: dict[str, tuple[str, str, Any]] = {}
     thresholds: dict[str, float] = {}
     prior = None
-    if args.method != "offline_oracle":
+    diff_gate = None
+    if args.method in ("robot_gated", "failure_recovery", "pca_only", "diffdagger"):
         detectors, asset_prior = _load_gate(args.detector_assets)
-        payload = json.loads(args.thresholds.read_text())
-        thresholds = {name: float(spec["threshold"]) for name, spec in payload["detectors"].items()}
-        if set(thresholds) != set(detectors):
-            raise ValueError("threshold names do not match detector assets")
+        if args.method == "pca_only":
+            detectors = {
+                name: spec for name, spec in detectors.items()
+                if spec[1] == "pca_residual" and spec[0] == args.pca_layer
+            }
+            if not detectors:
+                raise ValueError(f"no PCA detector found for layer {args.pca_layer}")
+        if args.method in ("robot_gated", "failure_recovery", "pca_only"):
+            payload = json.loads(args.thresholds.read_text())
+            thresholds = {
+                name: float(spec["threshold"])
+                for name, spec in payload["detectors"].items()
+                if name in detectors
+            }
+            if set(thresholds) != set(detectors):
+                raise ValueError("threshold names do not match selected detector assets")
         model = _load_model(args.checkpoint, args.norm_stats, args.pi05_base)
         prior = asset_prior.to("cuda")
+        if args.method == "diffdagger":
+            diff_gate = DiffDAggerQueryGate(
+                load_calibration_scores(args.diff_calibration),
+                alpha=args.diff_alpha,
+                patience=args.diff_patience,
+            )
 
     counts = {"id": 0, "ood": 0}
     accepted = 0
@@ -292,9 +363,13 @@ def main() -> None:
                     replay_env.close()
             else:
                 policy_env = _build_split_env(split, args, control_mode="pd_joint_delta_pos")
-                result = _policy_until_trigger(env=policy_env, model=model, prior=prior, detectors=detectors,
-                                               thresholds=thresholds, seed=seed, method=args.method,
-                                               execute_horizon=args.execute_horizon, max_policy_steps=args.max_policy_steps)
+                result = _policy_until_trigger(
+                    env=policy_env, model=model, prior=prior, detectors=detectors,
+                    thresholds=thresholds, seed=seed, method=args.method,
+                    execute_horizon=args.execute_horizon, max_policy_steps=args.max_policy_steps,
+                    diff_gate=diff_gate, diff_timesteps=args.diff_timesteps,
+                    diff_noise_samples=args.diff_noise_samples,
+                )
                 prefix_records, prefix_actions, timeline, trigger, initial_metadata = result
                 metadata["reset"] = initial_metadata
                 raw_row["policy_timeline"] = timeline
