@@ -220,7 +220,9 @@ class StackPyramidOracle:
                 lift_pose.q,
             )
             goal_low = self.sapien.Pose(
-                np.array([target_xy[0] * 0.8, target_xy[1] * 0.8, target_xy[2]]),
+                np.array(
+                    [target_xy[0] * 0.8, target_xy[1] * 0.8, target_xy[2] + 0.025]
+                ),
                 lift_pose.q,
             )
             self.planner.move_to_pose_with_screw(goal_high)
