@@ -90,7 +90,6 @@ if ! alive "$PID_DIR/sft_10000.pid" && ! checkpoint_complete 10000; then
       --config-name open_drawer_retrieve_place_id_sft_openpi_pi05 \
       runner.max_steps=10000 runner.save_interval=500 \
       actor.micro_batch_size=32 actor.global_batch_size=128 \
-      cluster.component_placement="$PLACEMENT" \
       >"$LOG_DIR/sft_10000.log" 2>&1 < /dev/null &
   echo $! > "$PID_DIR/sft_10000.pid"
   sleep 30
