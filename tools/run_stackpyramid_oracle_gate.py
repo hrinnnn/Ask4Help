@@ -17,6 +17,14 @@ def _bool(value: object) -> bool:
     return bool(np.asarray(value).reshape(-1)[0])
 
 
+def _seed_values(spec: object) -> list[int]:
+    if isinstance(spec, dict):
+        start = int(spec["start"])
+        count = int(spec["count"])
+        return list(range(start, start + count))
+    return [int(seed) for seed in spec]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, required=True)
@@ -37,7 +45,7 @@ def main() -> None:
     manifest = None
     if args.seed_manifest is not None:
         manifest = json.loads(args.seed_manifest.read_text(encoding="utf-8"))
-        seeds = manifest["oracle"][args.split]
+        seeds = _seed_values(manifest["oracle"][args.split])
         if len(seeds) != args.episodes:
             raise ValueError(
                 f"seed manifest has {len(seeds)} seeds for {args.split}, "

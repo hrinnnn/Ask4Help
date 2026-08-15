@@ -61,6 +61,7 @@ printf '%s\n' 'phase=v2_formal_timing' > "${V2_ROOT}/pipeline_state.txt"
     "${XVLA_ROOT}" \
     "${MODEL}" \
     "${ID_H5}" \
+    "${V2_ROOT}/protocol_gates/seed_manifest.json" \
     > "${V2_ROOT}/formal_timing.log" 2>&1
 
 printf '%s\n' 'complete' > "${V2_ROOT}/V2_RECOVERY_COMPLETE"

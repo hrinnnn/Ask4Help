@@ -15,6 +15,46 @@ from pathlib import Path
 SPLITS = ("id", "stage1_ood", "stage2_ood", "stage3_ood")
 
 
+def _seed_values(spec: object) -> list[int]:
+    if isinstance(spec, dict):
+        start = int(spec["start"])
+        count = int(spec["count"])
+        return list(range(start, start + count))
+    return [int(seed) for seed in spec]
+
+
+def _validate_v2_manifest(path: Path) -> None:
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    if manifest.get("format") != "stackpyramid_timing_protocol_seed_manifest_v2":
+        raise ValueError("v2 recovery requires the frozen v2 seed manifest")
+    if not manifest.get("declared_before_execution") or manifest.get("geometry") != "v2":
+        raise ValueError("v2 manifest must declare geometry=v2 before execution")
+    if not manifest.get("paired_reset", {}).get("enabled"):
+        raise ValueError("v2 manifest must explicitly enable paired resets")
+    predicates = {
+        "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},
+        "stage2_ood": {"prefix": "red_lifted", "target": "red_placed"},
+        "stage3_ood": {"prefix": "red_placed", "target": "blue_lifted"},
+    }
+    if manifest.get("stage_predicate") != predicates:
+        raise ValueError("v2 manifest stage_predicate does not match the frozen evaluator contract")
+    oracle = manifest.get("oracle", {})
+    oracle_seeds = [_seed_values(oracle[split]) for split in SPLITS]
+    if any(len(seeds) != 100 for seeds in oracle_seeds) or any(seeds != oracle_seeds[0] for seeds in oracle_seeds[1:]):
+        raise ValueError("v2 Oracle seeds must be 100 continuous paired seeds across all splits")
+    base = manifest.get("base_policy", {})
+    base_seeds = [_seed_values(base[split]) for split in SPLITS]
+    if any(len(seeds) != 100 for seeds in base_seeds) or any(seeds != base_seeds[0] for seeds in base_seeds[1:]):
+        raise ValueError("v2 base-policy seeds must be 100 continuous paired seeds across all splits")
+    final = manifest.get("final_evaluation", {})
+    final_seeds = [_seed_values(final[split]) for split in SPLITS]
+    if any(len(seeds) != 100 for seeds in final_seeds) or any(seeds != final_seeds[0] for seeds in final_seeds[1:]):
+        raise ValueError("v2 final-evaluation seeds must be 100 continuous paired seeds across all splits")
+    timing = manifest.get("timing_collection", {})
+    if any(len(_seed_values(timing[split])) != 100 for split in SPLITS[1:]):
+        raise ValueError("v2 timing-collection candidate seeds must each contain 100 seeds")
+
+
 def _write_seed_manifest(root: Path, source: Path | None = None) -> Path:
     manifest = {
         "format": "stackpyramid_timing_protocol_seed_manifest_v1",
@@ -198,6 +238,8 @@ def main() -> None:
         raise FileExistsError(root)
     root.mkdir(parents=True)
     seed_manifest = _write_seed_manifest(root, args.seed_manifest)
+    if args.seed_manifest is not None:
+        _validate_v2_manifest(seed_manifest)
     (root / "pipeline_state.json").write_text(
         json.dumps(
             {
@@ -221,6 +263,9 @@ def main() -> None:
         raise RuntimeError(f"OOD capability-gap gate failed: ID={id_success}, OOD={ood_success}")
     report = {
         "format": "stackpyramid_timing_protocol_gates_v1",
+        "benchmark_version": json.loads(seed_manifest.read_text(encoding="utf-8")).get("benchmark_version"),
+        "geometry": json.loads(seed_manifest.read_text(encoding="utf-8")).get("geometry", "v1"),
+        "seed_manifest": str(seed_manifest.resolve()),
         "oracle": oracle,
         "base_policy": base_policy,
         "gates": {

@@ -19,6 +19,14 @@ def _bool(value: Any) -> bool:
     return bool(np.asarray(value).reshape(-1)[0])
 
 
+def _seed_values(spec: object) -> list[int]:
+    if isinstance(spec, dict):
+        start = int(spec["start"])
+        count = int(spec["count"])
+        return list(range(start, start + count))
+    return [int(seed) for seed in spec]
+
+
 class BoundaryRecorder:
     def __init__(self, env: Any, split: str):
         from tools.collect_stackpyramid_xvla_dagger import StepRecorder
@@ -131,7 +139,7 @@ def main() -> None:
                 if seeds is None:
                     seed = args.start_seed + (episode * 10) + (0 if split == "stage1_ood" else 1 if split == "stage2_ood" else 2)
                 else:
-                    split_seeds = seeds["id" if split == "id" else split]
+                    split_seeds = _seed_values(seeds["id" if split == "id" else split])
                     if episode >= len(split_seeds):
                         raise ValueError(f"seed manifest is too short for {split}: {len(split_seeds)}")
                     seed = int(split_seeds[episode])

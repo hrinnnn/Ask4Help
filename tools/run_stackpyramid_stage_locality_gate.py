@@ -12,7 +12,18 @@ from pathlib import Path
 
 
 SPLITS = ("stage1_ood", "stage2_ood", "stage3_ood")
-STARTS = {"id": 74000, "stage1_ood": 75000, "stage2_ood": 76000, "stage3_ood": 77000}
+DEFAULT_STARTS = {"stage1_ood": 75000, "stage2_ood": 76000, "stage3_ood": 77000}
+EXPECTED_PREDICATES = {
+    "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},
+    "stage2_ood": {"prefix": "red_lifted", "target": "red_placed"},
+    "stage3_ood": {"prefix": "red_placed", "target": "blue_lifted"},
+}
+
+
+def _start(spec: object, default: int) -> int:
+    if isinstance(spec, dict):
+        return int(spec["start"])
+    return int(spec[0])
 
 
 def run_one(
@@ -44,6 +55,15 @@ def main() -> None:
     root.mkdir(parents=True)
     manifest = json.loads(args.seed_manifest.read_text(encoding="utf-8"))
     (root / "seed_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    if manifest.get("format", "").endswith("_v2"):
+        if manifest.get("geometry") != "v2" or not manifest.get("paired_reset", {}).get("enabled"):
+            raise ValueError("v2 locality audit requires frozen v2 geometry and paired_reset")
+        if manifest.get("stage_predicate") != EXPECTED_PREDICATES:
+            raise ValueError("seed manifest stage_predicate does not match the frozen evaluator contract")
+    starts = {
+        split: _start(manifest.get("base_policy", {}).get(split), DEFAULT_STARTS[split])
+        for split in SPLITS
+    }
     script = args.repo_root / "tools" / "evaluate_stackpyramid_xvla.py"
     commands: list[tuple[str, list[str], Path]] = []
     for index, split in enumerate(SPLITS):
@@ -58,7 +78,7 @@ def main() -> None:
             "--output", str(output),
             "--split", split,
             "--episodes", "100",
-            "--start-seed", str(STARTS[split]),
+            "--start-seed", str(starts[split]),
             "--max-episode-steps", "250",
             "--execute-horizon", "5",
             "--flow-steps", "5",
@@ -76,6 +96,7 @@ def main() -> None:
 
     report: dict[str, object] = {
         "format": "stackpyramid_stage_locality_gate_v1",
+        "seed_manifest": str((root / "seed_manifest.json").resolve()),
         "id_base_summary": str((root.parent / "base_policy" / "id" / "summary.json").resolve()),
         "splits": {},
     }

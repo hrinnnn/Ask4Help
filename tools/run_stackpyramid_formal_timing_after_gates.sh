@@ -8,6 +8,8 @@ REPO_ROOT=${4:?repo root is required}
 XVLA_ROOT=${5:?X-VLA root is required}
 MODEL=${6:?base checkpoint is required}
 ID_H5=${7:?ID H5 is required}
+SEED_MANIFEST=${8:-}
+MANIFEST_FOR_RUN=${SEED_MANIFEST:-${GATE_ROOT}/seed_manifest.json}
 
 STATE=${ROOT}/formal_pipeline_state.json
 write_state() {
@@ -19,6 +21,7 @@ if [[ -e "${ROOT}" ]]; then
     exit 2
 fi
 mkdir -p "${ROOT}"
+cp "${MANIFEST_FOR_RUN}" "${ROOT}/seed_manifest.json"
 write_state 'phase=waiting_for_protocol_gates'
 
 while true; do
@@ -44,7 +47,7 @@ write_state 'phase=boundary_audit'
     --task-root "${REPO_ROOT}" \
     --output "${ROOT}/audit" \
     --episodes 100 \
-    --seed-manifest "${GATE_ROOT}/seed_manifest.json" \
+    --seed-manifest "${MANIFEST_FOR_RUN}" \
     --sim-backend cpu \
     --render-backend cpu
 test -f "${ROOT}/audit/AUDIT_COMPLETE"
@@ -78,10 +81,23 @@ run_collection() {
 write_state 'phase=collection'
 for stage_index in 0 1 2; do
     case "${stage_index}" in
-        0) stage=stage1_ood; start_seed=63000 ;;
-        1) stage=stage2_ood; start_seed=63100 ;;
-        2) stage=stage3_ood; start_seed=63200 ;;
+        0) stage=stage1_ood; default_start_seed=63000 ;;
+        1) stage=stage2_ood; default_start_seed=63100 ;;
+        2) stage=stage3_ood; default_start_seed=63200 ;;
     esac
+    start_seed=$("${PYTHON}" - "${MANIFEST_FOR_RUN}" "${stage}" "${default_start_seed}" <<'PY'
+import json
+import sys
+manifest = json.load(open(sys.argv[1]))
+spec = manifest.get("timing_collection", {}).get(sys.argv[2])
+if isinstance(spec, dict):
+    print(int(spec["start"]))
+elif isinstance(spec, list):
+    print(int(spec[0]))
+else:
+    print(int(sys.argv[3]))
+PY
+)
     run_collection "${stage}" immediate 0 0-7 "${start_seed}" & p0=$!
     run_collection "${stage}" pre_stage 1 8-15 "${start_seed}" & p1=$!
     wait "${p0}" "${p1}"
@@ -126,6 +142,7 @@ write_state 'phase=evaluation'
     --xvla-root "${XVLA_ROOT}" \
     --python "${PYTHON}" \
     --gpus 0,1 \
+    --seed-manifest "${MANIFEST_FOR_RUN}" \
     --cpu-sets 0-7,8-15
 test -f "${ROOT}/TIMING_EVALUATION_COMPLETE"
 
