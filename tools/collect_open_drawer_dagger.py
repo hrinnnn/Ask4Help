@@ -274,7 +274,29 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--diff-noise-samples", type=int, default=1)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--target-per-source", type=int, default=50)
+    parser.add_argument(
+        "--target-total-accepted",
+        type=int,
+        help=(
+            "Stop after this many accepted expert trajectories in the fixed alternating "
+            "deployment stream; accepted ID/OOD counts are observational."
+        ),
+    )
+    parser.add_argument(
+        "--raw-attempt-budget",
+        type=int,
+        help=(
+            "Run exactly this many alternating raw deployments. In this mode, "
+            "accepted ID/OOD counts are observational and never stop collection."
+        ),
+    )
     parser.add_argument("--max-attempts", type=int, default=400)
+    parser.add_argument(
+        "--attempt-offset",
+        type=int,
+        default=0,
+        help="Continue the alternating stream after this many prior raw attempts.",
+    )
     parser.add_argument("--id-seed-start", type=int, default=81000)
     parser.add_argument("--ood-seed-start", type=int, default=82000)
     parser.add_argument(
@@ -291,6 +313,14 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.raw_attempt_budget is not None and args.raw_attempt_budget <= 0:
+        raise ValueError("--raw-attempt-budget must be positive")
+    if args.target_total_accepted is not None and args.target_total_accepted <= 0:
+        raise ValueError("--target-total-accepted must be positive")
+    if args.raw_attempt_budget is not None and args.target_total_accepted is not None:
+        raise ValueError("choose only one of --raw-attempt-budget and --target-total-accepted")
+    if args.attempt_offset < 0:
+        raise ValueError("--attempt-offset must be non-negative")
     if args.output_root.exists() and any(args.output_root.iterdir()):
         raise FileExistsError(f"refusing to overwrite {args.output_root}")
     if args.method in ("robot_gated", "failure_recovery", "pca_only") and (
@@ -343,13 +373,21 @@ def main() -> None:
     counts = {"id": 0, "ood": 0}
     accepted = 0
     attempts = 0
+    raw_budget = args.raw_attempt_budget
+    total_target = args.target_total_accepted
+    attempt_limit = raw_budget if raw_budget is not None else args.max_attempts
     try:
-        while attempts < args.max_attempts and min(counts.values()) < args.target_per_source:
-            source = "id" if attempts % 2 == 0 else "ood"
-            split = "id" if source == "id" else (args.ood_split or OOD_SPLITS[(attempts // 2) % len(OOD_SPLITS)])
-            seed = (args.id_seed_start if source == "id" else args.ood_seed_start) + (attempts // 2)
+        while attempts < attempt_limit and (
+            raw_budget is not None
+            or (total_target is not None and accepted < total_target)
+            or (total_target is None and min(counts.values()) < args.target_per_source)
+        ):
+            stream_index = args.attempt_offset + attempts
+            source = "id" if stream_index % 2 == 0 else "ood"
+            split = "id" if source == "id" else (args.ood_split or OOD_SPLITS[(stream_index // 2) % len(OOD_SPLITS)])
+            seed = (args.id_seed_start if source == "id" else args.ood_seed_start) + (stream_index // 2)
             attempts += 1
-            raw_row: dict[str, Any] = {"attempt_index": attempts - 1, "source": source, "split": split, "seed": seed, "method": args.method}
+            raw_row: dict[str, Any] = {"attempt_index": stream_index, "source": source, "split": split, "seed": seed, "method": args.method}
             full_records: list[Any] | None = None
             full_actions: list[np.ndarray] | None = None
             expert_records: list[Any] | None = None
@@ -422,7 +460,7 @@ def main() -> None:
             if not success or not expert_records or not expert_actions:
                 print(f"[open-drawer-collect] attempt={attempts} source={source} split={split} success=0 trigger={bool(trigger)}", flush=True)
                 continue
-            if counts[source] >= args.target_per_source:
+            if raw_budget is None and total_target is None and counts[source] >= args.target_per_source:
                 print(
                     f"[open-drawer-collect] attempt={attempts} source={source} "
                     f"success=1 quota_full=1; keeping raw attempt only",
@@ -442,7 +480,7 @@ def main() -> None:
             dataset.save_episode()
             counts[source] += 1
             accepted += 1
-            accepted_row = {"episode_index": accepted - 1, "attempt_index": attempts - 1, "source": source, "split": split,
+            accepted_row = {"episode_index": accepted - 1, "attempt_index": stream_index, "source": source, "split": split,
                             "seed": seed, "expert_actions": len(expert_actions), "trigger": trigger,
                             "raw_video": raw_row["video"], "metadata": metadata}
             with accepted_path.open("a", encoding="utf-8") as handle:
@@ -460,10 +498,32 @@ def main() -> None:
         "format": "open_drawer_dagger_collection_v1", "method": args.method,
         "target_per_source": args.target_per_source, "accepted": accepted,
         "accepted_id": counts["id"], "accepted_ood": counts["ood"], "attempts": attempts,
+        "target_total_accepted": total_target, "attempt_offset": args.attempt_offset,
+        "raw_attempt_budget": raw_budget,
+        "stop_rule": (
+            "raw_attempt_budget" if raw_budget is not None
+            else "total_accepted" if total_target is not None
+            else "accepted_per_source"
+        ),
         "dataset": str(args.output_root / "lerobot_dataset") if dataset is not None else None,
         "raw_attempts": str(manifest_path), "accepted_manifest": str(accepted_path),
     }
     (args.output_root / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+    if raw_budget is not None:
+        (args.output_root / "COLLECTION_COMPLETE").write_text(
+            "fixed raw deployment budget exhausted; accepted counts are observational\n"
+        )
+        return
+    if total_target is not None:
+        if accepted < total_target:
+            raise SystemExit(
+                f"collection incomplete: accepted={accepted} target_total={total_target} "
+                f"attempts={attempts} max_attempts={attempt_limit}"
+            )
+        (args.output_root / "COLLECTION_COMPLETE").write_text(
+            "fixed alternating deployment stream reached total accepted target; source counts are observational\n"
+        )
+        return
     if min(counts.values()) < args.target_per_source:
         raise SystemExit(f"collection incomplete: id={counts['id']} ood={counts['ood']} target={args.target_per_source}")
     (args.output_root / "COLLECTION_COMPLETE").write_text("balanced accepted expert data and raw attempts verified\n")
