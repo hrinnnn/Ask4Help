@@ -214,6 +214,7 @@ class StackPyramidOracle:
             lift_pose = self.sapien.Pose([0, 0, 0.1]) * grasp_pose
             self.planner.move_to_pose_with_screw(lift_pose)
             self.planner.move_to_pose_with_screw(grasp_pose)
+            self.planner.close_gripper()
             goal_pose = self.sapien.Pose(
                 target_cube.pose.sp.p * 0.8, grasp_pose.q
             )
