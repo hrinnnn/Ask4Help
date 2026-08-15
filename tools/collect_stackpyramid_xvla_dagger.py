@@ -220,7 +220,7 @@ class StackPyramidOracle:
             goal_pose = self.sapien.Pose(target_position, lift_pose.q)
             self.planner.move_to_pose_with_screw(goal_pose)
             self.planner.open_gripper()
-            self.planner.move_to_pose_with_screw(goal_pose * self.sapien.Pose([0, 0, 0.20]))
+            self.planner.move_to_pose_with_screw(goal_pose * self.sapien.Pose([0, 0, 0.08]))
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
@@ -245,7 +245,7 @@ class StackPyramidOracle:
                 break
         blue_position = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
         safe_pose = self.sapien.Pose(
-            [blue_position[0], blue_position[1], 0.35], grasp_pose.q
+            [blue_position[0], blue_position[1], 0.20], grasp_pose.q
         )
         self.planner.move_to_pose_with_screw(safe_pose)
         reach_pose = grasp_pose * self.sapien.Pose([0, 0, -0.05])
