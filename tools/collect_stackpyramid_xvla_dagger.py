@@ -461,6 +461,36 @@ def main() -> None:
         "raw_successes": sum(int(row["success"]) for row in raw_rows),
         "expert_action_steps": sum(len(item["actions"]) for item in accepted),
         "dataset": str((args.output_dir / "accepted_suffixes.h5").resolve()),
+        "selection_metrics": {
+            "raw_attempts": len(raw_rows),
+            "raw_attempts_by_split": {
+                split: sum(int(row["split"] == split) for row in raw_rows)
+                for split in ("id", args.split)
+            },
+            "raw_successes_by_split": {
+                split: sum(int(row["split"] == split and row["success"]) for row in raw_rows)
+                for split in ("id", args.split)
+            },
+            "alarm_count_by_split": {
+                split: sum(int(row["split"] == split and any(item["alarm"] for item in row["timeline"])) for row in raw_rows)
+                for split in ("id", args.split)
+            },
+            "query_count_by_split": {
+                split: sum(int(row["split"] == split and row["expert_start_step"] is not None and args.method != "offline_oracle") for row in raw_rows)
+                for split in ("id", args.split)
+            },
+            "takeover_count_by_split": {
+                split: sum(int(row["split"] == split and row["expert_start_step"] is not None and args.method != "offline_oracle") for row in raw_rows)
+                for split in ("id", args.split)
+            },
+            "assisted_success_by_split": {
+                split: sum(int(row["split"] == split and row["success"] and row["expert_start_step"] is not None and args.method != "offline_oracle") for row in raw_rows)
+                for split in ("id", args.split)
+            },
+            "accepted_by_split": accepted_counts,
+            "alternating_stream": True,
+            "selection_is_not_forced_50_50": True,
+        },
     }
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     (args.output_dir / "COLLECTION_COMPLETE").write_text("complete\n", encoding="utf-8")

@@ -19,7 +19,8 @@ def main() -> None:
     parser.add_argument("--xvla-root", type=Path, required=True)
     parser.add_argument("--asset", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--episodes", type=int, default=25)
+    parser.add_argument("--successful-rollouts", type=int, default=25)
+    parser.add_argument("--max-attempts", type=int, default=60)
     parser.add_argument("--start-seed", type=int, default=45000)
     parser.add_argument("--flow-steps", type=int, default=5)
     parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="cpu")
@@ -48,13 +49,15 @@ def main() -> None:
     maxima = []
     rows = []
     try:
-        for episode in range(args.episodes):
-            raw_obs, _ = env.reset(seed=args.start_seed + episode)
+        attempt = 0
+        while attempt < args.max_attempts and len(maxima) < args.successful_rollouts:
+            seed = args.start_seed + attempt
+            raw_obs, _ = env.reset(seed=seed)
             values = []
             executed = 0
             success = False
             while executed < 150 and not success:
-                generated, bridge, _inputs, _encoding = _predict(model, processor, raw_obs, device, args.start_seed + episode + executed, args.flow_steps)
+                generated, bridge, _inputs, _encoding = _predict(model, processor, raw_obs, device, seed + executed, args.flow_steps)
                 values.append(float(pca_residual_score(bridge.unsqueeze(1), stats)[0].item()))
                 for action in np.asarray(generated[:10], dtype=np.float32)[:5]:
                     raw_obs, _, terminated, truncated, _ = env.step(action)
@@ -63,14 +66,19 @@ def main() -> None:
                     if bool(terminated) or bool(truncated) or success:
                         break
             maximum = max(values) if values else float("nan")
-            maxima.append(maximum)
-            rows.append({"seed": args.start_seed + episode, "steps": executed, "success": bool(success), "max_score": maximum, "score_count": len(values)})
+            if success and np.isfinite(maximum):
+                maxima.append(maximum)
+            rows.append({"attempt": attempt, "seed": seed, "steps": executed, "success": bool(success), "max_score": maximum, "score_count": len(values)})
             print(json.dumps(rows[-1]), flush=True)
+            attempt += 1
     finally:
         env.close()
     finite = [value for value in maxima if np.isfinite(value)]
-    if len(finite) < max(2, args.episodes - 1):
-        raise RuntimeError(f"too many non-finite calibration trajectories: {len(finite)}/{args.episodes}")
+    if len(finite) < args.successful_rollouts:
+        raise RuntimeError(
+            f"Bridge-PCA calibration found {len(finite)} successful ID rollouts; "
+            f"required {args.successful_rollouts} within {args.max_attempts} attempts"
+        )
     rank = min(len(finite), math.ceil((len(finite) + 1) * 0.95))
     threshold = sorted(finite)[rank - 1]
     result = {
@@ -78,8 +86,10 @@ def main() -> None:
         "checkpoint": str(args.checkpoint.resolve()),
         "asset": str(args.asset.resolve()),
         "q": 0.95,
-        "episodes": len(rows),
+        "attempts": len(rows),
         "successful_id_rollouts": sum(int(row["success"]) for row in rows),
+        "successful_finite_rollouts": len(finite),
+        "max_attempts": args.max_attempts,
         "threshold": float(threshold),
         "trajectory_maxima": maxima,
         "rows": rows,

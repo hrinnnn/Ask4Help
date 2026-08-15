@@ -1,6 +1,6 @@
 # X-VLA StackPyramid 全阶段 OOD 计划
 
-**状态：部分完成。H20 X-VLA 原生环境、任务审计、oracle gate、ID base policy，以及 Stage-1/2/3 的 Internal-Feature PCA 收集、训练和评测已完成；Diff-DAgger、Failure-Recovery、Offline BC 尚未在三个 Stage 上完成对应的独立收集、matched-budget 训练和共同评测，因此本任务不能标记为完整完成。完整多介入时机 sweep 仍是后续独立实验。**
+**状态：协议审计中。H20 X-VLA 原生环境、任务审计、oracle gate、ID base policy，以及旧版 Stage-1/2/3 Internal-Feature PCA 结果已保存；旧四方法总控因 Diff 阈值未通过审计而停止，旧结果只作诊断，不能进入正式训练。正式设计要求 ID base 只训练一次，Stage-1/2/3 各自从同一 immutable ID ckpt-10000 独立收集、匹配预算和训练。**
 
 ## 1. 目标
 
@@ -62,9 +62,11 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 2. 记录任务阶段、首次报警和失败阶段。
 3. 使用同一 base policy 和冻结的该 Stage OOD seeds，分别收集四组 OOD expert 数据：
    `Internal-Feature PCA`、`Diff-DAgger`、`Failure-Recovery`、`Offline BC`。
-4. 四组各自形成独立训练 dataset。前三组保存各自规则触发后的成功 expert suffix；Offline BC
-   保存完整 OOD oracle trajectory。不得把 PCA suffix 复用于 Diff-DAgger，也不得用完整 oracle
-   trajectory 冒充 gated suffix。
+4. 前三种 gated 方法在冻结的 `ID / 当前 Stage OOD` 严格交替 raw stream 上运行，各自停止于
+   100 条成功且发生真实接管的 trajectory；不设置 50/50 accepted 配额。由于 ID base 已掌握 ID，
+   正式 accepted 数据应显著 OOD-dominant。Offline BC 不走 mixed gate，直接收集完整当前 Stage
+   OOD oracle trajectory。不得把 PCA suffix 复用于 Diff-DAgger，也不得用完整 oracle trajectory
+   冒充 gated suffix。
 5. 以低层 expert actions 选择四组共同可达预算；四组分别使用 `128 ID + 本组 OOD expert`
    的 `1:1 source-balanced` 数据，从相同 `ckpt-10000` 独立更新。
 6. 在共同 checkpoint 上，对四个更新后策略分别运行 100 ID、100 对应 Stage OOD 评测。
@@ -160,9 +162,15 @@ Timing 目录中的 DCA/EAS/DCE 仍是诊断代理；完整 paired state-snapsho
 冻结协议：
 
 - 同一 immutable ID base `stackpyramid_id_sft_10000_v1/formal_id_sft/ckpt-10000`，ID 数据为已验收的 128 条 asset subset。
-- 每个 Stage 使用同一组交替 raw attempt seed：偶数 attempt 为 ID，奇数 attempt 为该 Stage OOD；四种方法各收 100 条成功轨迹，Offline BC 从 reset 开始收完整 oracle，前三种方法只保留各自 gate 触发后的成功 suffix。
+- 每个 Stage 使用同一组交替 raw attempt seed：偶数 attempt 为 ID，奇数 attempt 为该 Stage OOD。前三种 gated 方法各收 100 条成功且发生真实接管的轨迹，只保留各自 gate 触发后的成功 suffix，不设 ID/OOD accepted quota；预期结果必须显著 OOD-dominant。Offline BC 单独收集 100 条当前 Stage 的完整 OOD oracle trajectory，不参加 mixed-stream data-selection 统计。
 - Internal-Feature Bridge-PCA 使用已验收的 PCA asset 与固定阈值 `0.95207279920578`；Diff-DAgger 使用独立成功 ID calibration 的 `q=.95` trajectory-maximum threshold、16 个 diff timesteps；Failure-Recovery 固定在 50 个低层 policy steps 后接管。
 - 四种方法收集完成后，以四组各自可达的最大共同 expert action 总量选择子集；训练仍保持 `128 ID + 本组 expert` 的 1:1 source-balanced sampler、正确 temporal action mask、batch 8、2000 steps、每 500 保存。
 - 评测统一使用 checkpoint-2000、纯 policy、100 条固定 ID 与 100 条对应 Stage OOD、`execute_horizon=5`、`max_episode_steps=250`；主表同时保留 ever grasped、base completion 和 strict success。
 
-当前状态（2026-08-15）：Diff calibration 已写出 25 条成功 ID 轨迹的阈值资产；Stage 1 Bridge-PCA、Offline-Oracle、Failure-Recovery 已完成 100/100。原始 Diff 目录仅完成 73/100，未进入训练；当前正在全新 `collections/stage1_ood/diffdagger_retry2/` 中恢复采集，完成标记通过后由持久恢复器自动继续预算对齐、训练和评测。四方法收集、训练、评测和 `comparison.json/.md` 完成前，本任务仍标记为“进行中”；任何中间 PCA 结果都不能称为完整四方法比较。
+当前状态（2026-08-15）：历史正确 mixed-stream 结果显示 Internal-kNN=96 OOD/4 ID、Diff=69/31、Failure-Recovery=75/25；而当前 PCA=49 ID/51 OOD，不能视为正常 data selection。旧 Stage 1 Diff retry 使用未通过审计的阈值，142 次 raw attempts 无 accepted，已停止并写入 diagnostic marker；所有旧 collection、日志和 partial H5 均保留，禁止进入预算对齐和训练。修正版必须先完成 ID、Stage-1/2/3 OOD 各 100 次 Oracle 审计，确认 ID base policy 已掌握且三个 OOD 存在受控缺口；PCA asset 只能由固定 ID expert 构建，PCA/Diff 都必须用独立成功 ID policy rollout 做 q=.95 校准。之后每个 Stage 才能按相同交替 raw stream、无 accepted split quota 收满 100 条，且 accepted 明显 OOD-dominant；否则在审计门停止。三组训练均从同一 ID `ckpt-10000` 独立重置 optimizer，不得串行续训。四方法收集、训练、评测和 `comparison.json/.md` 完成前，本任务仍标记为“进行中”。
+
+后续代码审计已定位到更具体的 calibration 缺口：现有 PCA asset 来自固定 ID expert，但其正式阈值
+没有在独立且成功的 ID policy rollout 上重新校准；旧 Diff retry 也出现大量 raw attempts 而没有
+真实触发。旧 Diff 采集及自动 retry 必须停止并保留为 diagnostic。修正版只有在四 split
+oracle/base-policy gate、PCA 独立成功-ID calibration、Diff 独立成功-ID calibration 和逐 split
+funnel 输出全部通过后，才允许启动正式 collection；PCA pilot 若仍非明显 OOD-dominant，不得训练。

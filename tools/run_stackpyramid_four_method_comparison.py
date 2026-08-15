@@ -39,6 +39,18 @@ class Controller:
             raise ValueError("provide two disjoint CPU sets")
         self.state: dict[str, Any] = {"format": "stackpyramid_four_method_comparison_v1"}
         self.diff_calibration = self.root / "calibration" / "diffdagger.json"
+        self.pca_calibration = args.pca_calibration
+        self.protocol_audit = args.protocol_audit
+        if self.protocol_audit is None:
+            raise ValueError("--protocol-audit is required for the corrected StackPyramid protocol")
+        if not (self.protocol_audit / "PROTOCOL_AUDIT_COMPLETE").is_file():
+            raise RuntimeError(f"protocol audit gate missing: {self.protocol_audit / 'PROTOCOL_AUDIT_COMPLETE'}")
+        audit = json.loads((self.protocol_audit / "audit.json").read_text())
+        gates = audit.get("gates", {})
+        if not gates.get("oracle_pass") or not gates.get("base_policy_pass"):
+            raise RuntimeError(f"protocol audit gates are not satisfied: {gates}")
+        if self.pca_calibration is None:
+            raise ValueError("--pca-calibration is required for independent ID calibration")
 
     def write_state(self, **updates: Any) -> None:
         self.state.update(updates)
@@ -144,7 +156,7 @@ class Controller:
             "--render-backend", "cpu",
         )
         if method == "bridge_pca":
-            command += ["--asset", str(self.args.pca_asset), "--pca-threshold", str(self.args.pca_threshold)]
+            command += ["--asset", str(self.args.pca_asset), "--pca-threshold", str(self.pca_threshold)]
         elif method == "diffdagger":
             command += ["--diff-threshold", str(threshold)]
         self.run_process(f"collect_{stage}_{method}", command, gpu, cpu_set)
@@ -171,6 +183,7 @@ class Controller:
                 if not (output / MARKERS["collection"]).is_file():
                     raise RuntimeError(f"collection marker missing: {output}")
         self.record_paths(stage, collections=outputs)
+        self.validate_collection_selection(stage, outputs)
         return outputs
 
     def _collection_command(self, stage: str, method: str, output: Path, stage_index: int) -> list[str]:
@@ -193,10 +206,27 @@ class Controller:
             "--render-backend", "cpu",
         )
         if method == "bridge_pca":
-            command += ["--asset", str(self.args.pca_asset), "--pca-threshold", str(self.args.pca_threshold)]
+            command += ["--asset", str(self.args.pca_asset), "--pca-threshold", str(self.pca_threshold)]
         elif method == "diffdagger":
             command += ["--diff-threshold", str(threshold)]
         return command
+
+    def validate_collection_selection(self, stage: str, paths: dict[str, Path]) -> None:
+        """Stop before budget matching if a gate is not selecting OOD-dominant data."""
+        for method, path in paths.items():
+            summary = json.loads((path / "summary.json").read_text())
+            accepted = summary.get("accepted_by_split", {})
+            total = int(summary.get("accepted_total", 0))
+            ood = int(accepted.get(stage, 0))
+            if total != 100 or ood / max(1, total) < self.args.min_ood_fraction:
+                raise RuntimeError(
+                    f"{stage}/{method} failed OOD-dominant selection gate: "
+                    f"accepted={total}, accepted_by_split={accepted}, "
+                    f"required_ood_fraction={self.args.min_ood_fraction}"
+                )
+            metrics = summary.get("selection_metrics", {})
+            if not metrics.get("alternating_stream") or not metrics.get("selection_is_not_forced_50_50"):
+                raise RuntimeError(f"{stage}/{method} missing corrected selection protocol metrics")
 
     def prepare_stage(self, stage: str, source_paths: dict[str, Path]) -> Path:
         self.write_state(stage=stage, phase="budget_selection")
@@ -384,7 +414,28 @@ class Controller:
         (self.root / "comparison.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def run(self) -> None:
-        self.write_state(phase="diff_calibration")
+        self.write_state(phase="pca_calibration", protocol_audit=str(self.protocol_audit))
+        pca_marker = self.pca_calibration.parent / "PCA_CALIBRATION_COMPLETE"
+        if not (pca_marker.is_file() and self.pca_calibration.is_file()):
+            output = self.fresh_path(self.pca_calibration.parent, "PCA_CALIBRATION_COMPLETE")
+            command = self.python_command(
+                "calibrate_stackpyramid_bridge_pca.py",
+                "--checkpoint", str(self.args.base_model),
+                "--xvla-root", str(self.args.xvla_root),
+                "--asset", str(self.args.pca_asset),
+                "--output", str(output / "calibration.json"),
+                "--successful-rollouts", "25",
+                "--max-attempts", "60",
+                "--start-seed", "45000",
+                "--flow-steps", "5",
+                "--sim-backend", "cpu",
+                "--render-backend", "cpu",
+            )
+            self.run_process("calibrate_pca", command, self.gpus[0], self.cpu_sets[0])
+            (output / "PCA_CALIBRATION_COMPLETE").write_text("complete\n", encoding="utf-8")
+            self.pca_calibration = output / "calibration.json"
+        self.pca_threshold = float(json.loads(self.pca_calibration.read_text())["threshold"])
+        self.write_state(phase="diff_calibration", pca_calibration=str(self.pca_calibration), pca_threshold=self.pca_threshold)
         calibration_marker = self.diff_calibration.parent / "DIFF_CALIBRATION_COMPLETE"
         if calibration_marker.is_file() and (self.diff_calibration.parent / "calibration.json").is_file():
             self.diff_calibration = self.diff_calibration.parent / "calibration.json"
@@ -409,6 +460,9 @@ class Controller:
                 raise RuntimeError("Diff calibration did not complete")
             self.diff_calibration = output / "calibration.json"
         for index, stage in enumerate(STAGES):
+            # Every stage is a separate experiment from the immutable ID base;
+            # no stage may resume another stage's optimizer or checkpoint.
+            self.write_state(stage=stage, base_model=str(self.args.base_model), optimizer_reset=True)
             source_paths = self.collect_stage(stage, index)
             selected = self.prepare_stage(stage, source_paths)
             training = self.train_stage(stage, selected)
@@ -428,7 +482,9 @@ def main() -> None:
     parser.add_argument("--base-model", type=Path, required=True)
     parser.add_argument("--id-h5", type=Path, required=True)
     parser.add_argument("--pca-asset", type=Path, required=True)
-    parser.add_argument("--pca-threshold", type=float, required=True)
+    parser.add_argument("--pca-threshold", type=float)
+    parser.add_argument("--pca-calibration", type=Path)
+    parser.add_argument("--protocol-audit", type=Path, required=True)
     parser.add_argument("--gpus", default="4,5")
     parser.add_argument("--cpu-sets", default="80-99,100-119")
     parser.add_argument("--training-steps", type=int, default=2000)
