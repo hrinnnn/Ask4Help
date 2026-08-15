@@ -21,6 +21,10 @@
     "stage2_ood": {"object": "green", "shift": [-0.120, 0.100]},
     "stage3_ood": {"object": "blue", "shift": [0.100, -0.120]}
   },
+  "oracle_red_placement": {
+    "center_offset_from_green_m": 0.045,
+    "release_height_above_table_m": 0.060
+  },
   "stage_predicates": {
     "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},
     "stage2_ood": {"prefix": "red_lifted", "target": "red_placed"},
