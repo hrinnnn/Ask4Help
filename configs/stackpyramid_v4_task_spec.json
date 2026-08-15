@@ -26,7 +26,7 @@
     "release_height_above_table_m": 0.060
   },
   "oracle_blue_approach": {
-    "safe_waypoint_height_m": 0.200
+    "safe_waypoint_height_m": 0.350
   },
   "stage_predicates": {
     "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},
