@@ -44,7 +44,7 @@ _OOD_SHIFTS_V3 = {
 # stage predicate is false at reset and remains physically valid after the
 # designated single-object shift, including the full reset-jitter envelope.
 _ID_CENTERS_V4 = np.asarray(
-    [[-0.080, -0.080], [0.080, -0.080], [0.000, 0.120]], dtype=np.float64
+    [[-0.080, -0.080], [0.080, -0.080], [0.000, 0.100]], dtype=np.float64
 )
 _OOD_SHIFTS_V4 = {
     "stage1_ood": np.asarray([0.120, 0.100], dtype=np.float64),
