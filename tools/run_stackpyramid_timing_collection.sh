@@ -7,6 +7,8 @@ TASK_ROOT="${TASK_ROOT:?set TASK_ROOT}"
 AUDIT="${AUDIT:?set AUDIT}"
 OUTPUT_ROOT="${OUTPUT_ROOT:?set OUTPUT_ROOT}"
 PYTHON="${PYTHON:?set PYTHON}"
+TARGET="${TARGET:-20}"
+MAX_ATTEMPTS="${MAX_ATTEMPTS:-100}"
 
 if [[ -e "$OUTPUT_ROOT" ]]; then
     echo "refusing to reuse timing collection output: $OUTPUT_ROOT" >&2
@@ -35,8 +37,8 @@ run_condition() {
         --output "$output" \
         --split "$split" \
         --condition "$condition" \
-        --target 20 \
-        --max-attempts 40 \
+        --target "$TARGET" \
+        --max-attempts "$MAX_ATTEMPTS" \
         --start-seed "$start_seed" \
         --pre-offset 25 \
         --boundary-offset 5 \
