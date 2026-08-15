@@ -16,6 +16,7 @@ LOG=$LOG_DIR/id_base_controller.log
 DATA=$ROOT/results/id_oracle_collection_v1/lerobot_datasets/open_drawer_retrieve_place/id_oracle_128_retry1_v1
 NORM=$ROOT/results/id_policy_training_v1/norm_stats_open_drawer_id_raw_v1
 PI05=$ROOT/results/model_cache/pi05_base_pytorch_v1
+EVALUATOR=${OPEN_DRAWER_EVALUATOR:-/data/zhaozhixuan/Ask4Help/tools/evaluate_open_drawer_id_pi05.py}
 
 mkdir -p "$LOG_DIR" "$PID_DIR"
 
@@ -118,7 +119,7 @@ for step in "${CHECKPOINT_STEPS[@]}"; do
     export ASK4HELP_RLINF_ROOT=$RL
     taskset -c 140-159 env CUDA_VISIBLE_DEVICES=${OPEN_DRAWER_EVAL_GPU:-7} \
       PYTHONPATH=$PYTHONPATH ASK4HELP_RLINF_ROOT=$ASK4HELP_RLINF_ROOT \
-      nohup "$PY" "$ROOT/tools/evaluate_open_drawer_id_pi05.py" \
+      nohup "$PY" "$EVALUATOR" \
         --checkpoint "$(ckpt "$step")" --pi05-base "$PI05" --norm-stats "$NORM" \
         --output-dir "$eval_dir" --episodes 100 --seed 90000 --split id \
         --execute-horizon 5 --max-episode-steps 400 \
