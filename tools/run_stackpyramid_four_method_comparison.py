@@ -61,6 +61,27 @@ class Controller:
                 return candidate
         raise RuntimeError(f"too many partial output directories for {base}")
 
+    def resolve_path(self, base: Path, marker: str) -> Path:
+        """Find an existing completed retry before allocating a new directory."""
+        if (base / marker).is_file():
+            return base
+        candidates = sorted(
+            candidate
+            for candidate in base.parent.glob(f"{base.name}_retry*")
+            if (candidate / marker).is_file()
+        )
+        if candidates:
+            return candidates[-1]
+        return self.fresh_path(base, marker)
+
+    def record_paths(self, stage: str, **paths: dict[str, Path]) -> None:
+        manifest_path = self.root / "stage_paths.json"
+        manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {}
+        stage_record = manifest.setdefault(stage, {})
+        for group, values in paths.items():
+            stage_record[group] = {key: str(value) for key, value in values.items()}
+        manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
     def command_env(self, gpu: int) -> dict[str, str]:
         env = os.environ.copy()
         env["CUDA_VISIBLE_DEVICES"] = str(gpu)
@@ -134,16 +155,22 @@ class Controller:
         self.write_state(stage=stage, phase="collection")
         outputs: dict[str, Path] = {}
         for method in METHODS:
-            outputs[method] = self.fresh_path(self.root / "collections" / stage / method, MARKERS["collection"])
+            outputs[method] = self.resolve_path(self.root / "collections" / stage / method, MARKERS["collection"])
         # Two workers are available. The pairings keep the maximum GPU use at two.
         first = [("bridge_pca", outputs["bridge_pca"], self.gpus[0]), ("offline_oracle", outputs["offline_oracle"], self.gpus[1])]
         second = [("failure_recovery", outputs["failure_recovery"], self.gpus[0]), ("diffdagger", outputs["diffdagger"], self.gpus[1])]
         for pair in (first, second):
-            jobs = [(f"collect_{stage}_{method}", self._collection_command(stage, method, output, stage_index), gpu) for method, output, gpu in pair]
-            self.run_pair(jobs)
+            jobs = [
+                (f"collect_{stage}_{method}", self._collection_command(stage, method, output, stage_index), gpu)
+                for method, output, gpu in pair
+                if not (output / MARKERS["collection"]).is_file()
+            ]
+            if jobs:
+                self.run_pair(jobs)
             for method, output, _gpu in pair:
                 if not (output / MARKERS["collection"]).is_file():
                     raise RuntimeError(f"collection marker missing: {output}")
+        self.record_paths(stage, collections=outputs)
         return outputs
 
     def _collection_command(self, stage: str, method: str, output: Path, stage_index: int) -> list[str]:
@@ -185,6 +212,7 @@ class Controller:
             for method in METHODS:
                 command += ["--source", f"{method}={source_paths[method] / 'accepted_suffixes.h5'}"]
             self.run_process(f"budget_{stage}", command, self.gpus[0], self.cpu_sets[0])
+        self.record_paths(stage, selected={"root": output})
         return output
 
     def train_one(self, stage: str, method: str, gpu: int, cpu_set: str, selected: Path, output: Path, smoke: bool) -> None:
@@ -208,14 +236,16 @@ class Controller:
             raise RuntimeError(f"{marker} missing: {output}")
 
     def train_stage(self, stage: str, selected: Path) -> dict[str, Path]:
-        outputs = {method: self.fresh_path(self.root / "training" / stage / method, MARKERS["training"]) for method in METHODS}
+        outputs = {method: self.resolve_path(self.root / "training" / stage / method, MARKERS["training"]) for method in METHODS}
         smoke_outputs = {method: self.fresh_path(self.root / "smoke" / stage / method, MARKERS["smoke"]) for method in METHODS}
         self.write_state(stage=stage, phase="smoke", training_outputs=outputs, smoke_outputs=smoke_outputs)
         for pair_methods in (("bridge_pca", "offline_oracle"), ("failure_recovery", "diffdagger")):
             jobs = []
             for index, method in enumerate(pair_methods):
-                jobs.append((f"smoke_{stage}_{method}", self._training_command(stage, method, selected, smoke_outputs[method], smoke=True), self.gpus[index]))
-            self.run_pair(jobs)
+                if not (smoke_outputs[method] / MARKERS["smoke"]).is_file():
+                    jobs.append((f"smoke_{stage}_{method}", self._training_command(stage, method, selected, smoke_outputs[method], smoke=True), self.gpus[index]))
+            if jobs:
+                self.run_pair(jobs)
             for method in pair_methods:
                 if not (smoke_outputs[method] / MARKERS["smoke"]).is_file():
                     raise RuntimeError(f"smoke marker missing: {smoke_outputs[method]}")
@@ -223,11 +253,14 @@ class Controller:
         for pair_methods in (("bridge_pca", "offline_oracle"), ("failure_recovery", "diffdagger")):
             jobs = []
             for index, method in enumerate(pair_methods):
-                jobs.append((f"train_{stage}_{method}", self._training_command(stage, method, selected, outputs[method], smoke=False), self.gpus[index]))
-            self.run_pair(jobs)
+                if not (outputs[method] / MARKERS["training"]).is_file():
+                    jobs.append((f"train_{stage}_{method}", self._training_command(stage, method, selected, outputs[method], smoke=False), self.gpus[index]))
+            if jobs:
+                self.run_pair(jobs)
             for method in pair_methods:
                 if not (outputs[method] / MARKERS["training"]).is_file():
                     raise RuntimeError(f"training marker missing: {outputs[method]}")
+        self.record_paths(stage, training=outputs, smoke=smoke_outputs)
         return outputs
 
     def _training_command(self, stage: str, method: str, selected: Path, output: Path, smoke: bool) -> list[str]:
@@ -290,9 +323,11 @@ class Controller:
             manifest_path = self.root / "selected" / stage / "budget_manifest.json"
             manifest = json.loads(manifest_path.read_text())
             for method in METHODS:
-                collection = json.loads((self.root / "collections" / stage / method / "summary.json").read_text())
+                paths = json.loads((self.root / "stage_paths.json").read_text()).get(stage, {})
+                collection_root = Path(paths.get("collections", {}).get(method, str(self.root / "collections" / stage / method)))
+                training_root = Path(paths.get("training", {}).get(method, str(self.root / "training" / stage / method)))
+                collection = json.loads((collection_root / "summary.json").read_text())
                 budget = manifest["methods"][method]
-                training_root = self.root / "training" / stage / method
                 losses = [json.loads(line)["loss"] for line in (training_root / "train.jsonl").read_text().splitlines() if line.strip()]
                 metrics = {}
                 for split in ("id", stage):
