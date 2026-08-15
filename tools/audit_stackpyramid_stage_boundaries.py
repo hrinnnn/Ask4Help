@@ -64,11 +64,15 @@ class BoundaryRecorder:
             and red[2] <= self.initial_z["red"] + 0.03
         )
         step = len(self.actions)
-        if self.boundaries["stage1"] is None and red_grasped and red_lifted:
+        # The stage boundary is a physical completion event.  Some valid
+        # Panda grasps do not satisfy the simulator's instantaneous contact
+        # predicate on the same step, so requiring both contact and height
+        # would miss valid OOD stage-1 executions.
+        if self.boundaries["stage1"] is None and red_lifted:
             self.boundaries["stage1"] = step
         if self.boundaries["stage2"] is None and red_placed:
             self.boundaries["stage2"] = step
-        if self.boundaries["stage3"] is None and blue_grasped and blue_lifted:
+        if self.boundaries["stage3"] is None and blue_lifted:
             self.boundaries["stage3"] = step
 
     def step(self, action: Any):
