@@ -147,9 +147,14 @@ def details(env: Any) -> dict[str, Any]:
     }
 
 
-def stage_events(env: Any, initial_z: dict[str, float]) -> dict[str, bool]:
-    """Return monotonic physical events used by the stage-locality gate."""
+def stage_events(
+    env: Any,
+    initial_z: dict[str, float],
+    completed_events: dict[str, bool] | None = None,
+) -> dict[str, bool]:
+    """Return stage events only after their preceding physical events."""
     base = env.unwrapped
+    completed_events = completed_events or {}
     red = base.cubeA.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
     blue = base.cubeC.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
     green = base.cubeB.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
@@ -159,17 +164,16 @@ def stage_events(env: Any, initial_z: dict[str, float]) -> dict[str, bool]:
     tcp = base.agent.tcp.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
     gripper_closed = bool(getattr(env, "gripper_closed", False))
     red_grasped = red_contact or (gripper_closed and float(np.linalg.norm(red - tcp)) <= 0.05)
-    red_lifted = float(red[2]) > initial_z["red"] + 0.015
+    red_lifted = completed_events.get("red_grasped", False) and float(red[2]) > initial_z["red"] + 0.015
     blue_lifted = float(blue[2]) > initial_z["blue"] + 0.015
     red_placed = (
+        completed_events.get("red_lifted", False)
+        and
         float(np.linalg.norm((red - green)[:2])) <= threshold
         and not red_grasped
         and float(red[2]) <= initial_z["red"] + 0.03
     )
-    # Blue grasping is only a valid event after the red placement event;
-    # this prevents a transient reset contact from becoming a stage event.
-    red_placed_history = "red_placed" in getattr(env, "event_first_steps", {})
-    blue_grasped = (red_placed or red_placed_history) and (
+    blue_grasped = completed_events.get("red_placed", False) and (
         blue_contact or (gripper_closed and float(np.linalg.norm(blue - tcp)) <= 0.05)
     )
     return {
@@ -177,7 +181,7 @@ def stage_events(env: Any, initial_z: dict[str, float]) -> dict[str, bool]:
         "red_lifted": red_lifted,
         "red_placed": red_placed,
         "blue_grasped": blue_grasped,
-        "blue_lifted": blue_lifted,
+        "blue_lifted": completed_events.get("blue_grasped", False) and blue_lifted,
     }
 
 
@@ -262,7 +266,7 @@ def main() -> None:
                     executed += 1
                     final_info = info if isinstance(info, dict) else {}
                     current = details(env)
-                    events = stage_events(env, initial_z)
+                    events = stage_events(env, initial_z, event_reached)
                     for name, reached in events.items():
                         if reached and not event_reached[name]:
                             event_reached[name] = True
@@ -278,7 +282,7 @@ def main() -> None:
                 if bool_scalar(terminated) or bool_scalar(truncated):
                     break
             final = details(env)
-            events = stage_events(env, initial_z)
+            events = stage_events(env, initial_z, event_reached)
             for name, reached in events.items():
                 if reached and not event_reached[name]:
                     event_reached[name] = True
