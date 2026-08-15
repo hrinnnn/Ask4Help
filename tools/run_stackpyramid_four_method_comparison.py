@@ -82,7 +82,10 @@ class Controller:
             self.write_state(running={"label": label, "pid": process.pid, "gpu": gpu, "log": str(log)})
             return_code = process.wait()
             stream.write(json.dumps({"return_code": return_code}) + "\n")
-        if return_code != 0:
+        # ManiSkill can abort while releasing its renderer after writing all
+        # requested artifacts. Callers verify the stage marker and payload
+        # immediately after this function, so preserve that documented case.
+        if return_code not in (0, -6):
             raise RuntimeError(f"{label} exited with {return_code}; see {log}")
 
     def run_pair(self, jobs: list[tuple[str, list[str], int]]) -> None:
