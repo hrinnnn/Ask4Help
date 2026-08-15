@@ -214,19 +214,19 @@ class StackPyramidOracle:
                 target_xy = target_xy.detach().cpu().numpy()
             target_xy = np.asarray(target_xy).reshape(-1, 3)[0]
             goal_xy = np.array([target_xy[0] * 0.8, target_xy[1] * 0.8])
-            goal_pose = self.sapien.Pose(
-                np.array([goal_xy[0], goal_xy[1], target_xy[2]]), grasp_pose.q
-            )
-            self.planner.move_to_pose_with_screw(goal_pose)
-            # Record a physical lift at the target, then lower vertically to
-            # the release height. Horizontal transport remains the official
-            # solver path and does not carry the cube at elevated height.
+            carry_z = 0.18
             lift_at_goal = self.sapien.Pose(
-                np.array([goal_xy[0], goal_xy[1], 0.10]), grasp_pose.q
+                np.array([goal_xy[0], goal_xy[1], carry_z]), grasp_pose.q
             )
             release_at_goal = self.sapien.Pose(
                 np.array([goal_xy[0], goal_xy[1], target_xy[2] + 0.025]),
                 grasp_pose.q,
+            )
+            self.planner.move_to_pose_with_screw(
+                self.sapien.Pose(
+                    np.array([moving_position[0], moving_position[1], carry_z]),
+                    grasp_pose.q,
+                )
             )
             self.planner.move_to_pose_with_screw(lift_at_goal)
             self.planner.move_to_pose_with_screw(release_at_goal)
