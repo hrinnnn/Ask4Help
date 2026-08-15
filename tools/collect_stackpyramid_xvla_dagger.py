@@ -201,9 +201,9 @@ class StackPyramidOracle:
         if need_move_a_b:
             # Keep the official ManiSkill order: approach open, close at grasp,
             # then transport. The recorder only captures the same env.step calls.
-            self.planner.close_gripper()
             grasp_pose = base.agent.build_grasp_pose(approaching, closing, moving_cube.pose.sp.p)
             reach_pose = grasp_pose * self.sapien.Pose([0, 0, -0.05])
+            self.planner.open_gripper()
             self.planner.move_to_pose_with_screw(reach_pose)
             self.planner.move_to_pose_with_screw(grasp_pose)
             self.planner.close_gripper()
