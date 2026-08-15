@@ -23,36 +23,38 @@ def _seed_values(spec: object) -> list[int]:
     return [int(seed) for seed in spec]
 
 
-def _validate_v2_manifest(path: Path) -> None:
+def _validate_versioned_manifest(path: Path) -> None:
     manifest = json.loads(path.read_text(encoding="utf-8"))
-    if manifest.get("format") != "stackpyramid_timing_protocol_seed_manifest_v2":
-        raise ValueError("v2 recovery requires the frozen v2 seed manifest")
-    if not manifest.get("declared_before_execution") or manifest.get("geometry") != "v2":
-        raise ValueError("v2 manifest must declare geometry=v2 before execution")
+    geometry = manifest.get("geometry")
+    expected_format = f"stackpyramid_timing_protocol_seed_manifest_{geometry}"
+    if geometry not in {"v2", "v3"} or manifest.get("format") != expected_format:
+        raise ValueError("versioned recovery requires a frozen v2 or v3 seed manifest")
+    if not manifest.get("declared_before_execution"):
+        raise ValueError("versioned manifest must be declared before execution")
     if not manifest.get("paired_reset", {}).get("enabled"):
-        raise ValueError("v2 manifest must explicitly enable paired resets")
+        raise ValueError("versioned manifest must explicitly enable paired resets")
     predicates = {
         "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},
         "stage2_ood": {"prefix": "red_lifted", "target": "red_placed"},
         "stage3_ood": {"prefix": "red_placed", "target": "blue_lifted"},
     }
     if manifest.get("stage_predicate") != predicates:
-        raise ValueError("v2 manifest stage_predicate does not match the frozen evaluator contract")
+        raise ValueError("versioned manifest stage_predicate does not match the frozen evaluator contract")
     oracle = manifest.get("oracle", {})
     oracle_seeds = [_seed_values(oracle[split]) for split in SPLITS]
     if any(len(seeds) != 100 for seeds in oracle_seeds) or any(seeds != oracle_seeds[0] for seeds in oracle_seeds[1:]):
-        raise ValueError("v2 Oracle seeds must be 100 continuous paired seeds across all splits")
+        raise ValueError("versioned Oracle seeds must be 100 continuous paired seeds across all splits")
     base = manifest.get("base_policy", {})
     base_seeds = [_seed_values(base[split]) for split in SPLITS]
     if any(len(seeds) != 100 for seeds in base_seeds) or any(seeds != base_seeds[0] for seeds in base_seeds[1:]):
-        raise ValueError("v2 base-policy seeds must be 100 continuous paired seeds across all splits")
+        raise ValueError("versioned base-policy seeds must be 100 continuous paired seeds across all splits")
     final = manifest.get("final_evaluation", {})
     final_seeds = [_seed_values(final[split]) for split in SPLITS]
     if any(len(seeds) != 100 for seeds in final_seeds) or any(seeds != final_seeds[0] for seeds in final_seeds[1:]):
-        raise ValueError("v2 final-evaluation seeds must be 100 continuous paired seeds across all splits")
+        raise ValueError("versioned final-evaluation seeds must be 100 continuous paired seeds across all splits")
     timing = manifest.get("timing_collection", {})
     if any(len(_seed_values(timing[split])) != 100 for split in SPLITS[1:]):
-        raise ValueError("v2 timing-collection candidate seeds must each contain 100 seeds")
+        raise ValueError("versioned timing-collection candidate seeds must each contain 100 seeds")
 
 
 def _write_seed_manifest(root: Path, source: Path | None = None) -> Path:
@@ -239,7 +241,7 @@ def main() -> None:
     root.mkdir(parents=True)
     seed_manifest = _write_seed_manifest(root, args.seed_manifest)
     if args.seed_manifest is not None:
-        _validate_v2_manifest(seed_manifest)
+        _validate_versioned_manifest(seed_manifest)
     (root / "pipeline_state.json").write_text(
         json.dumps(
             {

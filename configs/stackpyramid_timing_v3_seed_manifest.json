@@ -1,0 +1,38 @@
+{
+  "format": "stackpyramid_timing_protocol_seed_manifest_v3",
+  "benchmark_version": "stackpyramid_stage_localized_v3",
+  "declared_before_execution": true,
+  "geometry": "v3",
+  "paired_reset": {
+    "enabled": true,
+    "rule": "For each episode index, ID and every OOD split use the same reset seed; only the designated split geometry changes."
+  },
+  "stage_predicate": {
+    "stage1_ood": {"prefix": "red_grasped", "target": "red_lifted"},
+    "stage2_ood": {"prefix": "red_lifted", "target": "red_placed"},
+    "stage3_ood": {"prefix": "red_placed", "target": "blue_lifted"}
+  },
+  "oracle": {
+    "id": {"start": 83000, "count": 100},
+    "stage1_ood": {"start": 83000, "count": 100},
+    "stage2_ood": {"start": 83000, "count": 100},
+    "stage3_ood": {"start": 83000, "count": 100}
+  },
+  "base_policy": {
+    "id": {"start": 83400, "count": 100},
+    "stage1_ood": {"start": 83400, "count": 100},
+    "stage2_ood": {"start": 83400, "count": 100},
+    "stage3_ood": {"start": 83400, "count": 100}
+  },
+  "timing_collection": {
+    "stage1_ood": {"start": 63000, "count": 100},
+    "stage2_ood": {"start": 63100, "count": 100},
+    "stage3_ood": {"start": 63200, "count": 100}
+  },
+  "final_evaluation": {
+    "id": {"start": 72000, "count": 100},
+    "stage1_ood": {"start": 72000, "count": 100},
+    "stage2_ood": {"start": 72000, "count": 100},
+    "stage3_ood": {"start": 72000, "count": 100}
+  }
+}

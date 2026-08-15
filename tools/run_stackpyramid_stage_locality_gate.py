@@ -48,7 +48,7 @@ def main() -> None:
     parser.add_argument("--seed-manifest", type=Path, required=True)
     parser.add_argument("--gpus", nargs=2, default=("0", "1"))
     parser.add_argument("--cpu-sets", nargs=2, default=("0-7", "8-15"))
-    parser.add_argument("--geometry", choices=("v1", "v2"), default="v2")
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3"), default="v2")
     args = parser.parse_args()
     root = args.output_root
     if root.exists():

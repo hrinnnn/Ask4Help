@@ -24,13 +24,19 @@ _OOD_SHIFTS_V1 = {
     "stage2_ood": np.asarray([0.12, 0.10], dtype=np.float64),
     "stage3_ood": np.asarray([0.12, -0.16], dtype=np.float64),
 }
-# V2 keeps the same affected object and stage semantics while making each
-# shift local enough that the ID policy can reach the affected capability
-# boundary before failing. V1 remains the default for reproducibility.
+# V2 was a diagnostic geometry. Its stage-3 offset placed the blue cube too
+# close to the red/green pair and failed the Oracle feasibility gate. V3 keeps
+# the same affected object and stage semantics while preserving physical
+# clearance for the blue-cube grasp.
 _OOD_SHIFTS_V2 = {
     "stage1_ood": np.asarray([0.045, 0.045], dtype=np.float64),
     "stage2_ood": np.asarray([0.060, 0.050], dtype=np.float64),
     "stage3_ood": np.asarray([0.060, -0.080], dtype=np.float64),
+}
+_OOD_SHIFTS_V3 = {
+    "stage1_ood": np.asarray([0.045, 0.045], dtype=np.float64),
+    "stage2_ood": np.asarray([0.060, 0.050], dtype=np.float64),
+    "stage3_ood": np.asarray([0.100, -0.120], dtype=np.float64),
 }
 _REGISTERED = False
 
@@ -45,6 +51,8 @@ def stackpyramid_ood_shifts() -> dict[str, np.ndarray]:
         return _OOD_SHIFTS_V1
     if version == "v2":
         return _OOD_SHIFTS_V2
+    if version == "v3":
+        return _OOD_SHIFTS_V3
     raise ValueError(f"unknown STACKPYRAMID_OOD_GEOMETRY={version!r}")
 
 
