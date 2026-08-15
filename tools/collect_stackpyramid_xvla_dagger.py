@@ -238,6 +238,9 @@ class StackPyramidOracle:
         self.planner.move_to_pose_with_screw(reach_pose)
         if need_move_a_b:
             self.planner.open_gripper()
+            # Allow the released red cube to settle before the next grasp so
+            # the stage event is observed on the shared recorder timeline.
+            self.planner.open_gripper()
         self.planner.move_to_pose_with_screw(grasp_pose)
         self.planner.close_gripper()
         lift_pose = self.sapien.Pose([0, 0, 0.1]) * grasp_pose
