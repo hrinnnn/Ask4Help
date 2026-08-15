@@ -144,6 +144,16 @@ def main() -> None:
         finally:
             env.recorder.env.close()
 
+    # The stock StackPyramid execution has two physical capability boundaries:
+    # constructing the red-green base and starting the blue-cube transfer.
+    # Stage-1 and Stage-2 OOD alter the base-construction behavior, while
+    # Stage-3 OOD alters the blue-cube behavior.  Keep all raw predicates, but
+    # expose the boundary used by the timing sweep explicitly.
+    timing_boundary_source = {
+        "stage1_ood": "stage2",
+        "stage2_ood": "stage2",
+        "stage3_ood": "stage3",
+    }
     summaries: dict[str, Any] = {}
     for split in ("stage1_ood", "stage2_ood", "stage3_ood"):
         subset = [row for row in rows if row["split"] == split]
@@ -155,6 +165,10 @@ def main() -> None:
             "episodes": len(subset),
             "successful_oracle_episodes": sum(int(row["success"]) for row in subset),
             "median_boundary_steps": values,
+            "timing_boundary": {
+                "source": timing_boundary_source[split],
+                "step": values[timing_boundary_source[split]],
+            },
             "rows": subset,
         }
     args.output.mkdir(parents=True)

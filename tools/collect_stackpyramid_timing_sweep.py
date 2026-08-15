@@ -65,8 +65,14 @@ def main() -> None:
     from models.processing_xvla import XVLAProcessor
 
     audit = json.loads((args.audit / "boundary_audit.json").read_text(encoding="utf-8"))
-    key = {"stage1_ood": "stage1", "stage2_ood": "stage2", "stage3_ood": "stage3"}[args.split]
-    boundary = audit["summaries"][args.split]["median_boundary_steps"][key]
+    summary = audit["summaries"][args.split]
+    timing_boundary = summary.get("timing_boundary")
+    if timing_boundary is not None:
+        key = str(timing_boundary["source"])
+        boundary = timing_boundary["step"]
+    else:
+        key = {"stage1_ood": "stage1", "stage2_ood": "stage2", "stage3_ood": "stage3"}[args.split]
+        boundary = summary["median_boundary_steps"][key]
     if boundary is None:
         raise RuntimeError(f"missing audited boundary for {args.split}:{key}")
     start_step = {
