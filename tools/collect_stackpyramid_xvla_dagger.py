@@ -209,27 +209,15 @@ class StackPyramidOracle:
             self.planner.move_to_pose_with_screw(reach_pose)
             self.planner.move_to_pose_with_screw(grasp_pose)
             self.planner.close_gripper()
-            target_xy = target_cube.pose.sp.p
-            if hasattr(target_xy, "detach"):
-                target_xy = target_xy.detach().cpu().numpy()
-            target_xy = np.asarray(target_xy).reshape(-1, 3)[0]
-            goal_xy = np.array([target_xy[0] * 0.8, target_xy[1] * 0.8])
-            carry_z = 0.18
-            lift_at_goal = self.sapien.Pose(
-                np.array([goal_xy[0], goal_xy[1], carry_z]), grasp_pose.q
+            # Expose a real lift event, then return to the original grasp
+            # height before using the official tabletop transport path.
+            lift_pose = self.sapien.Pose([0, 0, 0.1]) * grasp_pose
+            self.planner.move_to_pose_with_screw(lift_pose)
+            self.planner.move_to_pose_with_screw(grasp_pose)
+            goal_pose = self.sapien.Pose(
+                target_cube.pose.sp.p * 0.8, grasp_pose.q
             )
-            release_at_goal = self.sapien.Pose(
-                np.array([goal_xy[0], goal_xy[1], target_xy[2] + 0.025]),
-                grasp_pose.q,
-            )
-            self.planner.move_to_pose_with_screw(
-                self.sapien.Pose(
-                    np.array([moving_position[0], moving_position[1], carry_z]),
-                    grasp_pose.q,
-                )
-            )
-            self.planner.move_to_pose_with_screw(lift_at_goal)
-            self.planner.move_to_pose_with_screw(release_at_goal)
+            self.planner.move_to_pose_with_screw(goal_pose)
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
