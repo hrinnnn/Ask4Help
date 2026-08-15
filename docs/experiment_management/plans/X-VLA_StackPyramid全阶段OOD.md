@@ -87,34 +87,37 @@ Stage 2 的绿块变化会改变红块应到达的底座位置，但不应改变
 `0/100, 0/100`。四个 split 的 400 个评测视频和完整 summary 保存在
 `/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_baseline_eval_ckpt10000_v1/`。
 
-## 9. Bridge-PCA gated DAgger 第一轮结果
+## 9. Bridge-PCA gated DAgger 修正版结果
 
-本轮使用固定 ID base policy `ckpt-10000`、`assets_retry2/bridge_pca.pt` 和 ID25 校准阈值
-`0.95207279920578`。三个 stage 各收集 100 条非空 expert suffix；对应 raw attempt
-分别为 103、203、100，收集根为
+正式主结果使用固定 ID base policy `ckpt-10000`、`assets_retry2/bridge_pca.pt` 和 ID25
+校准阈值 `0.95207279920578`。三个 stage 各收集 100 条非空 expert suffix；收集根为
 `/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_v1/bridge_pca_collection_v3/`。
 
 | 条件 | Ever grasped | Base completed | Strict success |
 |---|---:|---:|---:|
-| Stage 1 ID | 100/100 | 95/100 | 95/100 |
-| Stage 1 OOD | 12/100 | 10/100 | 9/100 |
-| Stage 2 ID | 100/100 | 100/100 | 99/100 |
-| Stage 2 OOD | 50/100 | 4/100 | 2/100 |
-| Stage 3 ID | 100/100 | 95/100 | 89/100 |
-| Stage 3 OOD | 100/100 | 100/100 | 97/100 |
+| Stage 1 ID | 100/100 | 92/100 | 90/100 |
+| Stage 1 OOD | 28/100 | 14/100 | 11/100 |
+| Stage 2 ID | 100/100 | 99/100 | 95/100 |
+| Stage 2 OOD | 95/100 | 9/100 | 4/100 |
+| Stage 3 ID | 100/100 | 100/100 | 97/100 |
+| Stage 3 OOD | 100/100 | 100/100 | 90/100 |
 
 三组 source-balanced 训练均完成 `ckpt-500/1000/1500/2000`，最终 loss 分别为
-Stage 1 `0.02377`、Stage 2 `0.20849`、Stage 3 `0.01823`。训练输出为
-`/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_v1/bridge_pca_training_v1/`。
-每组正式训练均保留 ID 与 expert 的 temporal-mask anchor 报告；最终 observation 保留且只有
-1 个有效 target timestep，尾部 anchor 没有被过滤。
+Stage 1 `0.0249633`、Stage 2 `0.1409179`、Stage 3 `0.0281246`。修正版训练输出为
+`/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_v2/bridge_pca_training_v2/`，
+正式评测输出为
+`/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_v2/bridge_pca_postprocess_v2/`。
+六份 100-episode summary、600 个评测视频、`comparison.json` 和
+`PIPELINE_COMPLETE` 均已验收。
 
-Timing 诊断和最终评测输出为
-`/data/zhaozhixuan/xvla_stackcube_data/stackpyramid_gated_dagger_v1/bridge_pca_postprocess_v1/`。
-其中包含三组 DCA/EAS/DCE 诊断 summary、六份 100-episode summary、600 个评测视频、
-`comparison.json`、`comparison.md` 和 `PIPELINE_COMPLETE`。DCA/EAS/DCE 当前是基于 nominal
-state 与 expert suffix 的诊断代理；在 paired state-snapshot DTW 完成前，不将其表述为最终的
-takeover timing utility。
+修正版训练的 temporal-mask 审计显示：每组为 `228=128 ID+100 expert` 条轨迹；ID 有
+`10576` 个 anchors，其中 `1152` 个是尾部 anchors；expert 尾部各有 `900` 个 anchors。
+最后观测保留且恰有 1 个有效 target timestep，真实动作维度为 8，未过滤 episode 尾部。
+
+旧目录 `bridge_pca_training_v1/bridge_pca_postprocess_v1/` 仅作诊断保留：其训练误把
+原始 H5 中额外的 10 条 ID 轨迹纳入，使用了 138 条而非 PCA 资产对应的 128 条 ID，不能作为主结果。
+Timing 目录中的 DCA/EAS/DCE 仍是诊断代理；完整 paired state-snapshot timing utility 和多时机
+对照仍需单独实验。
 
 ## 10. 运行位置
 
