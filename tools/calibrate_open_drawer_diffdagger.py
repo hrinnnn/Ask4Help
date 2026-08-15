@@ -63,12 +63,12 @@ def main() -> None:
                 while actions < args.max_policy_steps:
                     env_obs = _model_obs(raw_obs)
                     with torch.inference_mode():
-                        predicted, _ = model.predict_action_batch(
+                        predicted, prediction_info = model.predict_action_batch(
                             env_obs=env_obs, mode="eval", compute_values=False
                         )
                         uncertainty = model.compute_diffdagger_uncertainty(
                             env_obs,
-                            predicted,
+                            prediction_info["forward_inputs"]["model_action"],
                             num_timesteps=args.timesteps,
                             num_noise_samples=args.noise_samples,
                         )

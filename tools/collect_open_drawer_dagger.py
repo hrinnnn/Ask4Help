@@ -177,14 +177,16 @@ def _policy_until_trigger(*, env: Any, model: Any, prior: torch.Tensor, detector
             features = model.extract_multilayer_llmd_features(
                 env_obs, prior, include_action_expert_final=True
             )
-            predicted, _ = model.predict_action_batch(env_obs=env_obs, mode="eval", compute_values=False)
+            predicted, prediction_info = model.predict_action_batch(
+                env_obs=env_obs, mode="eval", compute_values=False
+            )
         scores = {name: _score(features[layer], kind, stats) for name, (layer, kind, stats) in detectors.items()}
         alarms = {name: score >= thresholds[name] for name, score in scores.items()}
         diff_decision = None
         if diff_gate is not None:
             diff_score = model.compute_diffdagger_uncertainty(
                 env_obs,
-                predicted,
+                prediction_info["forward_inputs"]["model_action"],
                 num_timesteps=diff_timesteps,
                 num_noise_samples=diff_noise_samples,
             )
