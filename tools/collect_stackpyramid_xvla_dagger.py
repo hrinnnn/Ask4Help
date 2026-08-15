@@ -238,13 +238,13 @@ class StackPyramidOracle:
             if self.planner.move_to_pose_with_screw(grasp_pose2, dry_run=True) != -1:
                 grasp_pose = grasp_pose2
                 break
+        if need_move_a_b:
+            # Release the red cube immediately after its transport.  This is
+            # required by the staged event contract: otherwise the subsequent
+            # reach to the blue cube carries the red cube away from its goal.
+            self.planner.open_gripper()
         reach_pose = grasp_pose * self.sapien.Pose([0, 0, -0.05])
         self.planner.move_to_pose_with_screw(reach_pose)
-        if need_move_a_b:
-            self.planner.open_gripper()
-            # Allow the released red cube to settle before the next grasp so
-            # the stage event is observed on the shared recorder timeline.
-            self.planner.open_gripper()
         self.planner.move_to_pose_with_screw(grasp_pose)
         self.planner.close_gripper()
         lift_pose = self.sapien.Pose([0, 0, 0.1]) * grasp_pose
@@ -256,7 +256,6 @@ class StackPyramidOracle:
         align_pose = self.sapien.Pose(lift_pose.p + offset, lift_pose.q)
         self.planner.move_to_pose_with_screw(align_pose)
         self.planner.open_gripper()
-        self.planner.close_gripper()
 
 
 def _load_asset(path: Path, device: torch.device):

@@ -159,13 +159,17 @@ def stage_events(env: Any, initial_z: dict[str, float]) -> dict[str, bool]:
     tcp = base.agent.tcp.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
     gripper_closed = bool(getattr(env, "gripper_closed", False))
     red_grasped = red_contact or (gripper_closed and float(np.linalg.norm(red - tcp)) <= 0.05)
-    blue_grasped = blue_contact or (gripper_closed and float(np.linalg.norm(blue - tcp)) <= 0.05)
     red_lifted = float(red[2]) > initial_z["red"] + 0.015
     blue_lifted = float(blue[2]) > initial_z["blue"] + 0.015
     red_placed = (
         float(np.linalg.norm((red - green)[:2])) <= threshold
         and not red_grasped
         and float(red[2]) <= initial_z["red"] + 0.03
+    )
+    # Blue grasping is only a valid event after the red placement event;
+    # this prevents a transient reset contact from becoming a stage event.
+    blue_grasped = red_placed and (
+        blue_contact or (gripper_closed and float(np.linalg.norm(blue - tcp)) <= 0.05)
     )
     return {
         "red_grasped": red_grasped,
