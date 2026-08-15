@@ -73,7 +73,7 @@ if ! alive "$PID_DIR/sft_10000.pid" && ! checkpoint_complete 10000; then
   export OPEN_DRAWER_EXPERIMENT_NAME=sft_10000
   export HF_DATASETS_CACHE=$ROOT/runtime_cache/hf_datasets
   export HF_HOME=$ROOT/runtime_cache/hf_home
-  export RAY_TMPDIR=${OPEN_DRAWER_RAY_TMPDIR:-/tmp/od} \
+  export RAY_TMPDIR=${OPEN_DRAWER_RAY_TMPDIR:-$ROOT/runtime_cache/ray} \
     TMPDIR=${OPEN_DRAWER_TMPDIR:-$RUN/tmp} PYTHONUNBUFFERED=1
   mkdir -p "$RAY_TMPDIR" "$TMPDIR"
   taskset -c 140-159 env PYTHONPATH=$PYTHONPATH EMBODIED_PATH=$EMBODIED_PATH \
