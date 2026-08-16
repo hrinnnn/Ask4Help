@@ -1,0 +1,29 @@
+{
+  "format": "stackpyramid_id_recovery_256_manifest_v1",
+  "benchmark_version": "stackpyramid_stage_localized_v4",
+  "declared_before_execution": true,
+  "geometry": "v4",
+  "task_spec": "configs/stackpyramid_v4_task_spec.json",
+  "instruction": "stack the red cube next to the green cube and place the blue cube on top",
+  "original_id_collection": {
+    "accepted": 128,
+    "attempt_seed_start": 86000,
+    "attempt_seed_count": 129,
+    "known_failed_seed": 86039
+  },
+  "additional_id_collection": {
+    "target_accepted": 128,
+    "attempt_seed_start": 86130,
+    "max_attempts": 140,
+    "distribution": "same v4 ID reset distribution; no OOD conditions"
+  },
+  "training": {
+    "total_accepted_episodes": 256,
+    "fresh_pretrained_xvla_base": true,
+    "selection_probe_seeds": {"start": 88400, "count": 20},
+    "formal_id_gate_seeds": {"start": 84400, "count": 100},
+    "checkpoint_interval": 2000,
+    "maximum_steps": 20000
+  },
+  "downstream_unlock": "new formal ID gate >=80/100 plus all prefix/locality gates"
+}
