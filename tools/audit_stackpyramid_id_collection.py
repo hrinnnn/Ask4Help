@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import h5py
-import imageio.v3 as iio
 import numpy as np
 
 
@@ -96,11 +96,27 @@ def _audit_h5(path: Path, horizon: int) -> dict[str, Any]:
 
 def _audit_video(path: Path) -> dict[str, Any]:
     try:
-        metadata = iio.immeta(path, plugin="ffmpeg")
-        frame_count = 0
-        for frame_count, _ in enumerate(iio.imiter(path, plugin="ffmpeg"), start=1):
-            pass
-        return {"path": str(path), "decodable": frame_count > 0, "frames": frame_count, "metadata": metadata}
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=nb_frames,width,height", "-of", "json", str(path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        decode = subprocess.run(
+            ["ffmpeg", "-v", "error", "-i", str(path), "-f", "null", "-"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        metadata = json.loads(probe.stdout) if probe.stdout else {}
+        streams = metadata.get("streams", [])
+        stream = streams[0] if streams else {}
+        frames = int(stream["nb_frames"]) if str(stream.get("nb_frames", "")).isdigit() else None
+        decodable = probe.returncode == 0 and decode.returncode == 0 and bool(streams)
+        result = {"path": str(path), "decodable": decodable, "frames": frames, "metadata": metadata}
+        if not decodable:
+            result["error"] = (probe.stderr + decode.stderr)[-1000:]
+        return result
     except Exception as exc:  # a failed decode is itself audit evidence
         return {"path": str(path), "decodable": False, "error": repr(exc)}
 
@@ -131,6 +147,13 @@ def main() -> None:
     rows = _json_rows(args.collection_root)
     strict_rows = [row for row in rows if "strict_success" in row]
     accepted_rows = [row for row in rows if "expert_action_steps" in row and "strict_success" not in row]
+    collection_summaries = []
+    for path in sorted(args.collection_root.glob("summary.json")):
+        try:
+            collection_summaries.append(json.loads(path.read_text(encoding="utf-8")))
+        except json.JSONDecodeError:
+            pass
+    collection_summary = collection_summaries[0] if collection_summaries else {}
 
     event_keys = ("red_grasped", "red_lifted", "red_placed", "blue_grasped", "blue_lifted")
     state_event_coverage = {
@@ -181,8 +204,9 @@ def main() -> None:
             "jsonl_rows": len(rows),
             "strict_success_rows": len(strict_rows),
             "accepted_rows": len(accepted_rows),
-            "raw_attempts": len(strict_rows),
-            "raw_failures": sum(int(not row.get("strict_success", False)) for row in strict_rows),
+            "raw_attempts": int(collection_summary.get("raw_attempts", len(strict_rows))),
+            "raw_successes": int(collection_summary.get("raw_successes", sum(int(row.get("success", False)) for row in rows))),
+            "raw_failures": int(collection_summary.get("raw_attempts", len(strict_rows))) - int(collection_summary.get("raw_successes", 0)),
             "stage_event_coverage": event_coverage,
             "state_derived_stage_event_coverage": state_event_coverage,
             "stage_event_source": "state object-pose layout [red:25:28, green:32:35, blue:39:42]; red lift/place and blue lift are inferred from the frozen v4 predicates",
