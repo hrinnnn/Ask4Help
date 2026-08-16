@@ -42,7 +42,14 @@ def _summary(root: Path) -> dict[str, Any]:
     }
 
 
-def merge(original: Path, additional: Path, output_root: Path, manifest: Path) -> None:
+def merge(
+    original: Path,
+    additional: Path,
+    output_root: Path,
+    manifest: Path,
+    original_root: Path | None = None,
+    additional_root: Path | None = None,
+) -> None:
     if output_root.exists():
         raise FileExistsError(f"refusing to overwrite {output_root}")
     output_h5 = output_root / "id" / "accepted_suffixes.h5"
@@ -68,14 +75,14 @@ def merge(original: Path, additional: Path, output_root: Path, manifest: Path) -
         "geometry_version": "v4",
         "split": "id_only",
         "instruction": TASK,
-        "original_collection_root": str(original.parent.parent.resolve()),
-        "additional_collection_root": str(additional.parent.parent.resolve()),
+        "original_collection_root": str((original_root or original.parent.parent).resolve()),
+        "additional_collection_root": str((additional_root or additional.parent.parent).resolve()),
         "manifest": str(manifest.resolve()),
         "source_group_counts": counts,
         "merged_episode_count": index,
         "source_summaries": {
-            "original": _summary(original.parent.parent),
-            "additional": _summary(additional.parent.parent),
+            "original": _summary(original_root or original.parent.parent),
+            "additional": _summary(additional_root or additional.parent.parent),
         },
         "norm": {
             "mode": "xvla_action_space",
@@ -97,8 +104,17 @@ def main() -> None:
     parser.add_argument("--additional-h5", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--original-root", type=Path)
+    parser.add_argument("--additional-root", type=Path)
     args = parser.parse_args()
-    merge(args.original_h5, args.additional_h5, args.output_root, args.manifest)
+    merge(
+        args.original_h5,
+        args.additional_h5,
+        args.output_root,
+        args.manifest,
+        original_root=args.original_root,
+        additional_root=args.additional_root,
+    )
 
 
 if __name__ == "__main__":
