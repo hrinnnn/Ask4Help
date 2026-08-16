@@ -222,6 +222,12 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    # The H20 runtime's CPU image preprocessing path can raise SIGFPE when
+    # unrestricted Torch/OMP thread pools are combined with the simulator.
+    # Evaluation is low-throughput by design, so keep the runtime deterministic
+    # and bounded without changing the policy or simulator semantics.
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
     if args.output.exists():
         raise FileExistsError(f"refusing to overwrite {args.output}")
     args.output.mkdir(parents=True)
