@@ -6,9 +6,15 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 from pathlib import Path
 from typing import Any
+
+# Set these before importing Torch or the simulator.  On the H20 runtime,
+# their unrestricted CPU pools can raise SIGFPE during image preprocessing.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
 
 import imageio
 import numpy as np
