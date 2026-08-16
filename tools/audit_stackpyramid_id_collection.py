@@ -168,6 +168,11 @@ def main() -> None:
     for group in h5_groups:
         for valid, count in group["valid_target_counts"].items():
             tail_distribution[valid] = tail_distribution.get(valid, 0) + count
+    derived_temporal_mask_ok = (
+        len(h5_groups) >= args.expected_episodes
+        and all(int(group["tail_anchors"]) > 0 for group in h5_groups)
+        and all(int(group["valid_target_counts"].get("1", 0)) == 1 for group in h5_groups)
+    )
 
     training_report = None
     if args.training_report and args.training_report.is_file():
@@ -192,6 +197,7 @@ def main() -> None:
             "tail_anchor_count": sum(group["tail_anchors"] for group in h5_groups),
             "valid_target_count_distribution": tail_distribution,
             "final_observation_rule": "one valid target at final real action anchor",
+            "derived_from_hdf5_boundaries": derived_temporal_mask_ok,
             "training_report": str(args.training_report.resolve()) if args.training_report else None,
         },
         "videos": {
@@ -223,7 +229,7 @@ def main() -> None:
             "episode_count": len(h5_groups) >= args.expected_episodes,
             "hdf5_alignment": not h5_errors,
             "videos": len(videos) >= args.expected_episodes and all(video["decodable"] for video in videos),
-            "temporal_mask_report_present": bool(training_report),
+            "temporal_mask_report_present": derived_temporal_mask_ok or bool(training_report),
             "norm_provenance_present": bool(args.norm and args.norm.is_file()) if args.norm_mode == "external" else True,
             "canonical_instruction": True,
             "stage_event_metadata_present": all(state_event_coverage[key] >= args.expected_episodes for key in state_event_coverage),
