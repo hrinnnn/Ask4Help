@@ -80,8 +80,11 @@ def make_policy(checkpoint: Path, xvla_root: Path, device: torch.device) -> Any:
     config.real_action_dim = REAL_ACTION_DIM
     config.max_action_dim = MODEL_ACTION_DIM
     config.num_actions = ACTION_HORIZON
+    # The standalone evaluator does not use Accelerate's mixed-precision
+    # parameter management.  Loading the complete policy in FP32 avoids a
+    # mixed-dtype matmul in the action expert's domain-conditioned layers.
     model = XVLA.from_pretrained(
-        str(checkpoint), config=config, torch_dtype=torch.bfloat16
+        str(checkpoint), config=config, torch_dtype=torch.float32
     ).to(device).eval()
     processor = XVLAProcessor.from_pretrained(checkpoint)
     return model, processor
@@ -118,7 +121,7 @@ def prepare_inputs(model: Any, processor: Any, raw_obs: dict[str, Any], device: 
 @torch.inference_mode()
 def predict(model: Any, inputs: dict[str, torch.Tensor], device: torch.device, seed: int, steps: int) -> np.ndarray:
     torch.manual_seed(seed)
-    with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=device.type == "cuda"):
+    with torch.autocast(device_type=device.type, enabled=False):
         encoding = model.forward_vlm(inputs["input_ids"], inputs["image_input"], inputs["image_mask"])
         prior = torch.randn(
             1, ACTION_HORIZON, model.action_space.dim_action,
