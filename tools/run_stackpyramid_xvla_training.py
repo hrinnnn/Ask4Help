@@ -331,7 +331,9 @@ def run_training(args: argparse.Namespace) -> None:
     _set_backbone_trainable(model, False, freeze_vlm=args.freeze_vlm)
     iterator = iter(loader)
     started = time.time()
-    for step in range(args.steps):
+    total_steps = 2 if args.smoke_only else args.steps
+    save_interval = 2 if args.smoke_only else args.save_interval
+    for step in range(total_steps):
         try:
             batch = next(iterator)
         except StopIteration:
@@ -343,7 +345,7 @@ def run_training(args: argparse.Namespace) -> None:
         _set_learning_rates(
             optimizer,
             step,
-            args.steps,
+            total_steps,
             args.learning_rate,
             args.learning_coef,
             args.freeze_steps,
@@ -367,11 +369,31 @@ def run_training(args: argparse.Namespace) -> None:
             with (args.output / "train.jsonl").open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(log) + "\n")
             print(json.dumps(log), flush=True)
-        if accelerator.is_main_process and (global_step % args.save_interval == 0 or global_step == args.steps):
+        if accelerator.is_main_process and (global_step % save_interval == 0 or global_step == total_steps):
             save_checkpoint(model, processor, accelerator, args.output, global_step)
     accelerator.wait_for_everyone()
     if accelerator.is_main_process:
-        (args.output / "TRAINING_COMPLETE").write_text("complete\n", encoding="utf-8")
+        if args.smoke_only:
+            reload_model, _reload_processor = load_model(
+                args.output / "ckpt-2", args.xvla_root, dtype=args.dtype
+            )
+            reload_model.to(accelerator.device).eval()
+            reload_batch = next(iter(loader))
+            reload_batch = {
+                key: value.to(accelerator.device) if isinstance(value, torch.Tensor) else value
+                for key, value in reload_batch.items()
+            }
+            with torch.inference_mode(), accelerator.autocast():
+                reload_loss = masked_flow_loss(reload_model, reload_batch)
+            if not torch.isfinite(reload_loss):
+                raise RuntimeError(f"non-finite reload smoke loss: {reload_loss}")
+            (args.output / "reload_forward_smoke.json").write_text(
+                json.dumps({"finite_loss": float(reload_loss.float()), "batch_size": args.batch_size}) + "\n",
+                encoding="utf-8",
+            )
+            (args.output / "RELOAD_SMOKE_COMPLETE").write_text("complete\n", encoding="utf-8")
+        else:
+            (args.output / "TRAINING_COMPLETE").write_text("complete\n", encoding="utf-8")
     accelerator.end_training()
 
 
@@ -399,6 +421,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log-interval", type=int, default=20)
     parser.add_argument("--seed", type=int, default=5100)
     parser.add_argument("--dtype", choices=("bf16", "fp32"), default="bf16")
+    parser.add_argument("--smoke-only", action="store_true")
     return parser.parse_args()
 
 
