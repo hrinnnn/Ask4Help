@@ -62,10 +62,21 @@ def frame_array(value: Any) -> np.ndarray | None:
 
 def make_policy(checkpoint: Path, xvla_root: Path, device: torch.device) -> Any:
     sys.path.insert(0, str(xvla_root))
+    from models.configuration_xvla import XVLAConfig
     from models.modeling_xvla import XVLA
     from models.processing_xvla import XVLAProcessor
 
-    model = XVLA.from_pretrained(checkpoint, torch_dtype=torch.bfloat16).to(device).eval()
+    # Keep inference's action contract identical to the training and reload
+    # smoke paths: the policy predicts a 20-D latent chunk while only the
+    # first 8 dimensions correspond to the environment action.
+    config = XVLAConfig.from_pretrained(str(checkpoint))
+    config.action_mode = "auto"
+    config.real_action_dim = REAL_ACTION_DIM
+    config.max_action_dim = MODEL_ACTION_DIM
+    config.num_actions = ACTION_HORIZON
+    model = XVLA.from_pretrained(
+        str(checkpoint), config=config, torch_dtype=torch.bfloat16
+    ).to(device).eval()
     processor = XVLAProcessor.from_pretrained(checkpoint)
     return model, processor
 
