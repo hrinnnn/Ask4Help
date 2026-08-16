@@ -416,13 +416,17 @@ def main() -> None:
     _install_rrt_fallback()
     import gymnasium as gym
     import mani_skill.envs  # noqa: F401
-    from models.modeling_xvla import XVLA
-    from models.processing_xvla import XVLAProcessor
-
     device = torch.device("cuda")
-    model = XVLA.from_pretrained(args.checkpoint, torch_dtype=torch.bfloat16).to(device).eval()
-    processor = XVLAProcessor.from_pretrained(args.checkpoint)
-    stats = _load_asset(args.asset, device) if args.asset else None
+    model = None
+    processor = None
+    stats = None
+    if args.method != "offline_oracle":
+        from models.modeling_xvla import XVLA
+        from models.processing_xvla import XVLAProcessor
+
+        model = XVLA.from_pretrained(args.checkpoint, torch_dtype=torch.bfloat16).to(device).eval()
+        processor = XVLAProcessor.from_pretrained(args.checkpoint)
+        stats = _load_asset(args.asset, device) if args.asset else None
     if args.method == "bridge_pca" and (stats is None or args.pca_threshold is None):
         raise ValueError("bridge_pca needs --asset and --pca-threshold")
     if args.method == "diffdagger" and args.diff_threshold is None:
