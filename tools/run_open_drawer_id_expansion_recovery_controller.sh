@@ -117,7 +117,10 @@ run_oracle_smoke() {
   fi
   wait_stage "$PID_DIR/oracle_smoke.pid" oracle_smoke
   check_oracle_smoke || fail oracle_smoke_gate_failed
-  printf '%s\n' '20 ID oracle attempts; strict success >=19; 20 videos.' > "$RUN/ORACLE_SMOKE_PASSED"
+  "$PY" "$ROOT/tools/audit_open_drawer_oracle_smoke.py" \
+    --root "$SMOKE" --expected 20 --output "$RUN/audit/oracle_smoke.json" \
+    || fail oracle_smoke_audit_failed
+  printf '%s\n' '20 ID oracle attempts; strict success 20/20; videos and trajectory state/action boundaries passed.' > "$RUN/ORACLE_SMOKE_PASSED"
 }
 
 run_collection() {
