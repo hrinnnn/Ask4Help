@@ -26,6 +26,8 @@ CPU_TRAIN=${OPEN_DRAWER_EXPANSION_CPU_TRAIN:-40-59}
 CPU_EVAL=${OPEN_DRAWER_EXPANSION_CPU_EVAL:-60-79}
 TRAIN_GPU=${OPEN_DRAWER_EXPANSION_TRAIN_GPU:-2}
 EVAL_GPU=${OPEN_DRAWER_EXPANSION_EVAL_GPU:-0}
+PLANNER_PYTHONPATH=${OPEN_DRAWER_PLANNER_PYTHONPATH:-}
+PLANNER_CUDA_VISIBLE_DEVICES=${OPEN_DRAWER_PLANNER_CUDA_VISIBLE_DEVICES:-0}
 NEW_SEED_START=76000
 GATE_SEED_START=52000
 
@@ -56,6 +58,7 @@ noise_method=flow_sde
 train_expert_only=true
 awbc=false
 norm_scope=merged ID-only frozen norm
+planner_runtime=isolated numpy 1.26.4 with environment mplib 0.1.1
 OOD_started=false
 EOF
   printf '%s\n' '{"old_id_seed_start":75000,"old_id_episodes":128,"new_id_seed_start":76000,"new_id_episodes":128,"gate_id_seed_start":52000,"gate_id_episodes":100,"split":"id"}' > "$RUN/provenance/seed_manifest.json"
@@ -106,7 +109,8 @@ run_oracle_smoke() {
   if [ ! -e "$SMOKE" ]; then
     state oracle_smoke starting starting
     start_stage "$PID_DIR/oracle_smoke.pid" "$LOG_DIR/oracle_smoke.log" \
-      env PYTHONPATH="$RL:$ROOT" PANDA_PLANNER_PYTHON="$PY" \
+      env CUDA_VISIBLE_DEVICES="$PLANNER_CUDA_VISIBLE_DEVICES" OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+      PYTHONPATH="$PLANNER_PYTHONPATH:$RL:$ROOT" PANDA_PLANNER_PYTHON="$PY" \
       taskset -c "$CPU_TRAIN" "$PY" "$RL/toolkits/lerobot/validate_open_drawer_retrieve_place_oracle.py" \
       --split id --start-seed "$NEW_SEED_START" --num-seeds 20 --output-dir "$SMOKE" --save-video \
       || true
@@ -123,7 +127,8 @@ run_collection() {
   if [ ! -e "$COLLECTION" ]; then
     state id_collection_extra128 starting starting
     start_stage "$PID_DIR/collection_extra128.pid" "$LOG_DIR/collection_extra128.log" \
-      env PYTHONPATH="$RL:$ROOT" PANDA_PLANNER_PYTHON="$PY" HF_LEROBOT_HOME=/sdd/ask4help-open-drawer/lerobot_cache \
+      env CUDA_VISIBLE_DEVICES="$PLANNER_CUDA_VISIBLE_DEVICES" OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 \
+      PYTHONPATH="$PLANNER_PYTHONPATH:$RL:$ROOT" PANDA_PLANNER_PYTHON="$PY" HF_LEROBOT_HOME=/sdd/ask4help-open-drawer/lerobot_cache \
       taskset -c "$CPU_TRAIN" "$PY" "$RL/toolkits/lerobot/collect_open_drawer_retrieve_place_lerobot.py" \
       --repo-id "$NEW_DATA" --output-dir "$COLLECTION" --video-dir "$COLLECTION/videos" \
       --num-episodes 128 --seed "$NEW_SEED_START" --max-attempts 160 --image-size 384 \
