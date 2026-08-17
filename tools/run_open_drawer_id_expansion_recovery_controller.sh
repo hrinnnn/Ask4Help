@@ -18,7 +18,9 @@ SMOKE=$RUN/oracle_smoke
 COLLECTION=${OPEN_DRAWER_EXPANSION_COLLECTION:-$RUN/collection_extra128}
 AUDIT=${OPEN_DRAWER_EXPANSION_AUDIT:-$RUN/audit/data_audit.json}
 TRAIN=$RUN/training/sft_from4000_to10000
-SMOKE_TRAIN=$RUN/smoke_training
+SMOKE_TRAIN=${OPEN_DRAWER_EXPANSION_SMOKE_TRAIN:-$RUN/smoke_training}
+TRAIN_EXPERIMENT=expansion_recovery_from4000
+SMOKE_EXPERIMENT=expansion_smoke
 LOG_DIR=$RUN/logs
 PID_DIR=$RUN/pids
 STATE=$RUN/pipeline_state.json
@@ -66,9 +68,12 @@ EOF
   printf '%s\n' '{"old_id_seed_start":75000,"old_id_episodes":128,"new_id_seed_start":76000,"new_id_episodes":128,"gate_id_seed_start":52000,"gate_id_episodes":100,"split":"id"}' > "$RUN/provenance/seed_manifest.json"
 }
 
+checkpoint_path() { printf '%s\n' "$TRAIN/$TRAIN_EXPERIMENT/checkpoints/global_step_$1"; }
+smoke_checkpoint_path() { printf '%s\n' "$SMOKE_TRAIN/$SMOKE_EXPERIMENT/checkpoints/global_step_$1"; }
 checkpoint_complete() {
-  [ -f "$TRAIN/checkpoints/global_step_$1/actor/model_state_dict/full_weights.pt" ] &&
-    [ -d "$TRAIN/checkpoints/global_step_$1/actor/dcp_checkpoint" ]
+  local path
+  path=$(checkpoint_path "$1")
+  [ -f "$path/actor/model_state_dict/full_weights.pt" ] && [ -d "$path/actor/dcp_checkpoint" ]
 }
 
 start_stage() {
@@ -179,7 +184,7 @@ run_merge_and_norm() {
 run_training_smoke() {
   [ -f "$RUN/SMOKE_COMPLETE" ] && return 0
   if [ -e "$SMOKE_TRAIN" ] && [ ! -f "$SMOKE_TRAIN/RELOAD_FORWARD_COMPLETE" ]; then
-    if [ ! -f "$SMOKE_TRAIN/checkpoints/global_step_4002/actor/model_state_dict/full_weights.pt" ]; then fail training_smoke_partial; fi
+    [ -f "$(smoke_checkpoint_path 4002)/actor/model_state_dict/full_weights.pt" ] || fail training_smoke_partial
   fi
   if [ ! -e "$SMOKE_TRAIN" ]; then
     state training_smoke starting starting
@@ -188,7 +193,7 @@ run_training_smoke() {
       env CUDA_VISIBLE_DEVICES="$TRAIN_GPU" ASK4HELP_RLINF_PLACEMENT="$TRAIN_GPU-$TRAIN_GPU" \
       OPEN_DRAWER_ID_DATASET="$MERGED" OPEN_DRAWER_ID_NORM_STATS="$NORM" \
       OPEN_DRAWER_PI05_MODEL_PATH="$MODEL" OPEN_DRAWER_RESUME_DIR="$BASE" \
-      OPEN_DRAWER_RUN_ROOT="$SMOKE_TRAIN" OPEN_DRAWER_EXPERIMENT_NAME=expansion_smoke \
+      OPEN_DRAWER_RUN_ROOT="$SMOKE_TRAIN" OPEN_DRAWER_EXPERIMENT_NAME="$SMOKE_EXPERIMENT" \
       RAY_TMPDIR="$RAY_SMOKE_DIR" TMPDIR="$SMOKE_TRAIN/tmp" HF_HOME="$ROOT/runtime_cache/hf_home" \
       PYTHONUNBUFFERED=1 PYTHONPATH="$RL:$ROOT" EMBODIED_PATH="$RL/examples/sft" REPO_PATH="$RL" \
       taskset -c "$CPU_TRAIN" "$PY" "$RL/examples/sft/train_vla_sft.py" \
@@ -197,7 +202,8 @@ run_training_smoke() {
       || true
   fi
   wait_stage "$PID_DIR/training_smoke.pid" training_smoke
-  local smoke_ckpt="$SMOKE_TRAIN/checkpoints/global_step_4002"
+  local smoke_ckpt
+  smoke_ckpt=$(smoke_checkpoint_path 4002)
   [ -f "$smoke_ckpt/actor/model_state_dict/full_weights.pt" ] || fail training_smoke_checkpoint_missing
   printf '%s\n' '2-step resume training completed from immutable step4000.' > "$SMOKE_TRAIN/SMOKE_COMPLETE"
   if [ ! -f "$SMOKE_TRAIN/RELOAD_FORWARD_COMPLETE" ]; then
@@ -216,7 +222,8 @@ run_training_smoke() {
 
 run_gate() {
   local step=$1
-  local ckpt="$TRAIN/checkpoints/global_step_$step"
+  local ckpt
+  ckpt=$(checkpoint_path "$step")
   local eval_dir="$RUN/eval_id_100_by_step/step_$step"
   local pid_file="$PID_DIR/eval_id_100_step_$step.pid"
   local log_file="$LOG_DIR/eval_id_100_step_$step.log"
@@ -277,7 +284,7 @@ run_formal_training() {
       env CUDA_VISIBLE_DEVICES="$TRAIN_GPU" ASK4HELP_RLINF_PLACEMENT="$TRAIN_GPU-$TRAIN_GPU" \
       OPEN_DRAWER_ID_DATASET="$MERGED" OPEN_DRAWER_ID_NORM_STATS="$NORM" \
       OPEN_DRAWER_PI05_MODEL_PATH="$MODEL" OPEN_DRAWER_RESUME_DIR="$BASE" \
-      OPEN_DRAWER_RUN_ROOT="$TRAIN" OPEN_DRAWER_EXPERIMENT_NAME=expansion_recovery_from4000 \
+      OPEN_DRAWER_RUN_ROOT="$TRAIN" OPEN_DRAWER_EXPERIMENT_NAME="$TRAIN_EXPERIMENT" \
       RAY_TMPDIR="$RAY_TRAIN_DIR" TMPDIR="$TRAIN/tmp" HF_HOME="$ROOT/runtime_cache/hf_home" \
       PYTHONUNBUFFERED=1 PYTHONPATH="$RL:$ROOT" EMBODIED_PATH="$RL/examples/sft" REPO_PATH="$RL" \
       taskset -c "$CPU_TRAIN" "$PY" "$RL/examples/sft/train_vla_sft.py" \
