@@ -11,9 +11,9 @@ OLD_COLLECTION=$ROOT/results/id_oracle_collection_v1/formal_128_retry1/episodes.
 OLD_VIDEOS=$ROOT/results/id_oracle_collection_v1/formal_128_retry1/videos
 BASE=$ROOT/results/open_drawer_failure_detection_v1/id_base_protocol_v3_batch128/sft_10000/checkpoints/global_step_4000
 MODEL=$ROOT/results/model_cache/pi05_base_pytorch_v1
-NEW_DATA=$RUN/datasets/id_extra128
-MERGED=$RUN/datasets/id_merged256
-NORM=$RUN/norm_stats/id_merged256
+NEW_DATA=${OPEN_DRAWER_EXPANSION_NEW_DATA:-$RUN/datasets/id_extra128}
+MERGED=${OPEN_DRAWER_EXPANSION_MERGED_DATA:-$RUN/datasets/id_merged256}
+NORM=${OPEN_DRAWER_EXPANSION_NORM_STATS:-$RUN/norm_stats/id_merged256}
 SMOKE=$RUN/oracle_smoke
 COLLECTION=$RUN/collection_extra128
 AUDIT=$RUN/audit/data_audit.json
@@ -30,6 +30,8 @@ PLANNER_PYTHONPATH=${OPEN_DRAWER_PLANNER_PYTHONPATH:-}
 PLANNER_CUDA_VISIBLE_DEVICES=${OPEN_DRAWER_PLANNER_CUDA_VISIBLE_DEVICES:-0}
 NEW_SEED_START=76000
 GATE_SEED_START=52000
+RAY_SMOKE_DIR=${OPEN_DRAWER_EXPANSION_RAY_SMOKE_DIR:-/sdd/od_open_drawer_expansion_smoke}
+RAY_TRAIN_DIR=${OPEN_DRAWER_EXPANSION_RAY_TRAIN_DIR:-/sdd/od_open_drawer_expansion_train}
 
 mkdir -p "$RUN" "$LOG_DIR" "$PID_DIR" "$RUN/provenance"
 
@@ -181,13 +183,13 @@ run_training_smoke() {
   fi
   if [ ! -e "$SMOKE_TRAIN" ]; then
     state training_smoke starting starting
-    mkdir -p "$SMOKE_TRAIN/tmp" "$RUN/ray_smoke"
+    mkdir -p "$SMOKE_TRAIN/tmp" "$RAY_SMOKE_DIR"
     start_stage "$PID_DIR/training_smoke.pid" "$LOG_DIR/training_smoke.log" \
       env CUDA_VISIBLE_DEVICES="$TRAIN_GPU" ASK4HELP_RLINF_PLACEMENT="$TRAIN_GPU-$TRAIN_GPU" \
       OPEN_DRAWER_ID_DATASET="$MERGED" OPEN_DRAWER_ID_NORM_STATS="$NORM" \
       OPEN_DRAWER_PI05_MODEL_PATH="$MODEL" OPEN_DRAWER_RESUME_DIR="$BASE" \
       OPEN_DRAWER_RUN_ROOT="$SMOKE_TRAIN" OPEN_DRAWER_EXPERIMENT_NAME=expansion_smoke \
-      RAY_TMPDIR="$RUN/ray_smoke" TMPDIR="$SMOKE_TRAIN/tmp" HF_HOME="$ROOT/runtime_cache/hf_home" \
+      RAY_TMPDIR="$RAY_SMOKE_DIR" TMPDIR="$SMOKE_TRAIN/tmp" HF_HOME="$ROOT/runtime_cache/hf_home" \
       PYTHONUNBUFFERED=1 PYTHONPATH="$RL:$ROOT" EMBODIED_PATH="$RL/examples/sft" REPO_PATH="$RL" \
       taskset -c "$CPU_TRAIN" "$PY" "$RL/examples/sft/train_vla_sft.py" \
       --config-path "$RL/examples/sft/config" --config-name open_drawer_retrieve_place_id_continuation_openpi_pi05 \
@@ -270,13 +272,13 @@ run_formal_training() {
   fi
   if ! checkpoint_complete 10000 && ! alive "$PID_DIR/train_to_10000.pid"; then
     state training_to_10000 starting starting
-    mkdir -p "$TRAIN/tmp" "$RUN/ray_training"
+    mkdir -p "$TRAIN/tmp" "$RAY_TRAIN_DIR"
     start_stage "$PID_DIR/train_to_10000.pid" "$LOG_DIR/train_to_10000.log" \
       env CUDA_VISIBLE_DEVICES="$TRAIN_GPU" ASK4HELP_RLINF_PLACEMENT="$TRAIN_GPU-$TRAIN_GPU" \
       OPEN_DRAWER_ID_DATASET="$MERGED" OPEN_DRAWER_ID_NORM_STATS="$NORM" \
       OPEN_DRAWER_PI05_MODEL_PATH="$MODEL" OPEN_DRAWER_RESUME_DIR="$BASE" \
       OPEN_DRAWER_RUN_ROOT="$TRAIN" OPEN_DRAWER_EXPERIMENT_NAME=expansion_recovery_from4000 \
-      RAY_TMPDIR="$RUN/ray_training" TMPDIR="$TRAIN/tmp" HF_HOME="$ROOT/runtime_cache/hf_home" \
+      RAY_TMPDIR="$RAY_TRAIN_DIR" TMPDIR="$TRAIN/tmp" HF_HOME="$ROOT/runtime_cache/hf_home" \
       PYTHONUNBUFFERED=1 PYTHONPATH="$RL:$ROOT" EMBODIED_PATH="$RL/examples/sft" REPO_PATH="$RL" \
       taskset -c "$CPU_TRAIN" "$PY" "$RL/examples/sft/train_vla_sft.py" \
       --config-path "$RL/examples/sft/config" --config-name open_drawer_retrieve_place_id_continuation_openpi_pi05 \
