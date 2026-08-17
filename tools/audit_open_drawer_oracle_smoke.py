@@ -33,8 +33,9 @@ def main() -> int:
     if len(videos) != args.expected:
         errors.append(f"videos:{len(videos)}!={args.expected}")
     for row in rows:
-        stages: dict[str, Any] = row.get("oracle", {}).get("stages", {})
-        if row.get("split") != "id" or stages.get("split") != "id":
+        stages: dict[str, Any] = row.get("oracle", {}).get("stages", row)
+        row_split = row.get("split", stages.get("split"))
+        if row_split != "id" or stages.get("split") != "id":
             errors.append(f"non_id_row:{row.get('seed')}")
         if stages.get("success") is not True:
             errors.append(f"failed_stage_row:{row.get('seed')}")
