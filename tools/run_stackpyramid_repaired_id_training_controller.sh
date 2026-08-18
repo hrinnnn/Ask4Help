@@ -64,7 +64,7 @@ import sys
 from pathlib import Path
 
 config = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-if config.get("model_type") != "XVLA":
+if str(config.get("model_type", "")).lower() != "xvla":
     raise SystemExit(f"unexpected base model_type: {config.get('model_type')!r}")
 PY
 
