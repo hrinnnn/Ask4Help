@@ -38,3 +38,7 @@ No old demonstration may enter the repaired dataset. After the 100-seed Oracle g
 ## Output and stop conditions
 
 All outputs use the independent root `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v1/`. Each gate writes its own marker, summary, videos, actions and state timelines. Any event-order, gripper, duration, evidence or Oracle-success failure stops the pipeline in diagnostic status; geometry, success predicate, horizon, seed semantics and thresholds must not be changed to obtain a pass.
+
+## Formal ID Gate Boundary
+
+The 256-data fresh ID training reached `TRAINING_COMPLETE` with the canonical original X-VLA base and all 20-episode probes remain diagnostic. The first formal 100-ID launcher failed before episode 1 because the optional evidence path attempted to convert a CUDA state tensor directly to NumPy. It is recorded as `FORMAL_GATE_FAILED_ENGINEERING_STATE_SERIALIZATION` under the formal gate root; no formal success/failure decision or `ID_BASE_VALIDATED` marker was written. The minimal fix serializes state through `detach().cpu().numpy()` and is committed in the source tree, but the formal evaluator is not relaunched in this phase without a new execution authorization.
