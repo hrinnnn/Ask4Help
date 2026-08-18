@@ -41,6 +41,12 @@ def bool_scalar(value: Any) -> bool:
     return bool(scalar(value))
 
 
+def json_state(value: Any) -> list[float]:
+    if isinstance(value, torch.Tensor):
+        value = value.detach().cpu().numpy()
+    return np.asarray(value, dtype=np.float32).reshape(-1).tolist()
+
+
 def image_array(value: Any) -> np.ndarray:
     if isinstance(value, torch.Tensor):
         value = value.detach().cpu().numpy()
@@ -289,7 +295,7 @@ def main() -> None:
             if args.formal_evidence:
                 formal_state_timeline.append({
                     "step": 0,
-                    "state": np.asarray(raw_obs["state"], dtype=np.float32).reshape(-1).tolist(),
+                    "state": json_state(raw_obs["state"]),
                     "details": details(env),
                     "stage_events": dict(event_reached),
                 })
@@ -316,7 +322,7 @@ def main() -> None:
                     if args.formal_evidence:
                         formal_state_timeline.append({
                             "step": executed,
-                            "state": np.asarray(raw_obs["state"], dtype=np.float32).reshape(-1).tolist(),
+                            "state": json_state(raw_obs["state"]),
                             "details": current,
                             "stage_events": dict(event_reached),
                         })
