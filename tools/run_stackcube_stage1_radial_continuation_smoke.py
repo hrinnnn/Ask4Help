@@ -474,6 +474,10 @@ def main() -> None:
         raise FileExistsError("radial continuation output roots must be new")
     args.local_output.mkdir(parents=True)
     write_json(
+        args.local_output / "pipeline_state.json",
+        {"stage": "calibration", "status": "RUNNING", "checkpoint": str(args.checkpoint)},
+    )
+    write_json(
         args.local_output / "protocol.json",
         {
             "task": "StackCube Stage1 radial-distance policy-to-expert-to-policy smoke",
@@ -515,6 +519,10 @@ def main() -> None:
             action_low=action_low,
             action_high=action_high,
             output=calibration_output,
+        )
+        write_json(
+            args.local_output / "pipeline_state.json",
+            {"stage": "continuation_smoke", "status": "RUNNING", "thresholds": thresholds},
         )
         smoke_output = args.local_output / "continuation_smoke"
         smoke_output.mkdir()
@@ -572,6 +580,14 @@ def main() -> None:
                 "Continuation smoke did not meet the pre-registered gate.\n",
                 encoding="utf-8",
             )
+        write_json(
+            args.local_output / "pipeline_state.json",
+            {
+                "stage": "continuation_smoke_complete",
+                "status": "PASSED" if passed else "DIAGNOSTIC_FAILED",
+                "summary": summary,
+            },
+        )
     finally:
         probe.close()
         del policy
