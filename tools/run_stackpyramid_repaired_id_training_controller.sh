@@ -23,7 +23,7 @@ if [[ -e "$OUTPUT" ]]; then
   exit 2
 fi
 test -f "$INPUT_ROOT/id/accepted_suffixes.h5"
-test -f "$WORK/fresh_id_train_smoke_2step_retry2/RELOAD_SMOKE_COMPLETE"
+test -f "$WORK/fresh_id_train_smoke_canonical_base_retry1/RELOAD_SMOKE_COMPLETE"
 mkdir -p "$WORK"
 mkdir -p "$OUTPUT"
 rm -rf "$OUTPUT"
