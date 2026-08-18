@@ -6,10 +6,11 @@ PY="/root/.venvs/xvla-h20/bin/python"
 XVLA_ROOT="/root/X-VLA"
 BASE_MODEL="/mnt/data/ask4help/models/X-VLA-Pt_from5090_v4"
 INPUT_ROOT="/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v1/fresh_id_training_input_256"
-OUTPUT="/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v1/id_sft_10000_retry1"
 WORK="/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v1"
-TRAIN_LOG="$WORK/id_sft_10000_retry1.log"
-TRAIN_PID_FILE="$WORK/id_sft_10000_retry1.pid"
+RUN_NAME="${RUN_NAME:-id_sft_10000_retry1}"
+OUTPUT="${OUTPUT:-/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v1/$RUN_NAME}"
+TRAIN_LOG="$WORK/${RUN_NAME}.log"
+TRAIN_PID_FILE="$WORK/${RUN_NAME}.pid"
 GATE_SEED=887000
 
 write_state() {
@@ -25,8 +26,8 @@ fi
 test -f "$INPUT_ROOT/id/accepted_suffixes.h5"
 test -f "$WORK/fresh_id_train_smoke_canonical_base_retry1/RELOAD_SMOKE_COMPLETE"
 mkdir -p "$WORK"
-mkdir -p "$OUTPUT"
 rm -rf "$OUTPUT"
+mkdir -p "$OUTPUT"
 
 write_state "fresh_id_training" "STARTING"
 cd "$ROOT"
