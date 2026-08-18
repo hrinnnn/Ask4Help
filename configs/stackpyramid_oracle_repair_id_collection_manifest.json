@@ -1,0 +1,25 @@
+{
+  "format": "stackpyramid_oracle_repair_id_collection_manifest_v1",
+  "status": "FROZEN_FOR_NEW_REPAIRED_ORACLE_COLLECTION",
+  "geometry": "STACKPYRAMID_OOD_GEOMETRY=v4",
+  "instruction": "stack the red cube next to the green cube and place the blue cube on top",
+  "oracle_source": "repaired StackPyramidOracle after 100-seed Oracle gate",
+  "id_only": true,
+  "seed_start": 886000,
+  "max_raw_attempts": 384,
+  "target_accepted_successes": 256,
+  "minimum_accepted_successes": 128,
+  "old_collections_excluded": [
+    "/mnt/data/ask4help/results/xvla_stackpyramid_v4/id_collection_retry4/",
+    "/mnt/data/ask4help/results/xvla_stackpyramid_v4/id_training_collection_retry1/"
+  ],
+  "output_root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v1/id_collection_256_retry1/",
+  "evidence_required": [
+    "raw attempt denominator and failure reasons",
+    "accepted HDF5 actions and T+1 observations",
+    "base camera, wrist camera, state alignment",
+    "decodable video for every raw attempt",
+    "single red grasp, closed red transport, target release, blue-after-red event order",
+    "temporal-mask tail-anchor audit before training"
+  ]
+}
