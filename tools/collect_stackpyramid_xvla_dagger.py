@@ -127,7 +127,11 @@ class StepRecorder:
         return raw_obs, reward, terminated, truncated, info
 
     def _update_events(self) -> None:
-        events = stage_events(self, self.initial_z)
+        completed_events = {
+            name: name in self.event_first_steps
+            for name in ("red_grasped", "red_lifted", "red_placed", "blue_grasped", "blue_lifted")
+        }
+        events = stage_events(self, self.initial_z, completed_events)
         step = len(self.actions)
         self.event_history.append(events)
         for name, reached in events.items():
@@ -202,8 +206,9 @@ class StackPyramidOracle:
         # near the red placement target.
         need_move_a_b = distance > 0.07 or stackpyramid_geometry_version() == "v4"
         if need_move_a_b:
-            # Keep the official ManiSkill order and retain the red cube until
-            # the blue-cube reach phase, where the official solver releases it.
+            # Keep the red cube closed from grasp through placement.  The
+            # previous v4 recipe lifted and then returned to the grasp height
+            # before transport, which created an unnecessary red motion phase.
             self.planner.open_gripper()
             grasp_pose = base.agent.build_grasp_pose(
                 approaching, closing, moving_cube.pose.sp.p
@@ -212,12 +217,10 @@ class StackPyramidOracle:
             self.planner.move_to_pose_with_screw(reach_pose)
             self.planner.move_to_pose_with_screw(grasp_pose)
             self.planner.close_gripper()
-            # Expose a real lift event, then return to the original grasp
-            # height before using the official tabletop transport path.
+            # Expose a real lift event, then keep the gripper closed for
+            # horizontal transport and vertical lowering.
             lift_pose = self.sapien.Pose([0, 0, 0.1]) * grasp_pose
             self.planner.move_to_pose_with_screw(lift_pose)
-            self.planner.move_to_pose_with_screw(grasp_pose)
-            self.planner.close_gripper()
             # Place red next to green with a small non-overlapping margin.
             # Scaling the absolute target pose (the upstream demo shortcut)
             # can put the cubes on top of each other in the v4 ID geometry.
@@ -230,11 +233,36 @@ class StackPyramidOracle:
             # Leave a small geometric margin inside the task's placement
             # tolerance; the diagonal cube-size threshold is about 0.0616 m.
             goal_xy = target_xy + 0.050 * direction / direction_norm
-            goal_p = np.asarray(
-                [goal_xy[0], goal_xy[1], target_position[2] + 0.04], dtype=np.float64
+            safe_z = max(float(target_position[2]) + 0.10, float(moving_position[2]) + 0.10)
+            transport_pose = self.sapien.Pose(
+                [goal_xy[0], goal_xy[1], safe_z], grasp_pose.q
             )
-            goal_pose = self.sapien.Pose(goal_p, grasp_pose.q)
-            self.planner.move_to_pose_with_screw(goal_pose)
+            self.planner.move_to_pose_with_screw(transport_pose)
+            lower_pose = self.sapien.Pose(
+                [goal_xy[0], goal_xy[1], target_position[2] + 0.04], grasp_pose.q
+            )
+            self.planner.move_to_pose_with_screw(lower_pose)
+            red_position = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+            placement_threshold = float(
+                np.linalg.norm(2 * base.cube_half_size[:2].detach().cpu().numpy()) + 0.005
+            )
+            if (
+                float(np.linalg.norm((red_position - target_position)[:2])) > placement_threshold
+            ):
+                raise RuntimeError("refusing red release before target tolerance")
+            self.planner.open_gripper()
+            if "red_placed" not in self.recorder.event_first_steps:
+                raise RuntimeError("red release did not produce a verified red_placed event")
+            released_red = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+            if (
+                float(np.linalg.norm((released_red - target_position)[:2])) > placement_threshold
+                or abs(float(released_red[2] - target_position[2])) > 0.03
+            ):
+                raise RuntimeError("red release did not satisfy target pose tolerance")
+            red_retreat_pose = self.sapien.Pose(
+                [goal_xy[0], goal_xy[1], safe_z], grasp_pose.q
+            )
+            self.planner.move_to_pose_with_screw(red_retreat_pose)
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
@@ -254,15 +282,8 @@ class StackPyramidOracle:
             if self.planner.move_to_pose_with_screw(grasp_pose2, dry_run=True) != -1:
                 grasp_pose = grasp_pose2
                 break
-        if need_move_a_b:
-            # Release the red cube immediately after its transport.  This is
-            # required by the staged event contract: otherwise the subsequent
-            # reach to the blue cube carries the red cube away from its goal.
-            self.planner.open_gripper()
-            red_retreat_pose = self.sapien.Pose(
-                [goal_xy[0], goal_xy[1], target_position[2] + 0.15], grasp_pose.q
-            )
-            self.planner.move_to_pose_with_screw(red_retreat_pose)
+        if need_move_a_b and "red_placed" not in self.recorder.event_first_steps:
+            raise RuntimeError("blue phase cannot start before verified red placement")
         # Move above the tabletop before translating to the blue cube.  The
         # direct low sweep can disturb the freshly placed red/green pair in
         # the tightly separated ID geometry.
