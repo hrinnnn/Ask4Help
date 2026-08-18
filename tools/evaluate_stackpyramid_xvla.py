@@ -226,6 +226,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="gpu")
     parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="gpu")
+    parser.add_argument(
+        "--formal-evidence",
+        action="store_true",
+        help="Save per-episode actions and full state/event timelines for a formal gate.",
+    )
     return parser.parse_args()
 
 
@@ -279,6 +284,15 @@ def main() -> None:
             event_reached = {name: False for name in ("red_grasped", "red_lifted", "red_placed", "blue_grasped", "blue_lifted")}
             event_steps: dict[str, int | None] = {name: None for name in event_reached}
             final_info: dict[str, Any] = {}
+            formal_actions: list[np.ndarray] = []
+            formal_state_timeline: list[dict[str, Any]] = []
+            if args.formal_evidence:
+                formal_state_timeline.append({
+                    "step": 0,
+                    "state": np.asarray(raw_obs["state"], dtype=np.float32).reshape(-1).tolist(),
+                    "details": details(env),
+                    "stage_events": dict(event_reached),
+                })
             while executed < args.max_episode_steps and not ever_pyramid:
                 inputs = prepare_inputs(model, processor, raw_obs, device)
                 chunk = predict(model, inputs, device, seed + executed, args.flow_steps)
@@ -290,6 +304,8 @@ def main() -> None:
                 for action in chunk[: args.execute_horizon]:
                     raw_obs, _, terminated, truncated, info = env.step(action.astype(np.float32))
                     executed += 1
+                    if args.formal_evidence:
+                        formal_actions.append(np.asarray(action, dtype=np.float32).copy())
                     final_info = info if isinstance(info, dict) else {}
                     current = details(env)
                     events = stage_events(env, initial_z, event_reached)
@@ -297,6 +313,13 @@ def main() -> None:
                         if reached and not event_reached[name]:
                             event_reached[name] = True
                             event_steps[name] = executed
+                    if args.formal_evidence:
+                        formal_state_timeline.append({
+                            "step": executed,
+                            "state": np.asarray(raw_obs["state"], dtype=np.float32).reshape(-1).tolist(),
+                            "details": current,
+                            "stage_events": dict(event_reached),
+                        })
                     ever_grasped |= any(current["grasped"])
                     ever_base |= bool(current["xy_ab"] and (current["z_cb"] or current["z_ca"]))
                     ever_pyramid |= bool(current["success"])
@@ -331,6 +354,15 @@ def main() -> None:
                 "final": final,
                 "video": str(video_path),
             }
+            if args.formal_evidence:
+                actions_path = args.output / "actions" / f"{args.split}_{seed}.npy"
+                states_path = args.output / "states" / f"{args.split}_{seed}.json"
+                actions_path.parent.mkdir(parents=True, exist_ok=True)
+                states_path.parent.mkdir(parents=True, exist_ok=True)
+                np.save(actions_path, np.asarray(formal_actions, dtype=np.float32))
+                states_path.write_text(json.dumps(formal_state_timeline) + "\n", encoding="utf-8")
+                row["actions"] = str(actions_path)
+                row["state_timeline"] = str(states_path)
             rows.append(row)
             print(json.dumps(row, ensure_ascii=True), flush=True)
     finally:
@@ -348,6 +380,9 @@ def main() -> None:
             for name in ("red_grasped", "red_lifted", "red_placed", "blue_grasped", "blue_lifted")
         },
         "video_count": len(list(videos.glob("*.mp4"))),
+        "formal_evidence": bool(args.formal_evidence),
+        "action_array_count": len(list((args.output / "actions").glob("*.npy"))) if args.formal_evidence else None,
+        "state_timeline_count": len(list((args.output / "states").glob("*.json"))) if args.formal_evidence else None,
         "rows": rows,
     }
     if args.split in STAGE_LOCALITY_CONTRACTS:
@@ -363,6 +398,31 @@ def main() -> None:
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=True) + "\n")
     if summary["episodes"] != args.episodes or summary["video_count"] != args.episodes:
         raise RuntimeError(f"incomplete evaluation artifacts: {summary}")
+    if args.formal_evidence:
+        evidence_errors = []
+        for row in rows:
+            action_path = Path(row["actions"])
+            state_path = Path(row["state_timeline"])
+            try:
+                action_array = np.load(action_path)
+                state_rows = json.loads(state_path.read_text(encoding="utf-8"))
+                if action_array.shape[0] != row["steps"]:
+                    evidence_errors.append(f"{row['seed']}: actions {action_array.shape} vs steps {row['steps']}")
+                if len(state_rows) != row["steps"] + 1:
+                    evidence_errors.append(f"{row['seed']}: states {len(state_rows)} vs steps+1 {row['steps'] + 1}")
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                evidence_errors.append(f"{row['seed']}: {exc}")
+        summary["formal_evidence_errors"] = evidence_errors
+        if (
+            summary["action_array_count"] != args.episodes
+            or summary["state_timeline_count"] != args.episodes
+            or evidence_errors
+        ):
+            raise RuntimeError(f"formal evidence incomplete: {summary}")
+        (args.output / "summary.json").write_text(
+            json.dumps(summary, indent=2, ensure_ascii=True) + "\n",
+            encoding="utf-8",
+        )
     (args.output / "EVAL_COMPLETE").write_text("complete\n")
 
 

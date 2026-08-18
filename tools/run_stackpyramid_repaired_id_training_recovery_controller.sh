@@ -67,7 +67,13 @@ for STEP in 2000 3000 4000 5000 6000 7000 8000 9000 10000; do
   done
   sleep 10
   write_state "id_gate_step_$STEP" "RUNNING"
-  kill -STOP "$TRAIN_PID"
+  if kill -0 "$TRAIN_PID" 2>/dev/null; then
+    kill -STOP "$TRAIN_PID"
+  elif [[ "$STEP" != "10000" ]]; then
+    echo "training exited before expected checkpoint gate $STEP" >&2
+    write_state "fresh_id_training" "FAILED_PID_EXITED_BEFORE_GATE_$STEP"
+    exit 1
+  fi
   GATE_OUT="$LOCAL_OUTPUT/id_gate/step-$STEP"
   mkdir -p "$LOCAL_OUTPUT/id_gate"
   "$PY" tools/evaluate_stackpyramid_xvla.py \
@@ -89,11 +95,15 @@ PY
   sync_tree "$CKPT"
   sync_tree "$GATE_OUT"
   rm -rf "$CKPT"
-  kill -CONT "$TRAIN_PID"
+  if kill -0 "$TRAIN_PID" 2>/dev/null; then
+    kill -CONT "$TRAIN_PID"
+  fi
   write_state "fresh_id_training" "RUNNING_AFTER_GATE_$STEP"
 done
 
-wait "$TRAIN_PID"
+if kill -0 "$TRAIN_PID" 2>/dev/null; then
+  wait "$TRAIN_PID"
+fi
 if [[ ! -f "$LOCAL_OUTPUT/TRAINING_COMPLETE" ]]; then
   write_state "fresh_id_training" "FAILED_NO_COMPLETION_MARKER"
   exit 1

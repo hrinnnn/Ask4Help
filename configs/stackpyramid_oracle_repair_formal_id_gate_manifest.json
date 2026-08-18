@@ -1,0 +1,13 @@
+{
+  "format": "stackpyramid_oracle_repair_formal_id_gate_manifest_v1",
+  "status": "FROZEN_FORMAL_GATE",
+  "geometry": "STACKPYRAMID_OOD_GEOMETRY=v4",
+  "checkpoint": "ckpt-10000",
+  "seed_start": 888000,
+  "episodes": 100,
+  "seed_end_exclusive": 888100,
+  "strict_success_threshold": 80,
+  "formal_evidence": true,
+  "required_artifacts": ["episodes.jsonl", "100 videos", "100 actions", "100 state timelines", "summary.json", "EVAL_COMPLETE"],
+  "probe_seed_range_excluded": "887000--887019"
+}
