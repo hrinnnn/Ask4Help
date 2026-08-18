@@ -1,0 +1,27 @@
+{
+  "format": "stackcube_stage1_radial_two_way_seed_manifest_v1",
+  "status": "FROZEN_DESIGN_NOT_UNLOCKED",
+  "paired_reset": true,
+  "same_seed_rule": "ID and radial OOD share green pose, ID red pose source, robot/camera/instruction and non-target randomness",
+  "radial_rule": "red_ood_xy = red_id_xy + 0.04 * normalize(red_id_xy - green_xy)",
+  "ranges": {
+    "paired_reset_smoke": {"start": 971000, "count": 20},
+    "oracle_smoke": {"start": 971100, "count": 20},
+    "oracle_gate": {"start": 971200, "count": 100},
+    "continuation_smoke": {"start": 972000, "count": 20},
+    "successful_id_calibration": {"start": 973000, "count": 50},
+    "mixed_collection": {"start": 974000, "count": 1000},
+    "heldout_id": {"start": 975000, "count": 100},
+    "heldout_ood": {"start": 976000, "count": 100}
+  },
+  "expert_collection": {
+    "accepted_successful_trajectories_per_method": 100,
+    "raw_stream": "strictly alternating ID/OOD attempts",
+    "accepted_split_quota": null,
+    "matched_budget_unit": "low-level expert actions",
+    "return_rule": "expert returns control only after stable red lift; retain the successful continuation timeline"
+  },
+  "formal_unlocked": false,
+  "downstream_training_unlocked": false,
+  "old_diagonal_manifests_reused": false
+}

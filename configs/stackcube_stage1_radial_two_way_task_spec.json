@@ -1,0 +1,53 @@
+{
+  "format": "stackcube_stage1_radial_two_way_task_spec_v1",
+  "status": "LOCAL_SPEC_FROZEN_SERVER_LOCKED_UNTIL_ORACLE_AND_CONTINUATION_GATES",
+  "task": "stack the red cube on the green cube",
+  "base_checkpoint": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_stackcube_v1/temporal_mask_v2/id_sft_from3500_to10000_official_2gpu_retry1/ckpt-7500",
+  "id_env_id": "RLinfStackCubeStage1RadialID-v1",
+  "ood_env_id": "RLinfStackCubeStage1RadialOOD-v1",
+  "ood_split": "stage1_radial_distance_ood",
+  "geometry": {
+    "id_distribution": "existing controlled StackCube ID distribution",
+    "red_ood_rule": "red_ood_xy = red_id_xy + 0.04 * normalize(red_id_xy - green_xy)",
+    "radial_distance_m": 0.04,
+    "changed_factor": "red cube initial XY only",
+    "unchanged_factors": [
+      "green cube pose",
+      "robot initial state",
+      "camera state",
+      "language instruction",
+      "all non-target random factors",
+      "success predicate",
+      "formal episode horizon"
+    ]
+  },
+  "reset_predicates": {
+    "red_grasped": false,
+    "red_lifted": false,
+    "red_placed": false
+  },
+  "continuation_predicates": {
+    "expert_takeover": "gate requests expert while policy is active",
+    "stable_red_lift": "red_grasped and red_lifted for two consecutive low-level decisions",
+    "return_to_policy": "expert ends after stable_red_lift and policy resumes on the same environment state",
+    "continuation_success": "policy completes unchanged StackCube success predicate after return",
+    "false_release": "red is released before the stable-lift return predicate or policy return causes an invalid release",
+    "final_success": "unchanged StackCubeEnv.evaluate().success"
+  },
+  "oracle_gate": {
+    "smoke_episodes_per_split": 20,
+    "minimum_success_rate": 0.90,
+    "full_denominator_required": true,
+    "video_action_state_evidence_required": true
+  },
+  "continuation_gate": {
+    "ood_only_episodes": 20,
+    "minimum_continuation_success": 0.80,
+    "minimum_continuation_success_count": 16,
+    "real_return_required": true,
+    "second_takeover_required": false,
+    "full_score_state_action_video_required": true
+  },
+  "output_root": "/mnt/data/ask4help/results/xvla_stackcube_v1/temporal_mask_v2/stackcube_stage1_radial_two_way_v1/",
+  "diagnostic_boundary": "old diagonal StackCube Stage1 v1/v2 artifacts and all Stage2 timing/data-selection artifacts are excluded"
+}

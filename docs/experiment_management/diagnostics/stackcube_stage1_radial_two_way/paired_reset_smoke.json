@@ -1,0 +1,1498 @@
+{
+  "validation": {
+    "episodes": 20,
+    "passed": true,
+    "failed_episodes": 0,
+    "radial_shift_distance_m": 0.04,
+    "green_pose_changed": false,
+    "non_target_factors_changed": false,
+    "reset_predicates_all_false": true,
+    "failures": [],
+    "task": "StackCube Stage1 radial-distance OOD",
+    "seed_start": 971000,
+    "num_seeds": 20,
+    "paired_reset": true
+  },
+  "pairs": [
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971000,
+        "cube_a_id_xy": [
+          -0.019595761507150037,
+          0.11278320771809278
+        ],
+        "cube_a_xy": [
+          -0.019595761507150037,
+          0.11278320771809278
+        ],
+        "cube_b_xy": [
+          -0.01562271607141042,
+          0.018551680346937386
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          -0.042125165938075346,
+          0.9991123412282973
+        ],
+        "red_id_distance_m": 0.0943152471275735,
+        "red_ood_distance_m": 0.0943152471275735,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971000,
+        "cube_a_id_xy": [
+          -0.019595761507150037,
+          0.11278320771809278
+        ],
+        "cube_a_xy": [
+          -0.02128076814467305,
+          0.15274770136722465
+        ],
+        "cube_b_xy": [
+          -0.01562271607141042,
+          0.018551680346937386
+        ],
+        "red_shift_xy": [
+          -0.0016850066375230129,
+          0.03996449364913188
+        ],
+        "red_shift_norm_m": 0.03999999999999999,
+        "radial_unit_green_to_red_id": [
+          -0.042125165938075346,
+          0.9991123412282973
+        ],
+        "red_id_distance_m": 0.0943152471275735,
+        "red_ood_distance_m": 0.13431524712757348,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971001,
+        "cube_a_id_xy": [
+          0.001143068349197189,
+          0.08304739216535004
+        ],
+        "cube_a_xy": [
+          0.001143068349197189,
+          0.08304739216535004
+        ],
+        "cube_b_xy": [
+          -0.008267504933281314,
+          -0.01020766786855206
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.10040228312453435,
+          0.994946923983074
+        ],
+        "red_id_distance_m": 0.09372867816965938,
+        "red_ood_distance_m": 0.09372867816965938,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971001,
+        "cube_a_id_xy": [
+          0.001143068349197189,
+          0.08304739216535004
+        ],
+        "cube_a_xy": [
+          0.005159159674178563,
+          0.122845269124673
+        ],
+        "cube_b_xy": [
+          -0.008267504933281314,
+          -0.01020766786855206
+        ],
+        "red_shift_xy": [
+          0.004016091324981374,
+          0.039797876959322964
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          0.10040228312453435,
+          0.994946923983074
+        ],
+        "red_id_distance_m": 0.09372867816965938,
+        "red_ood_distance_m": 0.1337286781696594,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971002,
+        "cube_a_id_xy": [
+          0.010802736405982692,
+          0.08637920945231801
+        ],
+        "cube_a_xy": [
+          0.010802736405982692,
+          0.08637920945231801
+        ],
+        "cube_b_xy": [
+          0.0062798507800821525,
+          0.005578711664156555
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.05588847296691473,
+          0.9984370178380939
+        ],
+        "red_id_distance_m": 0.08092698522248104,
+        "red_ood_distance_m": 0.08092698522248104,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971002,
+        "cube_a_id_xy": [
+          0.010802736405982692,
+          0.08637920945231801
+        ],
+        "cube_a_xy": [
+          0.01303827532465928,
+          0.12631669016584177
+        ],
+        "cube_b_xy": [
+          0.0062798507800821525,
+          0.005578711664156555
+        ],
+        "red_shift_xy": [
+          0.0022355389186765884,
+          0.03993748071352375
+        ],
+        "red_shift_norm_m": 0.03999999999999999,
+        "radial_unit_green_to_red_id": [
+          0.05588847296691473,
+          0.9984370178380939
+        ],
+        "red_id_distance_m": 0.08092698522248104,
+        "red_ood_distance_m": 0.12092698522248103,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971003,
+        "cube_a_id_xy": [
+          0.0075425420918741725,
+          0.10238391796211128
+        ],
+        "cube_a_xy": [
+          0.0075425420918741725,
+          0.10238391796211128
+        ],
+        "cube_b_xy": [
+          -0.005959949099511403,
+          0.016060224115375568
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.15453791719024912,
+          0.9879868582883579
+        ],
+        "red_id_distance_m": 0.08737332194507888,
+        "red_ood_distance_m": 0.08737332194507888,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971003,
+        "cube_a_id_xy": [
+          0.0075425420918741725,
+          0.10238391796211128
+        ],
+        "cube_a_xy": [
+          0.013724058779484138,
+          0.1419033922936456
+        ],
+        "cube_b_xy": [
+          -0.005959949099511403,
+          0.016060224115375568
+        ],
+        "red_shift_xy": [
+          0.006181516687609965,
+          0.03951947433153431
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          0.15453791719024912,
+          0.9879868582883579
+        ],
+        "red_id_distance_m": 0.08737332194507888,
+        "red_ood_distance_m": 0.12737332194507886,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971004,
+        "cube_a_id_xy": [
+          0.005673935117197142,
+          0.07724077655682535
+        ],
+        "cube_a_xy": [
+          0.005673935117197142,
+          0.07724077655682535
+        ],
+        "cube_b_xy": [
+          0.01675872371033503,
+          -0.01610520117826978
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          -0.11792098684874815,
+          0.993022981033479
+        ],
+        "red_id_distance_m": 0.0940018302879015,
+        "red_ood_distance_m": 0.0940018302879015,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971004,
+        "cube_a_id_xy": [
+          0.005673935117197142,
+          0.07724077655682535
+        ],
+        "cube_a_xy": [
+          0.0009570956432472166,
+          0.11696169579816451
+        ],
+        "cube_b_xy": [
+          0.01675872371033503,
+          -0.01610520117826978
+        ],
+        "red_shift_xy": [
+          -0.004716839473949926,
+          0.039720919241339164
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          -0.11792098684874815,
+          0.993022981033479
+        ],
+        "red_id_distance_m": 0.0940018302879015,
+        "red_ood_distance_m": 0.1340018302879015,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971005,
+        "cube_a_id_xy": [
+          0.027475944755066768,
+          0.08351659678009887
+        ],
+        "cube_a_xy": [
+          0.027475944755066768,
+          0.08351659678009887
+        ],
+        "cube_b_xy": [
+          0.017370940025443954,
+          -0.0028640555682185867
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.1161899496246446,
+          0.9932270111138854
+        ],
+        "red_id_distance_m": 0.08696969714047867,
+        "red_ood_distance_m": 0.08696969714047867,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971005,
+        "cube_a_id_xy": [
+          0.027475944755066768,
+          0.08351659678009887
+        ],
+        "cube_a_xy": [
+          0.03212354274005255,
+          0.1232456772246543
+        ],
+        "cube_b_xy": [
+          0.017370940025443954,
+          -0.0028640555682185867
+        ],
+        "red_shift_xy": [
+          0.004647597984985784,
+          0.03972908044455542
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          0.1161899496246446,
+          0.9932270111138854
+        ],
+        "red_id_distance_m": 0.08696969714047867,
+        "red_ood_distance_m": 0.12696969714047865,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971006,
+        "cube_a_id_xy": [
+          0.0023500658566209705,
+          0.08267899854347523
+        ],
+        "cube_a_xy": [
+          0.0023500658566209705,
+          0.08267899854347523
+        ],
+        "cube_b_xy": [
+          -0.007287919430300209,
+          0.0031312078995038473
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.12028006594816172,
+          0.9927399990609354
+        ],
+        "red_id_distance_m": 0.08012953111511392,
+        "red_ood_distance_m": 0.08012953111511392,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971006,
+        "cube_a_id_xy": [
+          0.0023500658566209705,
+          0.08267899854347523
+        ],
+        "cube_a_xy": [
+          0.00716126849454744,
+          0.12238859850591263
+        ],
+        "cube_b_xy": [
+          -0.007287919430300209,
+          0.0031312078995038473
+        ],
+        "red_shift_xy": [
+          0.004811202637926469,
+          0.039709599962437406
+        ],
+        "red_shift_norm_m": 0.039999999999999994,
+        "radial_unit_green_to_red_id": [
+          0.12028006594816172,
+          0.9927399990609354
+        ],
+        "red_id_distance_m": 0.08012953111511392,
+        "red_ood_distance_m": 0.12012953111511392,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971007,
+        "cube_a_id_xy": [
+          -0.0035768242669467526,
+          0.11202980600839825
+        ],
+        "cube_a_xy": [
+          -0.0035768242669467526,
+          0.11202980600839825
+        ],
+        "cube_b_xy": [
+          -0.00011458483066805857,
+          0.01262393502078075
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          -0.034808219278658396,
+          0.9993940103235804
+        ],
+        "red_id_distance_m": 0.09946614644551671,
+        "red_ood_distance_m": 0.09946614644551671,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971007,
+        "cube_a_id_xy": [
+          -0.0035768242669467526,
+          0.11202980600839825
+        ],
+        "cube_a_xy": [
+          -0.004969153038093088,
+          0.15200556642134147
+        ],
+        "cube_b_xy": [
+          -0.00011458483066805857,
+          0.01262393502078075
+        ],
+        "red_shift_xy": [
+          -0.0013923287711463356,
+          0.03997576041294322
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          -0.034808219278658396,
+          0.9993940103235804
+        ],
+        "red_id_distance_m": 0.09946614644551671,
+        "red_ood_distance_m": 0.13946614644551672,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971008,
+        "cube_a_id_xy": [
+          -0.01184325124951505,
+          0.07231474952446904
+        ],
+        "cube_a_xy": [
+          -0.01184325124951505,
+          0.07231474952446904
+        ],
+        "cube_b_xy": [
+          -0.01471251362358775,
+          -0.009359397917768035
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.035108948636534236,
+          0.9993834908210347
+        ],
+        "red_id_distance_m": 0.08172453136597083,
+        "red_ood_distance_m": 0.08172453136597083,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971008,
+        "cube_a_id_xy": [
+          -0.01184325124951505,
+          0.07231474952446904
+        ],
+        "cube_a_xy": [
+          -0.010438893304053681,
+          0.11229008915731042
+        ],
+        "cube_b_xy": [
+          -0.01471251362358775,
+          -0.009359397917768035
+        ],
+        "red_shift_xy": [
+          0.001404357945461369,
+          0.03997533963284139
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          0.035108948636534236,
+          0.9993834908210347
+        ],
+        "red_id_distance_m": 0.08172453136597083,
+        "red_ood_distance_m": 0.12172453136597083,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971009,
+        "cube_a_id_xy": [
+          0.024400909862076985,
+          0.0846208719089875
+        ],
+        "cube_a_xy": [
+          0.024400909862076985,
+          0.0846208719089875
+        ],
+        "cube_b_xy": [
+          0.016290982613535458,
+          -0.005933043132744671
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.08920207828607427,
+          0.99601354871781
+        ],
+        "red_id_distance_m": 0.09091634863632549,
+        "red_ood_distance_m": 0.09091634863632549,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971009,
+        "cube_a_id_xy": [
+          0.024400909862076985,
+          0.0846208719089875
+        ],
+        "cube_a_xy": [
+          0.027968992993519955,
+          0.1244614138576999
+        ],
+        "cube_b_xy": [
+          0.016290982613535458,
+          -0.005933043132744671
+        ],
+        "red_shift_xy": [
+          0.0035680831314429708,
+          0.03984054194871241
+        ],
+        "red_shift_norm_m": 0.040000000000000015,
+        "radial_unit_green_to_red_id": [
+          0.08920207828607427,
+          0.99601354871781
+        ],
+        "red_id_distance_m": 0.09091634863632549,
+        "red_ood_distance_m": 0.1309163486363255,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971010,
+        "cube_a_id_xy": [
+          -0.012962634833642682,
+          0.09972692145670116
+        ],
+        "cube_a_xy": [
+          -0.012962634833642682,
+          0.09972692145670116
+        ],
+        "cube_b_xy": [
+          -0.009033619489037985,
+          0.018911419714659736
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          -0.04855974560307884,
+          0.9988202796834695
+        ],
+        "red_id_distance_m": 0.08091095403835033,
+        "red_ood_distance_m": 0.08091095403835033,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971010,
+        "cube_a_id_xy": [
+          -0.012962634833642682,
+          0.09972692145670116
+        ],
+        "cube_a_xy": [
+          -0.014905024657765834,
+          0.13967973264403993
+        ],
+        "cube_b_xy": [
+          -0.009033619489037985,
+          0.018911419714659736
+        ],
+        "red_shift_xy": [
+          -0.0019423898241231526,
+          0.039952811187338774
+        ],
+        "red_shift_norm_m": 0.039999999999999994,
+        "radial_unit_green_to_red_id": [
+          -0.04855974560307884,
+          0.9988202796834695
+        ],
+        "red_id_distance_m": 0.08091095403835033,
+        "red_ood_distance_m": 0.12091095403835032,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971011,
+        "cube_a_id_xy": [
+          -0.013948975146984455,
+          0.09471114894436633
+        ],
+        "cube_a_xy": [
+          -0.013948975146984455,
+          0.09471114894436633
+        ],
+        "cube_b_xy": [
+          -0.01742791451116484,
+          6.533905202589896e-05
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.03673265124890586,
+          0.9993251284403022
+        ],
+        "red_id_distance_m": 0.09470972679338004,
+        "red_ood_distance_m": 0.09470972679338004,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971011,
+        "cube_a_id_xy": [
+          -0.013948975146984455,
+          0.09471114894436633
+        ],
+        "cube_a_xy": [
+          -0.012479669097028221,
+          0.13468415408197842
+        ],
+        "cube_b_xy": [
+          -0.01742791451116484,
+          6.533905202589896e-05
+        ],
+        "red_shift_xy": [
+          0.0014693060499562337,
+          0.039973005137612094
+        ],
+        "red_shift_norm_m": 0.040000000000000015,
+        "radial_unit_green_to_red_id": [
+          0.03673265124890586,
+          0.9993251284403022
+        ],
+        "red_id_distance_m": 0.09470972679338004,
+        "red_ood_distance_m": 0.13470972679338006,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971012,
+        "cube_a_id_xy": [
+          -0.01877951953722952,
+          0.07564276351812536
+        ],
+        "cube_a_xy": [
+          -0.01877951953722952,
+          0.07564276351812536
+        ],
+        "cube_b_xy": [
+          -0.005870915410406732,
+          -0.013260358610134873
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          -0.14369174794290135,
+          0.9896224944761076
+        ],
+        "red_id_distance_m": 0.08983538937776905,
+        "red_ood_distance_m": 0.08983538937776905,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971012,
+        "cube_a_id_xy": [
+          -0.01877951953722952,
+          0.07564276351812536
+        ],
+        "cube_a_xy": [
+          -0.024527189454945572,
+          0.11522766329716967
+        ],
+        "cube_b_xy": [
+          -0.005870915410406732,
+          -0.013260358610134873
+        ],
+        "red_shift_xy": [
+          -0.005747669917716053,
+          0.03958489977904431
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          -0.14369174794290135,
+          0.9896224944761076
+        ],
+        "red_id_distance_m": 0.08983538937776905,
+        "red_ood_distance_m": 0.12983538937776906,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971013,
+        "cube_a_id_xy": [
+          0.0007107045784513003,
+          0.11587538489663153
+        ],
+        "cube_a_xy": [
+          0.0007107045784513003,
+          0.11587538489663153
+        ],
+        "cube_b_xy": [
+          0.010226554127457993,
+          0.017167277288699028
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          -0.09595905360063338,
+          0.9953852822058757
+        ],
+        "red_id_distance_m": 0.09916572946425853,
+        "red_ood_distance_m": 0.09916572946425853,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971013,
+        "cube_a_id_xy": [
+          0.0007107045784513003,
+          0.11587538489663153
+        ],
+        "cube_a_xy": [
+          -0.003127657565574035,
+          0.15569079618486656
+        ],
+        "cube_b_xy": [
+          0.010226554127457993,
+          0.017167277288699028
+        ],
+        "red_shift_xy": [
+          -0.003838362144025335,
+          0.03981541128823503
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          -0.09595905360063338,
+          0.9953852822058757
+        ],
+        "red_id_distance_m": 0.09916572946425853,
+        "red_ood_distance_m": 0.13916572946425854,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971014,
+        "cube_a_id_xy": [
+          0.007755074427342924,
+          0.07967215253763604
+        ],
+        "cube_a_xy": [
+          0.007755074427342924,
+          0.07967215253763604
+        ],
+        "cube_b_xy": [
+          -0.0023165217386745996,
+          -0.012948195960020864
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.10810338466006623,
+          0.9941396573042632
+        ],
+        "red_id_distance_m": 0.09316633514933789,
+        "red_ood_distance_m": 0.09316633514933789,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971014,
+        "cube_a_id_xy": [
+          0.007755074427342924,
+          0.07967215253763604
+        ],
+        "cube_a_xy": [
+          0.012079209813745573,
+          0.11943773882980657
+        ],
+        "cube_b_xy": [
+          -0.0023165217386745996,
+          -0.012948195960020864
+        ],
+        "red_shift_xy": [
+          0.004324135386402649,
+          0.03976558629217053
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          0.10810338466006623,
+          0.9941396573042632
+        ],
+        "red_id_distance_m": 0.09316633514933789,
+        "red_ood_distance_m": 0.1331663351493379,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971015,
+        "cube_a_id_xy": [
+          -0.0189006923807269,
+          0.0864020221700583
+        ],
+        "cube_a_xy": [
+          -0.0189006923807269,
+          0.0864020221700583
+        ],
+        "cube_b_xy": [
+          -0.00933068403141196,
+          -0.000535532928560567
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          -0.10941816986087988,
+          0.9939958068846646
+        ],
+        "red_id_distance_m": 0.08746269802796704,
+        "red_ood_distance_m": 0.08746269802796704,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971015,
+        "cube_a_id_xy": [
+          -0.0189006923807269,
+          0.0864020221700583
+        ],
+        "cube_a_xy": [
+          -0.023277419175162097,
+          0.12616185444544487
+        ],
+        "cube_b_xy": [
+          -0.00933068403141196,
+          -0.000535532928560567
+        ],
+        "red_shift_xy": [
+          -0.004376726794435196,
+          0.03975983227538657
+        ],
+        "red_shift_norm_m": 0.03999999999999998,
+        "radial_unit_green_to_red_id": [
+          -0.10941816986087988,
+          0.9939958068846646
+        ],
+        "red_id_distance_m": 0.08746269802796704,
+        "red_ood_distance_m": 0.12746269802796703,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971016,
+        "cube_a_id_xy": [
+          0.0015398300914915737,
+          0.10366709147593454
+        ],
+        "cube_a_xy": [
+          0.0015398300914915737,
+          0.10366709147593454
+        ],
+        "cube_b_xy": [
+          -0.008745121816591017,
+          0.008822704550775677
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.10780825843067801,
+          0.9941717051969162
+        ],
+        "red_id_distance_m": 0.09540040863099497,
+        "red_ood_distance_m": 0.09540040863099497,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971016,
+        "cube_a_id_xy": [
+          0.0015398300914915737,
+          0.10366709147593454
+        ],
+        "cube_a_xy": [
+          0.005852160428718695,
+          0.1434339596838112
+        ],
+        "cube_b_xy": [
+          -0.008745121816591017,
+          0.008822704550775677
+        ],
+        "red_shift_xy": [
+          0.004312330337227121,
+          0.03976686820787666
+        ],
+        "red_shift_norm_m": 0.04000000000000001,
+        "radial_unit_green_to_red_id": [
+          0.10780825843067801,
+          0.9941717051969162
+        ],
+        "red_id_distance_m": 0.09540040863099497,
+        "red_ood_distance_m": 0.13540040863099498,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971017,
+        "cube_a_id_xy": [
+          0.0002554826917220681,
+          0.09285142175597844
+        ],
+        "cube_a_xy": [
+          0.0002554826917220681,
+          0.09285142175597844
+        ],
+        "cube_b_xy": [
+          -0.00947690148040326,
+          0.009710434199051342
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.11626493414744193,
+          0.9932182363849805
+        ],
+        "red_id_distance_m": 0.08370868003746648,
+        "red_ood_distance_m": 0.08370868003746648,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971017,
+        "cube_a_id_xy": [
+          0.0002554826917220681,
+          0.09285142175597844
+        ],
+        "cube_a_xy": [
+          0.004906080057619746,
+          0.13258015121137767
+        ],
+        "cube_b_xy": [
+          -0.00947690148040326,
+          0.009710434199051342
+        ],
+        "red_shift_xy": [
+          0.004650597365897678,
+          0.039728729455399237
+        ],
+        "red_shift_norm_m": 0.040000000000000015,
+        "radial_unit_green_to_red_id": [
+          0.11626493414744193,
+          0.9932182363849805
+        ],
+        "red_id_distance_m": 0.08370868003746648,
+        "red_ood_distance_m": 0.1237086800374665,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971018,
+        "cube_a_id_xy": [
+          -0.004416497387278938,
+          0.0789316042949779
+        ],
+        "cube_a_xy": [
+          -0.004416497387278938,
+          0.0789316042949779
+        ],
+        "cube_b_xy": [
+          -0.019655290914113964,
+          -0.015054168689074743
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.16004923158218412,
+          0.9871090332227502
+        ],
+        "red_id_distance_m": 0.09521316270119058,
+        "red_ood_distance_m": 0.09521316270119058,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971018,
+        "cube_a_id_xy": [
+          -0.004416497387278938,
+          0.0789316042949779
+        ],
+        "cube_a_xy": [
+          0.0019854718760084263,
+          0.11841596562388793
+        ],
+        "cube_b_xy": [
+          -0.019655290914113964,
+          -0.015054168689074743
+        ],
+        "red_shift_xy": [
+          0.0064019692632873645,
+          0.03948436132891002
+        ],
+        "red_shift_norm_m": 0.040000000000000015,
+        "radial_unit_green_to_red_id": [
+          0.16004923158218412,
+          0.9871090332227502
+        ],
+        "red_id_distance_m": 0.09521316270119058,
+        "red_ood_distance_m": 0.1352131627011906,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    },
+    {
+      "id": {
+        "task": "stack the red cube on the green cube",
+        "split": "id",
+        "paired_seed": 971019,
+        "cube_a_id_xy": [
+          0.022046294574647456,
+          0.09197642302409068
+        ],
+        "cube_a_xy": [
+          0.022046294574647456,
+          0.09197642302409068
+        ],
+        "cube_b_xy": [
+          0.01457008990234479,
+          0.011694346759756714
+        ],
+        "red_shift_xy": [
+          0.0,
+          0.0
+        ],
+        "red_shift_norm_m": 0.0,
+        "radial_unit_green_to_red_id": [
+          0.09272302221159583,
+          0.9956919408893233
+        ],
+        "red_id_distance_m": 0.08062943262614773,
+        "red_ood_distance_m": 0.08062943262614773,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      },
+      "ood": {
+        "task": "stack the red cube on the green cube",
+        "split": "stage1_radial_distance_ood",
+        "paired_seed": 971019,
+        "cube_a_id_xy": [
+          0.022046294574647456,
+          0.09197642302409068
+        ],
+        "cube_a_xy": [
+          0.02575521546311129,
+          0.1318041006596636
+        ],
+        "cube_b_xy": [
+          0.01457008990234479,
+          0.011694346759756714
+        ],
+        "red_shift_xy": [
+          0.0037089208884638347,
+          0.03982767763557293
+        ],
+        "red_shift_norm_m": 0.04,
+        "radial_unit_green_to_red_id": [
+          0.09272302221159583,
+          0.9956919408893233
+        ],
+        "red_id_distance_m": 0.08062943262614773,
+        "red_ood_distance_m": 0.12062943262614771,
+        "paired_green_equal": true,
+        "non_target_factors_equal": true,
+        "reset_predicates": {
+          "red_grasped": false,
+          "red_lifted": false,
+          "red_placed": false
+        },
+        "metadata_complete": true
+      }
+    }
+  ]
+}
