@@ -33,11 +33,17 @@ def _pose_snapshot(recorder: Any) -> dict[str, Any]:
         cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0].astype(float).tolist()
         for cube in cubes
     ]
+    target_xy_distance = float(np.linalg.norm(np.asarray(positions[0][:2]) - np.asarray(positions[1][:2])))
+    target_xy_tolerance = float(
+        np.linalg.norm(2 * base.cube_half_size[:2].detach().cpu().numpy()) + 0.005
+    )
     return {
         "action_step": len(recorder.actions),
         "red_pose": positions[0],
         "green_pose": positions[1],
         "blue_pose": positions[2],
+        "red_green_xy_distance": target_xy_distance,
+        "red_green_xy_tolerance": target_xy_tolerance,
         "grasped": [
             _bool(base.agent.is_grasping(cube)) for cube in cubes
         ],
