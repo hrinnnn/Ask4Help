@@ -44,3 +44,7 @@
 - 专家无法在 OOD reset 后完成接近/抓取/稳定抬升；
 - return-to-policy 不真实、continuation success 低于 `16/20` 或出现 false release；
 - 任何失败均保留新目录为 diagnostic，不调整 radial distance、阈值或成功定义来追求通过率。
+
+## v1 Diagnostic Closure
+
+H20 real-runtime reset smoke and ID/OOD Oracle smoke passed. The independent ID calibration used 47/50 successful rollouts and froze upper=`1.6427710056` and lower=`1.0735905170`. The OOD-only continuation smoke then produced 14/20 takeovers, 11/20 real returns, but only 3/20 continuation successes and 5/20 false releases. A read-only handoff audit found that all 11 returned episodes still had the carried red object outside the ID object-green distance range `[0.08, 0.10]` m at the stable-lift handoff. The result is `RADIAL_CONTINUATION_GATE_FAILED_PERSISTENT_CARRIED_OOD`; no downstream collection or training is unlocked. The complete evidence is retained under `/mnt/data/ask4help/results/xvla_stackcube_v1/temporal_mask_v2/stackcube_stage1_radial_two_way_v1/continuation_smoke_retry1/`.
