@@ -238,12 +238,46 @@ run_id_gate() {
   wait_stage "$pid_file" "id_gate_step_${step}"
   [ -f "$eval_dir/summary.json" ] || fail "id_gate_summary_missing_step=$step"
   local videos; videos=$(find "$eval_dir/videos" -maxdepth 1 -type f -name '*.mp4' 2>/dev/null | wc -l | tr -d ' ')
+  local evidence_dir="$eval_dir/episodes"
+  local action_files; action_files=$(find "$evidence_dir" -mindepth 2 -maxdepth 2 -type f -name 'actions.npy' 2>/dev/null | wc -l | tr -d ' ')
+  local state_files; state_files=$(find "$evidence_dir" -mindepth 2 -maxdepth 2 -type f -name 'states.npy' 2>/dev/null | wc -l | tr -d ' ')
+  local timeline_files; timeline_files=$(find "$evidence_dir" -mindepth 2 -maxdepth 2 -type f -name 'timeline.json' 2>/dev/null | wc -l | tr -d ' ')
+  if [ "$videos" != 100 ] || [ "$action_files" != 100 ] || [ "$state_files" != 100 ] || [ "$timeline_files" != 100 ] || [ ! -f "$eval_dir/provenance.json" ]; then
+    printf '%s\n' "videos=$videos actions=$action_files states=$state_files timelines=$timeline_files provenance=$(test -f "$eval_dir/provenance.json" && echo yes || echo no)" > "$eval_dir/GATE_EVIDENCE_FAILED"
+    fail "id_gate_evidence_missing_step=$step"
+  fi
+  "$PY" - "$evidence_dir" <<'PY' || fail "id_gate_evidence_invalid_step=$step"
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+
+root = Path(sys.argv[1])
+dirs = sorted(path for path in root.iterdir() if path.is_dir())
+if len(dirs) != 100:
+    raise SystemExit(f"episode_dirs={len(dirs)}")
+for path in dirs:
+    actions = np.load(path / "actions.npy")
+    states = np.load(path / "states.npy")
+    timeline = json.loads((path / "timeline.json").read_text())
+    if actions.ndim != 2 or actions.shape[1] != 8:
+        raise SystemExit(f"bad_actions:{path}:{actions.shape}")
+    if states.ndim != 2 or states.shape[0] != actions.shape[0] + 1 or states.shape[1] < 9:
+        raise SystemExit(f"bad_states:{path}:{states.shape}:{actions.shape}")
+    if len(timeline.get("timeline", [])) != actions.shape[0] + 1:
+        raise SystemExit(f"bad_timeline:{path}")
+    if not timeline.get("tail_observation_retained", False):
+        raise SystemExit(f"tail_missing:{path}")
+    if not np.isfinite(actions).all() or not np.isfinite(states).all():
+        raise SystemExit(f"nonfinite:{path}")
+PY
   "$PY" - "$eval_dir/summary.json" "$RUN" "$step" "$videos" <<'PY'
 import json, sys
 from pathlib import Path
 summary=json.loads(Path(sys.argv[1]).read_text())
 run=Path(sys.argv[2]); step=int(sys.argv[3]); videos=int(sys.argv[4])
-payload={"step":step,"episodes":summary.get("episodes"),"successes":summary.get("successes"),"videos":videos,"summary":sys.argv[1],"pass":summary.get("episodes")==100 and videos==100 and summary.get("successes",0)>=80}
+payload={"step":step,"episodes":summary.get("episodes"),"successes":summary.get("successes"),"videos":videos,"actions":100,"states":100,"timelines":100,"provenance":str(Path(sys.argv[1]).parent/"provenance.json"),"summary":sys.argv[1],"pass":summary.get("episodes")==100 and videos==100 and summary.get("successes",0)>=80}
 (run/f"ID_GATE_STEP_{step}.json").write_text(json.dumps(payload,indent=2)+"\n")
 if payload["pass"]:
     (run/f"ID_BASE_CANDIDATE_STEP_{step}").write_text(json.dumps(payload,indent=2)+"\n")

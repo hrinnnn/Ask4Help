@@ -90,6 +90,26 @@ def main() -> None:
         raise ValueError("episodes, execute-horizon and max-episode-steps must be positive")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "videos").mkdir(exist_ok=True)
+    (args.output_dir / "episodes").mkdir(exist_ok=True)
+    (args.output_dir / "provenance.json").write_text(
+        json.dumps(
+            {
+                "task": "OpenDrawerRetrievePlace",
+                "checkpoint": str(args.checkpoint),
+                "pi05_base": str(args.pi05_base),
+                "norm_stats": str(args.norm_stats),
+                "split": args.split,
+                "seed_start": args.seed,
+                "episodes": args.episodes,
+                "execute_horizon": args.execute_horizon,
+                "max_episode_steps": args.max_episode_steps,
+                "success_predicate": "strict OpenDrawer task success",
+                "evidence_format": "episodes/<episode>/actions.npy, states.npy, timeline.json",
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     model = _load_model(args.checkpoint, args.norm_stats, args.pi05_base)
     env = gym.make(
         _split_env_id(args.split),
@@ -113,6 +133,7 @@ def main() -> None:
             raw_obs, info = env.reset(seed=seed)
             records = [_extract_record(raw_obs)]
             actions: list[np.ndarray] = []
+            event_timeline: list[dict[str, bool]] = [{}]
             success = False
             ever_drawer_opened = False
             ever_grasped = False
@@ -133,6 +154,22 @@ def main() -> None:
                     )
                     actions.append(action)
                     records.append(_extract_record(raw_obs))
+                    event_timeline.append(
+                        {
+                            key: bool(_bool(value))
+                            for key, value in info.items()
+                            if key
+                            in {
+                                "ever_drawer_opened",
+                                "ever_grasped",
+                                "ever_lifted",
+                                "object_in_target",
+                                "object_released",
+                                "is_robot_static",
+                                "success",
+                            }
+                        }
+                    )
                     ever_drawer_opened |= _bool(info.get("ever_drawer_opened", False))
                     ever_grasped |= _bool(info.get("ever_grasped", False))
                     ever_lifted |= _bool(info.get("ever_lifted", False))
@@ -142,6 +179,21 @@ def main() -> None:
                     success = _bool(info.get("success", False))
                     if success or _bool(terminated) or _bool(truncated):
                         break
+            episode_dir = args.output_dir / "episodes" / f"episode_{episode:06d}"
+            episode_dir.mkdir(parents=True, exist_ok=True)
+            np.save(episode_dir / "actions.npy", np.asarray(actions, dtype=np.float32))
+            np.save(
+                episode_dir / "states.npy",
+                np.asarray([record.state for record in records], dtype=np.float32),
+            )
+            timeline = [
+                {
+                    "step": index,
+                    "state": np.asarray(record.state, dtype=np.float32).tolist(),
+                    "events": event_timeline[index],
+                }
+                for index, record in enumerate(records)
+            ]
             main_camera = _select_camera(
                 records[0].obs, "", ("base_camera",) + MAIN_CAMERA_CANDIDATES, "main"
             )
@@ -173,9 +225,25 @@ def main() -> None:
                 "ever_in_target": bool(ever_in_target),
                 "ever_released": bool(ever_released),
                 "ever_static": bool(ever_static),
-                "steps": len(actions),
-                "video": str(video_path),
+                    "steps": len(actions),
+                    "video": str(video_path),
+                    "actions": str(episode_dir / "actions.npy"),
+                    "states": str(episode_dir / "states.npy"),
+                    "timeline": str(episode_dir / "timeline.json"),
             }
+            (episode_dir / "timeline.json").write_text(
+                json.dumps(
+                    {
+                        "episode_index": episode,
+                        "seed": seed,
+                        "steps": len(actions),
+                        "tail_observation_retained": len(records) == len(actions) + 1,
+                        "timeline": timeline,
+                    },
+                    indent=2,
+                )
+                + "\n"
+            )
             rows.append(row)
             with (args.output_dir / "episodes.jsonl").open("a") as episodes_file:
                 episodes_file.write(json.dumps(row, sort_keys=True) + "\n")
