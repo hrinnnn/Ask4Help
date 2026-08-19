@@ -1,0 +1,82 @@
+{
+  "format": "stackpyramid_id_recovery_512_manifest_v1",
+  "declared_before_execution": true,
+  "benchmark_version": "stackpyramid_stage_localized_v4",
+  "geometry": "v4",
+  "task_spec": "configs/stackpyramid_v4_task_spec.json",
+  "instruction": "stack the red cube next to the green cube and place the blue cube on top",
+  "oracle": {
+    "implementation": "tools/collect_stackpyramid_xvla_dagger.py::StackPyramidOracle",
+    "sequence": "single red grasp -> closed direct transport -> target release -> blue stage",
+    "max_episode_steps": 300,
+    "fresh_env_per_episode": true
+  },
+  "source_exclusion": {
+    "old_v1_v2_v3": true,
+    "failed_formal_retries": ["retry1", "retry2", "retry3", "retry4"],
+    "current_failed_base_excluded": true,
+    "original_collection": {
+      "root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v1/id_collection_256_retry1/",
+      "accepted": 256,
+      "seed_start": 886000,
+      "seed_end_exclusive": 886256
+    }
+  },
+  "additional_collection": {
+    "root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v2/id_collection_additional_256_retry1/",
+    "split": "id",
+    "seed_start": 886300,
+    "seed_end_exclusive": 886556,
+    "smoke_seed_start": 886280,
+    "smoke_seed_end_exclusive": 886282,
+    "target_accepted": 256,
+    "max_raw_attempts": 320,
+    "raw_seed_order": "seed_start + raw_attempt_index",
+    "accepted_distribution": "ID-only",
+    "required_evidence": [
+      "raw attempt denominator and failure reasons",
+      "256 accepted videos",
+      "256 accepted action/state trajectories",
+      "event_first_steps and event_history for every raw attempt",
+      "single red grasp, closed red transport, target release, blue-after-red order",
+      "episode length, stall, truncation and video decode audit"
+    ]
+  },
+  "merged_training_data": {
+    "root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v2/id_training_collection_512_retry1/",
+    "expected_episodes": 512,
+    "ood_included": false,
+    "norm_mode": "xvla_action_space",
+    "recompute_norm": true,
+    "temporal_mask": "mandatory final real-action anchor with one valid target"
+  },
+  "training": {
+    "base_model": "/mnt/data/ask4help/models/X-VLA-Pt_from5090_v4",
+    "fresh_from_pretrained_base": true,
+    "steps": 20000,
+    "checkpoint_steps": [5000, 10000, 15000, 20000],
+    "save_interval": 5000,
+    "batch_size": 8,
+    "freeze_steps": 1000,
+    "warmup_steps": 2000,
+    "dtype": "bf16",
+    "gpu": "0"
+  },
+  "selection_probe": {
+    "seed_start": 88500,
+    "seed_end_exclusive": 88520,
+    "episodes": 20,
+    "is_formal_gate": false,
+    "checkpoint_steps": [5000, 10000, 15000, 20000]
+  },
+  "formal_id_gate": {
+    "seed_start": 84400,
+    "seed_end_exclusive": 84500,
+    "episodes": 100,
+    "minimum_strict_success": 80,
+    "geometry": "v4",
+    "fresh_env_per_episode": true,
+    "formal_evidence": true
+  },
+  "downstream_unlock": "formal ID gate >=80/100; no OOD/PCA/timing before pass"
+}

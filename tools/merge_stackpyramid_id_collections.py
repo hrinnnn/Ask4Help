@@ -49,6 +49,8 @@ def merge(
     manifest: Path,
     original_root: Path | None = None,
     additional_root: Path | None = None,
+    expected_total: int = 256,
+    format_name: str = "stackpyramid_id_recovery_256_v1",
 ) -> None:
     if output_root.exists():
         raise FileExistsError(f"refusing to overwrite {output_root}")
@@ -67,10 +69,10 @@ def merge(
                     source.copy(name, destination, name=f"traj_{index:06d}")
                     index += 1
 
-    if index != 256:
-        raise ValueError(f"expected 256 merged trajectories, found {index}")
+    if index != expected_total:
+        raise ValueError(f"expected {expected_total} merged trajectories, found {index}")
     provenance = {
-        "format": "stackpyramid_id_recovery_256_v1",
+        "format": format_name,
         "task": "StackPyramid",
         "geometry_version": "v4",
         "split": "id_only",
@@ -80,6 +82,7 @@ def merge(
         "manifest": str(manifest.resolve()),
         "source_group_counts": counts,
         "merged_episode_count": index,
+        "expected_episode_count": expected_total,
         "source_summaries": {
             "original": _summary(original_root or original.parent.parent),
             "additional": _summary(additional_root or additional.parent.parent),
@@ -106,6 +109,8 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--original-root", type=Path)
     parser.add_argument("--additional-root", type=Path)
+    parser.add_argument("--expected-total", type=int, default=256)
+    parser.add_argument("--format-name", default="stackpyramid_id_recovery_256_v1")
     args = parser.parse_args()
     merge(
         args.original_h5,
@@ -114,6 +119,8 @@ def main() -> None:
         args.manifest,
         original_root=args.original_root,
         additional_root=args.additional_root,
+        expected_total=args.expected_total,
+        format_name=args.format_name,
     )
 
 

@@ -135,6 +135,11 @@ def main() -> None:
         help="The canonical X-VLA path uses model action-space preprocessing rather than an external norm file.",
     )
     parser.add_argument("--expected-episodes", type=int, default=128)
+    parser.add_argument(
+        "--skip-video-evidence",
+        action="store_true",
+        help="Use for a merged HDF5 root whose source collections were audited separately.",
+    )
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -203,6 +208,7 @@ def main() -> None:
         "videos": {
             "count": len(videos),
             "decodable_count": sum(int(video["decodable"]) for video in videos),
+            "evidence_skipped": args.skip_video_evidence,
             "failed": [video for video in videos if not video["decodable"]],
             "records": videos,
         },
@@ -228,7 +234,7 @@ def main() -> None:
         "gates": {
             "episode_count": len(h5_groups) >= args.expected_episodes,
             "hdf5_alignment": not h5_errors,
-            "videos": len(videos) >= args.expected_episodes and all(video["decodable"] for video in videos),
+            "videos": args.skip_video_evidence or (len(videos) >= args.expected_episodes and all(video["decodable"] for video in videos)),
             "temporal_mask_report_present": derived_temporal_mask_ok or bool(training_report),
             "norm_provenance_present": bool(args.norm and args.norm.is_file()) if args.norm_mode == "external" else True,
             "canonical_instruction": True,

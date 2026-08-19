@@ -94,6 +94,11 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--gpu", default="0")
     parser.add_argument("--cpu-set", default="0-19")
+    parser.add_argument(
+        "--checkpoint-steps",
+        default="",
+        help="Comma-separated checkpoint steps; empty preserves the original 2000..20000 schedule.",
+    )
     args = parser.parse_args()
     if args.output_root.exists():
         raise FileExistsError(f"refusing to overwrite {args.output_root}")
@@ -104,7 +109,12 @@ def main() -> None:
     results: list[dict[str, Any]] = []
     try:
         steps = checkpoint_steps(args.training_root)
-        expected = list(range(2000, 20001, 2000))
+        expected = (
+            [int(value) for value in args.checkpoint_steps.split(",") if value.strip()]
+            if args.checkpoint_steps
+            else list(range(2000, 20001, 2000))
+        )
+        expected = sorted(expected)
         if steps != expected:
             raise RuntimeError(f"unexpected checkpoint set: {steps}; expected {expected}")
         for index, step in enumerate(steps, start=1):

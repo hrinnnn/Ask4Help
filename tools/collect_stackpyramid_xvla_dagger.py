@@ -417,6 +417,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target", type=int, default=20)
     parser.add_argument("--id-seed", type=int, default=70000)
     parser.add_argument("--ood-seed", type=int, default=80000)
+    parser.add_argument(
+        "--seed-start",
+        type=int,
+        help="Explicit sequential seed start for an ID-only collection (split=id).",
+    )
     parser.add_argument("--max-attempts", type=int, default=500)
     parser.add_argument("--min-ood-fraction", type=float)
     parser.add_argument("--flow-steps", type=int, default=5)
@@ -424,6 +429,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--diff-patience", type=int, default=2)
     parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="cpu")
     parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="cpu")
+    parser.add_argument(
+        "--fresh-env-per-episode",
+        action="store_true",
+        help="Close and recreate the simulator before each raw attempt.",
+    )
     return parser.parse_args()
 
 
@@ -452,10 +462,15 @@ def main() -> None:
         raise ValueError("bridge_pca needs --asset and --pca-threshold")
     if args.method == "diffdagger" and args.diff_threshold is None:
         raise ValueError("diffdagger needs --diff-threshold")
-    env = StepRecorder(gym.make(
-        stackpyramid_env_id(args.split), obs_mode="rgb+state", control_mode="pd_joint_pos",
-        render_mode="rgb_array", sim_backend=args.sim_backend, render_backend=args.render_backend,
-    ))
+    def make_env() -> StepRecorder:
+        return StepRecorder(gym.make(
+            stackpyramid_env_id(args.split), obs_mode="rgb+state", control_mode="pd_joint_pos",
+            render_mode="rgb_array", sim_backend=args.sim_backend, render_backend=args.render_backend,
+        ))
+
+    if args.seed_start is not None and args.split != "id":
+        raise ValueError("--seed-start is only valid for an ID-only collection (--split id)")
+    env = make_env()
     accepted: list[dict[str, Any]] = []
     raw_rows: list[dict[str, Any]] = []
     accepted_counts = {"id": 0, args.split: 0}
@@ -464,9 +479,15 @@ def main() -> None:
         for attempt in range(args.max_attempts):
             if len(accepted) >= args.target:
                 break
+            if args.fresh_env_per_episode and attempt > 0:
+                env.close()
+                env = make_env()
             split = "id" if attempt % 2 == 0 else args.split
-            seed = next_seed[split]
-            next_seed[split] += 1
+            if args.seed_start is not None:
+                seed = args.seed_start + attempt
+            else:
+                seed = next_seed[split]
+                next_seed[split] += 1
             raw_obs, _ = env.reset(seed=seed)
             expert_start: int | None = 0 if args.method == "offline_oracle" else None
             ever_grasped = False
@@ -530,6 +551,12 @@ def main() -> None:
                 "expert_action_steps": 0 if expert_start is None else max(0, len(env.actions) - expert_start),
                 "steps": len(env.actions),
                 "timeline": scores,
+                "event_first_steps": dict(env.event_first_steps),
+                "event_history": list(env.event_history),
+                "reset_invariants": dict(env.reset_invariants),
+                "geometry": stackpyramid_geometry_version(),
+                "env_id": stackpyramid_env_id(args.split),
+                "instruction": TASK,
                 "final": final,
                 "oracle_error": oracle_error,
             }
