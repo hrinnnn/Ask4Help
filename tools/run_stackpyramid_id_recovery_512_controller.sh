@@ -10,7 +10,7 @@ XVLA_ROOT="${XVLA_ROOT:-/root/X-VLA}"
 BASE_MODEL="/mnt/data/ask4help/models/X-VLA-Pt_from5090_v4"
 WORK="${WORK:-/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v2}"
 PERSIST="${PERSIST:-/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v2}"
-ORIGINAL_ROOT="/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v1/id_collection_256_retry1"
+ORIGINAL_ROOT="/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v1/id_collection_256_retry1"
 MANIFEST="$ROOT/configs/stackpyramid_id_recovery_512_manifest.json"
 PYTHONPATH_VALUE="$ROOT:$XVLA_ROOT:${PYTHONPATH:-}"
 

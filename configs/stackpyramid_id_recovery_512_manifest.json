@@ -16,7 +16,7 @@
     "failed_formal_retries": ["retry1", "retry2", "retry3", "retry4"],
     "current_failed_base_excluded": true,
     "original_collection": {
-      "root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v1/id_collection_256_retry1/",
+      "root": "/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v1/id_collection_256_retry1/",
       "accepted": 256,
       "seed_start": 886000,
       "seed_end_exclusive": 886256
