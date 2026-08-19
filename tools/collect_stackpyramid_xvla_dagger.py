@@ -232,7 +232,9 @@ class StackPyramidOracle:
                 direction_norm = 1.0
             # Leave a small geometric margin inside the task's placement
             # tolerance; the diagonal cube-size threshold is about 0.0616 m.
-            goal_xy = target_xy + 0.050 * direction / direction_norm
+            # The slightly wider fixed offset leaves the blue-cube approach
+            # clearance after red has been released and settled.
+            goal_xy = target_xy + 0.058 * direction / direction_norm
             safe_z = max(float(target_position[2]) + 0.10, float(moving_position[2]) + 0.10)
             transport_pose = self.sapien.Pose(
                 [goal_xy[0], goal_xy[1], safe_z], grasp_pose.q
