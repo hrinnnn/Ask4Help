@@ -42,3 +42,30 @@ All outputs use the independent root `/mnt/data/ask4help/results/xvla_stackpyram
 ## Formal ID Gate Boundary
 
 The 256-data fresh ID training reached `TRAINING_COMPLETE` with the canonical original X-VLA base and all 20-episode probes remain diagnostic. The first formal 100-ID launcher failed before episode 1 because the optional evidence path attempted to convert a CUDA state tensor directly to NumPy. It is recorded as `FORMAL_GATE_FAILED_ENGINEERING_STATE_SERIALIZATION` under the formal gate root; no formal success/failure decision or `ID_BASE_VALIDATED` marker was written. The minimal fix serializes state through `detach().cpu().numpy()` and is committed in the source tree, but the formal evaluator is not relaunched in this phase without a new execution authorization.
+
+
+## Final Formal ID Gate Closure
+
+The repaired formal lifecycle smoke subsequently passed in
+`formal_geometry_lifecycle_smoke_retry4`: three independent episodes used
+fresh environments, the recorded environment was
+`Ask4HelpStackPyramidID-v4`, all reset predicates were false, and the v4
+red--green reset distance was within the frozen `[0.14, 0.18]` m range.
+
+The canonical formal evaluation is
+`formal_id_gate_100_retry4` with checkpoint `ckpt-10000` and frozen seeds
+`84400--84499`. It contains `100/100` episodes, videos, action arrays, and
+state timelines; all rows pass the formal evidence checks and
+`formal_evidence_errors=[]`. The evaluation used geometry `v4`, environment
+ID `Ask4HelpStackPyramidID-v4`, and a fresh-environment-per-episode
+lifecycle. The scientific result is `ever_grasped=82/100`,
+`red_lifted=41/100`, `red_placed=0/100`, and `strict_success=0/100`. It
+therefore writes `FORMAL_ID_GATE_FAILED` and
+`ID_BASE_NOT_ACCEPTED_FORMAL_100`.
+
+Retry1 remains an engineering diagnostic for state serialization, retry2 is
+invalid because the formal evaluator used the wrong geometry, and retry3 is
+an engineering diagnostic for reset lifecycle contamination. None of these
+directories is merged with retry4 or used to change its denominator. Because
+the canonical ID base is not accepted, prefix/locality gates, OOD collection,
+PCA calibration, timing sweeps, and downstream training remain locked.
