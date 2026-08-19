@@ -14,7 +14,7 @@ ORIGINAL_ROOT="/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v1/id_
 MANIFEST="$ROOT/configs/stackpyramid_id_recovery_512_manifest.json"
 PYTHONPATH_VALUE="$ROOT:$XVLA_ROOT:${PYTHONPATH:-}"
 
-COLLECTION_SMOKE="$WORK/id_collection_smoke_retry1"
+COLLECTION_SMOKE="$WORK/id_collection_smoke_retry2"
 COLLECTION="$WORK/id_collection_additional_256_retry1"
 COLLECTION_AUDIT="$WORK/id_collection_additional_256_audit_retry1"
 MERGED="$WORK/id_training_collection_512_retry1"
@@ -29,6 +29,7 @@ LOG="$WORK/controller.log"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 export PYTHONUNBUFFERED=1
 export PYTHONPATH="$PYTHONPATH_VALUE"
+export STACKPYRAMID_OOD_GEOMETRY=v4
 mkdir -p "$WORK" "$PERSIST"
 
 write_state() {
