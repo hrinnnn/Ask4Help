@@ -77,8 +77,8 @@ if [[ ! -d "$ORIGINAL_ROOT" || ! -f "$ORIGINAL_ROOT/accepted_suffixes.h5" ]]; th
   echo "audited original 256-ID collection is missing: $ORIGINAL_ROOT" >&2
   exit 4
 fi
-if pgrep -af 'online-awbc|run_stackpyramid.*ood|run_stackpyramid.*timing|run_stackpyramid.*pca|run_stackpyramid.*diff' >/dev/null 2>&1; then
-  echo "unrelated or downstream StackPyramid process is alive; refusing to start" >&2
+if pgrep -af 'run_stackpyramid.*ood|run_stackpyramid.*timing|run_stackpyramid.*pca|run_stackpyramid.*diff|stackpyramid_id_recovery_512' >/dev/null 2>&1; then
+  echo "downstream or duplicate StackPyramid process is alive; refusing to start" >&2
   exit 5
 fi
 
