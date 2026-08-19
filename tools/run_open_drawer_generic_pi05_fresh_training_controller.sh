@@ -5,7 +5,7 @@ if [ -z "$ROOT" ]; then ROOT=/data/zhaozhixuan/Ask4Help-open-drawer; fi
 PY=$OPEN_DRAWER_PYTHON
 if [ -z "$PY" ]; then PY=/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python; fi
 RL=$ROOT/RLinf
-RUN=/sdd/ask4help-open-drawer/results/open_drawer_generic_pi05_fresh_v7
+RUN=/sdd/ask4help-open-drawer/results/open_drawer_generic_pi05_fresh_v8
 MODEL=$ROOT/results/model_cache/pi05_base_pytorch_v1
 MERGED=/sdd/ask4help-open-drawer/results/open_drawer_canonical_id_recovery_v3/datasets/id_merged512
 NORM=/sdd/ask4help-open-drawer/results/open_drawer_id_expansion_recovery_v4/norm_stats/id_merged256
@@ -23,10 +23,11 @@ alive(){ [ -s "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null; }
 waitpid(){ while alive "$1"; do sleep 30; done; }
 choose_gpus(){
   while :; do
-    idle=$(nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,nounits | awk -F, '$2+0 < 1000 && $3+0 == 0 {gsub(/ /,"",$1); print $1}' | head -2)
-    G0=$(printf '%s\n' "$idle" | sed -n '1p'); G1=$(printf '%s\n' "$idle" | sed -n '2p')
+    apps=$(nvidia-smi --query-compute-apps=gpu_uuid --format=csv,noheader 2>/dev/null | sed 's/ //g')
+    idle=$(nvidia-smi --query-gpu=index,uuid,memory.free,memory.used,utilization.gpu --format=csv,noheader,nounits | awk -F, -v apps="$apps" '$3+0 >= 28672 && $5+0 <= 5 {gsub(/ /,"",$1); gsub(/ /,"",$2); if (index(apps,$2)==0) print $1 ":" $2}')
+    G0=$(printf '%s\n' "$idle" | cut -d: -f1 | sed -n '1p'); G1=$(printf '%s\n' "$idle" | cut -d: -f1 | sed -n '2p')
     if [ -n "$G0" ] && [ -n "$G1" ]; then return 0; fi
-    state waiting_for_idle_gpus waiting fewer_than_two_idle_gpus
+    state waiting_for_idle_gpus waiting need_two_gpus_free_ge_28GiB_and_no_compute_apps
     sleep 300
   done
 }
@@ -48,7 +49,7 @@ verify_visible_mapping(){
   [ "$actual" = "$expected" ] || fail "cuda_visible_mapping_mismatch expected=$expected actual=$actual pid=$pid"
 }
 common_env(){
-  printf '%s\n' CUDA_VISIBLE_DEVICES="$1" ASK4HELP_RLINF_PLACEMENT="$2" OPEN_DRAWER_ID_DATASET="$MERGED" OPEN_DRAWER_ID_NORM_STATS="$NORM" OPEN_DRAWER_PI05_MODEL_PATH="$MODEL" PYTHONPATH="$ROOT:$RL" EMBODIED_PATH="$RL/examples/sft" RAY_TMPDIR=/sdd/ray_od_v7 TMPDIR=/sdd/tmp_od_v7 PYTHONUNBUFFERED=1
+  printf '%s\n' CUDA_VISIBLE_DEVICES="$1" ASK4HELP_RLINF_PLACEMENT="$2" OPEN_DRAWER_ID_DATASET="$MERGED" OPEN_DRAWER_ID_NORM_STATS="$NORM" OPEN_DRAWER_PI05_MODEL_PATH="$MODEL" PYTHONPATH="$ROOT:$RL" EMBODIED_PATH="$RL/examples/sft" RAY_TMPDIR=/sdd/ray_od_v8 TMPDIR=/sdd/tmp_od_v8 PYTHONUNBUFFERED=1
 }
 smoke(){
   [ -f "$RUN/TRAINING_SMOKE_PASSED" ] && return
