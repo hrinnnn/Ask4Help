@@ -15,7 +15,7 @@ MANIFEST="$ROOT/configs/stackpyramid_id_recovery_512_manifest.json"
 PYTHONPATH_VALUE="$ROOT:$XVLA_ROOT:${PYTHONPATH:-}"
 
 COLLECTION_SMOKE="$WORK/id_collection_smoke_retry11"
-COLLECTION="$WORK/id_collection_additional_256_retry2"
+COLLECTION="$WORK/id_collection_additional_256_retry3"
 COLLECTION_AUDIT="$WORK/id_collection_additional_256_audit_retry1"
 MERGED="$WORK/id_training_collection_512_retry1"
 MERGED_AUDIT="$WORK/id_training_collection_512_audit_retry1"
