@@ -55,8 +55,11 @@ def inspect(path):
         rows.append({
             "index": index,
             "shape": list(value.shape),
-            "max_abs_diff_vs_first": float(np.max(np.abs(value - first))) if first is not None else None,
-            "mean_abs_diff_vs_first": float(np.mean(np.abs(value - first))) if first is not None else None,
+            "same_shape_as_first": bool(first is not None and value.shape == first.shape),
+            "max_abs_diff_vs_first": float(np.max(np.abs(value - first)))
+            if first is not None and value.shape == first.shape else None,
+            "mean_abs_diff_vs_first": float(np.mean(np.abs(value - first)))
+            if first is not None and value.shape == first.shape else None,
         })
     return {"episodes": len(arrays), "anchors": anchors, "tail_anchors": tail, "first_five": rows}
 
@@ -68,8 +71,10 @@ diversity = {
     "historical_256": old,
     "additional_256": new,
     "additional_actions_not_template_only": any(
-        row["max_abs_diff_vs_first"] not in (None, 0.0) for row in new["first_five"][1:]
-    ),
+        row["shape"] != new["first_five"][0]["shape"]
+        or row["max_abs_diff_vs_first"] not in (None, 0.0)
+        for row in new["first_five"][1:]
+    ) if new["first_five"] else False,
     "merge_allowed": False,
     "training_allowed": False,
 }
