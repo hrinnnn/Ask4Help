@@ -63,3 +63,21 @@ subdirectories and completion markers. Any missing evidence, geometry or
 reset mismatch, non-finite loss, failed smoke, raw-attempt overflow, or formal
 ID failure stops the pipeline without changing the frozen protocol. GPU0 is
 reserved for this pipeline; GPU1 and unrelated processes remain untouched.
+
+## Oracle Smoke Closure
+
+The pipeline stopped before formal collection. Under the explicit v4 reset
+and red event contract, five fresh-environment smoke retries and seed
+comparisons consistently reached red placement but produced no blue grasp or
+blue lift. The first smoke retry was separately invalid because the controller
+did not export geometry=v4; it is retained as an engineering diagnostic. The
+v4 retries used full fresh lifecycle and reset metadata, and none produced an
+accepted demonstration. The reconciliation is
+`ORACLE_SMOKE_FAILED_BLUE_STAGE` under
+`/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v2/`.
+
+The historical 256-ID collection is not evidence for this protocol because
+its successful episodes retained the red cube into the blue phase. Continuing
+to alter blue waypoints would change the Oracle design rather than repair the
+approved pipeline. Therefore no new 256-ID collection, 512 merge, training,
+selection probe, formal gate, or OOD/PCA/timing stage was started.
