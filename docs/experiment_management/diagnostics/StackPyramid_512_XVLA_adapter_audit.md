@@ -70,6 +70,20 @@ actual (N), tail-anchor count and valid-mask distribution must come from the
 512-episode audit; the old 72,171-anchor 256-ID report must not be reused as
 the new exposure value.
 
+The full-planner 256-ID collection and its independent audit have now passed:
+the new collection contributes `66,808` real action anchors and `2,304` tail
+anchors. Together with the historical audited 256-ID collection, the
+projected merged dataset would contain `138,979` anchors and `4,608` tail
+anchors. A 20,000-step, batch-8 run would therefore expose `160,000` samples,
+or `1.1513` effective dataset passes. This is an exposure calculation only;
+the H5 files have not been merged and no training has started.
+
+The additional collection is not template-only: its first five trajectories
+have lengths `263, 264, 258, 258, 258`, and the full-planner event/video/HDF5
+audit passes. The machine-readable reports are
+`training_exposure_report.json` and `action_diversity_report.json` under the
+v3 result root.
+
 ## Decision Boundary
 
 The collection can finish and be audited. Merge, 2-step training smoke,
