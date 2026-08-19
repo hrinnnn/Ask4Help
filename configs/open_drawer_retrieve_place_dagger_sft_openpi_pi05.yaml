@@ -67,7 +67,7 @@ actor:
       use_rlt: false
     openpi_data:
       repo_id: ${oc.env:OPEN_DRAWER_ID_DATASET}
-      default_prompt: open the drawer and place the object in the tray
+      default_prompt: open the drawer, retrieve the blue object, and place it in the green tray
       norm_stats_path: ${oc.env:OPEN_DRAWER_ID_NORM_STATS}
   optim:
     lr: 2.5e-5

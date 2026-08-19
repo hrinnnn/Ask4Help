@@ -20,10 +20,13 @@ sys.path[:0] = [str(ROOT), str(RLINF_ROOT)]
 from rlinf.envs.maniskill.open_drawer_retrieve_place_spec import (  # noqa: E402
     ENV_IDS,
     TASK_INSTRUCTION,
+    reset_metadata,
+    validate_reset_metadata,
 )
 from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     MAIN_CAMERA_CANDIDATES,
     WRIST_CAMERA_CANDIDATES,
+    _camera_image,
     _build_frames,
     _extract_record,
     _select_camera,
@@ -66,6 +69,22 @@ def _split_env_id(split: str) -> str:
         raise ValueError(f"unknown split {split!r}; expected one of {SPLITS}") from exc
 
 
+def _camera_provenance(records: list[Any], main_camera: str, wrist_camera: str) -> dict[str, Any]:
+    """Record the selected camera keys and actual RGB shapes from the reset observation."""
+
+    main_image = _camera_image(records[0].obs, main_camera)
+    wrist_image = _camera_image(records[0].obs, wrist_camera)
+    if main_image is None or wrist_image is None:
+        raise RuntimeError("reset observation is missing a selected base or wrist RGB image")
+    return {
+        "main": main_camera,
+        "wrist": wrist_camera,
+        "main_shape": list(main_image.shape),
+        "wrist_shape": list(wrist_image.shape),
+        "requested_size": [384, 384],
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", type=Path, required=True)
@@ -105,35 +124,48 @@ def main() -> None:
                 "max_episode_steps": args.max_episode_steps,
                 "success_predicate": "strict OpenDrawer task success",
                 "evidence_format": "episodes/<episode>/actions.npy, states.npy, timeline.json",
+                "reset_metadata_format": "env_id, instruction, split, control_mode, camera, physical ranges, lifecycle",
+                "environment_policy": "one fresh environment instance per episode",
             },
             indent=2,
         )
         + "\n"
     )
     model = _load_model(args.checkpoint, args.norm_stats, args.pi05_base)
-    env = gym.make(
-        _split_env_id(args.split),
-        robot_uids="panda_wristcam",
-        num_envs=1,
-        obs_mode="rgb",
-        control_mode="pd_joint_delta_pos",
-        reward_mode="sparse",
-        render_mode="rgb_array",
-        sim_backend="physx_cpu",
-        sim_config={"sim_freq": 100, "control_freq": 10},
-        sensor_configs={"width": 384, "height": 384},
-        max_episode_steps=args.max_episode_steps,
-    )
-    low = np.asarray(env.action_space.low).reshape(-1)
-    high = np.asarray(env.action_space.high).reshape(-1)
     rows: list[dict[str, Any]] = []
-    try:
-        for episode in range(args.episodes):
+    for episode in range(args.episodes):
+        env = gym.make(
+            _split_env_id(args.split),
+            robot_uids="panda_wristcam",
+            num_envs=1,
+            obs_mode="rgb",
+            control_mode="pd_joint_delta_pos",
+            reward_mode="sparse",
+            render_mode="rgb_array",
+            sim_backend="physx_cpu",
+            sim_config={"sim_freq": 100, "control_freq": 10},
+            sensor_configs={"width": 384, "height": 384},
+            max_episode_steps=args.max_episode_steps,
+        )
+        try:
+            low = np.asarray(env.action_space.low).reshape(-1)
+            high = np.asarray(env.action_space.high).reshape(-1)
             seed = args.seed + episode
             raw_obs, info = env.reset(seed=seed)
             records = [_extract_record(raw_obs)]
+            main_camera = _select_camera(
+                records[0].obs, "", ("base_camera",) + MAIN_CAMERA_CANDIDATES, "main"
+            )
+            wrist_camera = _select_camera(
+                records[0].obs, "", ("hand_camera",) + WRIST_CAMERA_CANDIDATES, "wrist"
+            )
+            reset_provenance = reset_metadata(env, split=args.split)
+            reset_provenance["camera"] = _camera_provenance(records, main_camera, wrist_camera)
+            reset_errors = validate_reset_metadata(reset_provenance, split=args.split)
+            if reset_errors:
+                raise RuntimeError(f"reset provenance failed for episode {episode}: {reset_errors}")
             actions: list[np.ndarray] = []
-            event_timeline: list[dict[str, bool]] = [{}]
+            event_timeline: list[dict[str, Any]] = [{"reset": True}]
             success = False
             ever_drawer_opened = False
             ever_grasped = False
@@ -179,12 +211,18 @@ def main() -> None:
                     success = _bool(info.get("success", False))
                     if success or _bool(terminated) or _bool(truncated):
                         break
+            action_array = np.asarray(actions, dtype=np.float32)
+            state_array = np.asarray([record.state for record in records], dtype=np.float32)
+            if action_array.ndim != 2 or action_array.shape[1] != 8:
+                raise RuntimeError(f"actions must be [T,8], got {action_array.shape}")
+            if state_array.ndim != 2 or state_array.shape != (len(actions) + 1, 9):
+                raise RuntimeError(f"states must be [T+1,9], got {state_array.shape}")
             episode_dir = args.output_dir / "episodes" / f"episode_{episode:06d}"
             episode_dir.mkdir(parents=True, exist_ok=True)
-            np.save(episode_dir / "actions.npy", np.asarray(actions, dtype=np.float32))
-            np.save(
-                episode_dir / "states.npy",
-                np.asarray([record.state for record in records], dtype=np.float32),
+            np.save(episode_dir / "actions.npy", action_array)
+            np.save(episode_dir / "states.npy", state_array)
+            (episode_dir / "reset_metadata.json").write_text(
+                json.dumps(reset_provenance, indent=2) + "\n"
             )
             timeline = [
                 {
@@ -194,12 +232,6 @@ def main() -> None:
                 }
                 for index, record in enumerate(records)
             ]
-            main_camera = _select_camera(
-                records[0].obs, "", ("base_camera",) + MAIN_CAMERA_CANDIDATES, "main"
-            )
-            wrist_camera = _select_camera(
-                records[0].obs, "", ("hand_camera",) + WRIST_CAMERA_CANDIDATES, "wrist"
-            )
             frames = _build_frames(
                 records=records,
                 actions=actions,
@@ -225,11 +257,17 @@ def main() -> None:
                 "ever_in_target": bool(ever_in_target),
                 "ever_released": bool(ever_released),
                 "ever_static": bool(ever_static),
-                    "steps": len(actions),
-                    "video": str(video_path),
-                    "actions": str(episode_dir / "actions.npy"),
-                    "states": str(episode_dir / "states.npy"),
-                    "timeline": str(episode_dir / "timeline.json"),
+                "steps": len(actions),
+                "video": str(video_path),
+                "actions": str(episode_dir / "actions.npy"),
+                "states": str(episode_dir / "states.npy"),
+                "timeline": str(episode_dir / "timeline.json"),
+                "reset_metadata": str(episode_dir / "reset_metadata.json"),
+                "env_id": reset_provenance["env_id"],
+                "instruction": reset_provenance["instruction"],
+                "control_mode": reset_provenance["control_mode"],
+                "camera": reset_provenance["camera"],
+                "lifecycle_at_reset": reset_provenance["lifecycle"],
             }
             (episode_dir / "timeline.json").write_text(
                 json.dumps(
@@ -238,6 +276,7 @@ def main() -> None:
                         "seed": seed,
                         "steps": len(actions),
                         "tail_observation_retained": len(records) == len(actions) + 1,
+                        "reset_metadata": reset_provenance,
                         "timeline": timeline,
                     },
                     indent=2,
@@ -253,8 +292,8 @@ def main() -> None:
                 f"cumulative={sum(int(r['success']) for r in rows)}/{len(rows)}",
                 flush=True,
             )
-    finally:
-        env.close()
+        finally:
+            env.close()
     summary = {
         "task": "OpenDrawerRetrievePlace",
         "split": args.split,
