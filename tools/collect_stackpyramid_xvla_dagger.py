@@ -232,9 +232,7 @@ class StackPyramidOracle:
                 direction_norm = 1.0
             # Leave a small geometric margin inside the task's placement
             # tolerance; the diagonal cube-size threshold is about 0.0616 m.
-            # The slightly wider fixed offset leaves the blue-cube approach
-            # clearance after red has been released and settled.
-            goal_xy = target_xy + 0.058 * direction / direction_norm
+            goal_xy = target_xy + 0.050 * direction / direction_norm
             safe_z = max(float(target_position[2]) + 0.10, float(moving_position[2]) + 0.10)
             transport_pose = self.sapien.Pose(
                 [goal_xy[0], goal_xy[1], safe_z], grasp_pose.q
@@ -252,19 +250,6 @@ class StackPyramidOracle:
                 float(np.linalg.norm((red_position - target_position)[:2])) > placement_threshold
             ):
                 raise RuntimeError("refusing red release before target tolerance")
-            self.planner.open_gripper()
-            if "red_placed" not in self.recorder.event_first_steps:
-                raise RuntimeError("red release did not produce a verified red_placed event")
-            released_red = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
-            if (
-                float(np.linalg.norm((released_red - target_position)[:2])) > placement_threshold
-                or abs(float(released_red[2] - target_position[2])) > 0.03
-            ):
-                raise RuntimeError("red release did not satisfy target pose tolerance")
-            red_retreat_pose = self.sapien.Pose(
-                [goal_xy[0], goal_xy[1], safe_z], grasp_pose.q
-            )
-            self.planner.move_to_pose_with_screw(red_retreat_pose)
 
         moving_cube = base.cubeC
         obb = get_actor_obb(moving_cube)
@@ -284,13 +269,24 @@ class StackPyramidOracle:
             if self.planner.move_to_pose_with_screw(grasp_pose2, dry_run=True) != -1:
                 grasp_pose = grasp_pose2
                 break
-        if need_move_a_b and "red_placed" not in self.recorder.event_first_steps:
-            raise RuntimeError("blue phase cannot start before verified red placement")
-        # Leave the released red/green pair through a fixed high-clearance
-        # waypoint before approaching blue. This changes only the Oracle path,
-        # not the v4 reset geometry or task success definition.
-        neutral_pose = self.sapien.Pose([0.0, 0.0, 0.30], grasp_pose.q)
-        self.planner.move_to_pose_with_screw(neutral_pose)
+        if need_move_a_b:
+            self.planner.open_gripper()
+            if "red_placed" not in self.recorder.event_first_steps:
+                raise RuntimeError("red release did not produce a verified red_placed event")
+            released_red = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+            if (
+                float(np.linalg.norm((released_red - target_position)[:2])) > placement_threshold
+                or abs(float(released_red[2] - target_position[2])) > 0.03
+            ):
+                raise RuntimeError("red release did not satisfy target pose tolerance")
+            red_retreat_pose = self.sapien.Pose(
+                [goal_xy[0], goal_xy[1], target_position[2] + 0.15], grasp_pose.q
+            )
+            self.planner.move_to_pose_with_screw(red_retreat_pose)
+        # This is the historical blue approach path; the only change is that
+        # red is now released immediately before the blue reach.
+        safe_pose = self.sapien.Pose([0, 0, 0.15]) * grasp_pose
+        self.planner.move_to_pose_with_screw(safe_pose)
         reach_pose = grasp_pose * self.sapien.Pose([0, 0, -0.05])
         self.planner.move_to_pose_with_screw(reach_pose)
         self.planner.move_to_pose_with_screw(grasp_pose)
