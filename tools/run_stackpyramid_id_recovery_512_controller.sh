@@ -146,6 +146,53 @@ if [[ ! -f "$MERGED_AUDIT/ID_COLLECTION_AUDIT_PASS" ]]; then
   write_state "merged_audit" "PASSED"
 fi
 
+if [[ ! -f "$WORK/TRAINING_EXPOSURE_REVIEW_REQUIRED" ]]; then
+  write_state "training_exposure_review" "WAITING_LEADER_DECISION"
+  "$PY" - "$MERGED_AUDIT/audit.json" "$WORK/training_exposure_report.json" "$PERSIST/training_exposure_report.json" <<'PY'
+import json, sys
+from pathlib import Path
+audit_path, local_path, durable_path = map(Path, sys.argv[1:])
+audit = json.loads(audit_path.read_text(encoding="utf-8"))
+groups = [
+    group
+    for report in audit.get("hdf5", {}).get("files", [])
+    for group in report.get("groups", [])
+]
+anchors = sum(int(group.get("actions", 0)) for group in groups)
+tail = sum(int(group.get("tail_anchors", 0)) for group in groups)
+batch = 8
+steps = 20000
+report = {
+    "format": "stackpyramid_training_exposure_report_v1",
+    "status": "TRAINING_EXPOSURE_REVIEW_REQUIRED",
+    "training_started": False,
+    "collection_root": str(audit.get("collection_root")),
+    "episodes": len(groups),
+    "total_anchors": anchors,
+    "tail_anchors": tail,
+    "batch_size": batch,
+    "planned_optimizer_steps": steps,
+    "planned_samples": batch * steps,
+    "effective_dataset_passes": (batch * steps / anchors) if anchors else None,
+    "freeze_steps": 1000,
+    "warmup_steps": 2000,
+    "freeze_fraction_of_steps": 1000 / steps,
+    "warmup_fraction_of_steps": 2000 / steps,
+    "post_freeze_steps": steps - 1000,
+    "leader_decision_required": True,
+    "ood_started": False,
+    "note": "Do not launch smoke or fresh training until optimizer-step exposure is approved.",
+}
+for path in (local_path, durable_path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+print(json.dumps(report, indent=2))
+PY
+  printf 'training exposure report written; waiting for steps/accumulation decision\n' > "$WORK/TRAINING_EXPOSURE_REVIEW_REQUIRED"
+  cp "$WORK/TRAINING_EXPOSURE_REVIEW_REQUIRED" "$PERSIST/TRAINING_EXPOSURE_REVIEW_REQUIRED"
+  exit 0
+fi
+
 if [[ ! -f "$SMOKE/RELOAD_SMOKE_COMPLETE" ]]; then
   write_state "train_smoke" "RUNNING"
   run_once "$PY" "$ROOT/tools/run_stackpyramid_xvla_training.py" \
