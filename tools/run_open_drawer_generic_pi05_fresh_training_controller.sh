@@ -5,7 +5,7 @@ if [ -z "$ROOT" ]; then ROOT=/data/zhaozhixuan/Ask4Help-open-drawer; fi
 PY=$OPEN_DRAWER_PYTHON
 if [ -z "$PY" ]; then PY=/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python; fi
 RL=$ROOT/RLinf
-RUN=/sdd/ask4help-open-drawer/results/open_drawer_generic_pi05_fresh_v6
+RUN=/sdd/ask4help-open-drawer/results/open_drawer_generic_pi05_fresh_v7
 MODEL=$ROOT/results/model_cache/pi05_base_pytorch_v1
 MERGED=/sdd/ask4help-open-drawer/results/open_drawer_canonical_id_recovery_v3/datasets/id_merged512
 NORM=/sdd/ask4help-open-drawer/results/open_drawer_id_expansion_recovery_v4/norm_stats/id_merged256
@@ -30,14 +30,31 @@ choose_gpus(){
     sleep 300
   done
 }
+record_gpu_mapping(){
+  label=$1; pid=$2
+  {
+    printf 'label=%s\n' "$label"
+    printf 'launcher_pid=%s\n' "$pid"
+    nvidia-smi --query-gpu=index,uuid,memory.used,utilization.gpu --format=csv,noheader
+    printf '%s\n' 'compute_apps:'
+    nvidia-smi --query-compute-apps=gpu_uuid,pid,used_memory --format=csv,noheader 2>/dev/null || true
+    printf '%s\n' 'launcher_cuda_visible_devices:'
+    tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep '^CUDA_VISIBLE_DEVICES=' || true
+  } > "$RUN/provenance/gpu_mapping_$label.txt"
+}
+verify_visible_mapping(){
+  pid=$1; expected=$2
+  actual=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^CUDA_VISIBLE_DEVICES=//p' | head -1)
+  [ "$actual" = "$expected" ] || fail "cuda_visible_mapping_mismatch expected=$expected actual=$actual pid=$pid"
+}
 common_env(){
-  printf '%s\n' CUDA_VISIBLE_DEVICES="$1" ASK4HELP_RLINF_PLACEMENT="$2" OPEN_DRAWER_ID_DATASET="$MERGED" OPEN_DRAWER_ID_NORM_STATS="$NORM" OPEN_DRAWER_PI05_MODEL_PATH="$MODEL" PYTHONPATH="$ROOT:$RL" EMBODIED_PATH="$RL/examples/sft" RAY_TMPDIR=/sdd/ray_od_v6 TMPDIR=/sdd/tmp_od_v6 PYTHONUNBUFFERED=1
+  printf '%s\n' CUDA_VISIBLE_DEVICES="$1" ASK4HELP_RLINF_PLACEMENT="$2" OPEN_DRAWER_ID_DATASET="$MERGED" OPEN_DRAWER_ID_NORM_STATS="$NORM" OPEN_DRAWER_PI05_MODEL_PATH="$MODEL" PYTHONPATH="$ROOT:$RL" EMBODIED_PATH="$RL/examples/sft" RAY_TMPDIR=/sdd/ray_od_v7 TMPDIR=/sdd/tmp_od_v7 PYTHONUNBUFFERED=1
 }
 smoke(){
   [ -f "$RUN/TRAINING_SMOKE_PASSED" ] && return
   out="$RUN/training/smoke_2step"; [ ! -e "$out" ] || fail smoke_output_exists; mkdir -p "$out"
-  env $(common_env "$G0" "$G0-$G0") OPEN_DRAWER_RUN_ROOT="$out" OPEN_DRAWER_EXPERIMENT_NAME=smoke_2step taskset -c 40-59 "$PY" "$RL/examples/sft/train_vla_sft.py" --config-path "$RL/examples/sft/config" --config-name open_drawer_canonical_id_sft_20000_openpi_pi05 runner.max_steps=2 runner.save_interval=2 > "$LOG/training_smoke.log" 2>&1 < /dev/null &
-  echo $! > "$PIDS/training_smoke.pid"; waitpid "$PIDS/training_smoke.pid"
+  env $(common_env "$G0" "0-0") OPEN_DRAWER_RUN_ROOT="$out" OPEN_DRAWER_EXPERIMENT_NAME=smoke_2step taskset -c 40-59 "$PY" "$RL/examples/sft/train_vla_sft.py" --config-path "$RL/examples/sft/config" --config-name open_drawer_canonical_id_sft_20000_openpi_pi05 runner.max_steps=2 runner.save_interval=2 > "$LOG/training_smoke.log" 2>&1 < /dev/null &
+  echo $! > "$PIDS/training_smoke.pid"; sleep 5; if alive "$PIDS/training_smoke.pid"; then record_gpu_mapping smoke "$(cat "$PIDS/training_smoke.pid")"; verify_visible_mapping "$(cat "$PIDS/training_smoke.pid")" "$G0"; fi; waitpid "$PIDS/training_smoke.pid"
   actual="$out/smoke_2step/checkpoints/global_step_2/actor/model_state_dict/full_weights.pt"
   [ -f "$actual" ] || fail verified_smoke_checkpoint_missing
   printf '%s\n' "$actual" > "$RUN/provenance/verified_smoke_checkpoint_path.txt"
@@ -47,8 +64,8 @@ train(){
   [ -f "$RUN/TRAINING_COMPLETE" ] && return
   out="$RUN/training/id_sft_20000"; mkdir -p "$out"
   if [ ! -f "$RUN/TRAINING_STARTED" ]; then
-    env $(common_env "$G0,$G1" "$G0-$G1") OPEN_DRAWER_RUN_ROOT="$out" OPEN_DRAWER_EXPERIMENT_NAME=canonical_id_sft_20000 taskset -c 0-39 "$PY" "$RL/examples/sft/train_vla_sft.py" --config-path "$RL/examples/sft/config" --config-name open_drawer_canonical_id_sft_20000_openpi_pi05 > "$LOG/training_20000.log" 2>&1 < /dev/null &
-    echo $! > "$PIDS/training_20000.pid"; printf '%s\n' generic_pi05_fresh_training_started_no_resume > "$RUN/TRAINING_STARTED"
+    env $(common_env "$G0,$G1" "0-1") OPEN_DRAWER_RUN_ROOT="$out" OPEN_DRAWER_EXPERIMENT_NAME=canonical_id_sft_20000 taskset -c 0-39 "$PY" "$RL/examples/sft/train_vla_sft.py" --config-path "$RL/examples/sft/config" --config-name open_drawer_canonical_id_sft_20000_openpi_pi05 > "$LOG/training_20000.log" 2>&1 < /dev/null &
+    echo $! > "$PIDS/training_20000.pid"; sleep 5; if alive "$PIDS/training_20000.pid"; then record_gpu_mapping train "$(cat "$PIDS/training_20000.pid")"; verify_visible_mapping "$(cat "$PIDS/training_20000.pid")" "$G0,$G1"; fi; printf '%s\n' generic_pi05_fresh_training_started_no_resume > "$RUN/TRAINING_STARTED"
   fi
   waitpid "$PIDS/training_20000.pid"
   for step in 5000 10000 15000 20000; do [ -f "$out/canonical_id_sft_20000/checkpoints/global_step_$step/actor/model_state_dict/full_weights.pt" ] || fail missing_checkpoint_$step; done
@@ -59,7 +76,7 @@ eval_step(){
   out="$RUN/eval/$kind""_step_$step"; ckpt="$RUN/training/id_sft_20000/canonical_id_sft_20000/checkpoints/global_step_$step"
   [ -f "$out/summary.json" ] && return
   mkdir -p "$out"
-  env $(common_env "$G0" "$G0-$G0") "$PY" "$ROOT/tools/evaluate_open_drawer_id_pi05.py" --checkpoint "$ckpt" --pi05-base "$MODEL" --norm-stats "$NORM" --output-dir "$out" --episodes "$episodes" --seed "$seed" --split id --execute-horizon 5 --max-episode-steps 400 > "$LOG/$kind""_step_$step.log" 2>&1 || true
+  env $(common_env "$G0" "0-0") "$PY" "$ROOT/tools/evaluate_open_drawer_id_pi05.py" --checkpoint "$ckpt" --pi05-base "$MODEL" --norm-stats "$NORM" --output-dir "$out" --episodes "$episodes" --seed "$seed" --split id --execute-horizon 5 --max-episode-steps 400 > "$LOG/$kind""_step_$step.log" 2>&1 || true
   "$PY" - "$out" "$episodes" <<'PY'
 import json,sys
 from pathlib import Path
