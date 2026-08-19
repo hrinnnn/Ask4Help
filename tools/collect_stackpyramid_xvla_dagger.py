@@ -169,6 +169,7 @@ class StackPyramidOracle:
         recorder: StepRecorder,
         template_actions: np.ndarray | None = None,
         template_blue_start_step: int = 130,
+        full_planner: bool = False,
     ):
         import sapien
         from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
@@ -176,6 +177,7 @@ class StackPyramidOracle:
         self.recorder = recorder
         self.template_actions = template_actions
         self.template_blue_start_step = template_blue_start_step
+        self.full_planner = full_planner
         self.sapien = sapien
         self.planner = PandaArmMotionPlanningSolver(
             recorder,
@@ -285,12 +287,47 @@ class StackPyramidOracle:
             )
             self.planner.move_to_pose_with_screw(red_retreat_pose)
 
-        if self.template_actions is not None:
+        if self.template_actions is not None and not self.full_planner:
             # The red prefix is planned from the current reset. The canonical
             # suffix starts after red settling and supplies only the known-good
             # blue approach/grasp/lift/place path.
             for action in self.template_actions[self.template_blue_start_step:]:
                 self.recorder.step(action)
+            return
+
+        if self.full_planner:
+            # State-conditioned blue waypoints recovered from the canonical
+            # replay, expressed relative to the current blue reset pose.
+            blue_position = base.cubeC.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
+            blue_q = np.asarray(
+                [-0.0017, 0.7070, 0.7072, -0.0025], dtype=np.float64
+            )
+            blue_reach = blue_position + np.asarray(
+                [-0.0008, -0.0058, 0.0312], dtype=np.float64
+            )
+            blue_grasp = blue_position + np.asarray(
+                [-0.0013, -0.0059, -0.0003], dtype=np.float64
+            )
+            blue_lift = blue_position + np.asarray(
+                [-0.0025, -0.0062, 0.0175], dtype=np.float64
+            )
+            self.planner.move_to_pose_with_screw(self.sapien.Pose(blue_reach, blue_q))
+            self.planner.move_to_pose_with_screw(self.sapien.Pose(blue_grasp, blue_q))
+            self.planner.close_gripper()
+            self.planner.move_to_pose_with_screw(self.sapien.Pose(blue_lift, blue_q))
+            goal_pose_a = base.cubeA.pose * self.sapien.Pose([0, 0, base.cube_half_size[2] * 2])
+            goal_pose_b = base.cubeB.pose * self.sapien.Pose([0, 0, base.cube_half_size[2] * 2])
+            goal_p = ((goal_pose_a.p + goal_pose_b.p) / 2).detach().cpu().numpy().reshape(-1, 3)[0]
+            high_goal_pose = self.sapien.Pose(
+                [goal_p[0], goal_p[1], goal_p[2] + 0.10], blue_q
+            )
+            place_pose = self.sapien.Pose(
+                [goal_p[0], goal_p[1], goal_p[2] + 0.03], blue_q
+            )
+            self.planner.move_to_pose_with_screw(high_goal_pose)
+            self.planner.move_to_pose_with_screw(place_pose)
+            self.planner.open_gripper()
+            self.planner.move_to_pose_with_screw(high_goal_pose)
             return
 
         # This is the historical blue approach path; the only change is that
@@ -437,6 +474,7 @@ def parse_args() -> argparse.Namespace:
         help="Replay the audited canonical expert action template from traj_000000.",
     )
     parser.add_argument("--template-blue-start-step", type=int, default=130)
+    parser.add_argument("--full-planner", action="store_true")
     parser.add_argument(
         "--fresh-env-per-episode",
         action="store_true",
@@ -552,6 +590,7 @@ def main() -> None:
                         env,
                         template_actions=template_actions,
                         template_blue_start_step=args.template_blue_start_step,
+                        full_planner=args.full_planner,
                     ).run()
                 except Exception as exc:
                     oracle_error = repr(exc)
