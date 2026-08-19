@@ -27,7 +27,8 @@ export PYTHONPATH="$ROOT:$XVLA_ROOT:${PYTHONPATH:-}"
   --checkpoint "$CHECKPOINT" --xvla-root "$XVLA_ROOT" --output "$LOCAL" \
   --split id --episodes 100 --start-seed 888000 \
   --max-episode-steps 300 --execute-horizon 5 --flow-steps 5 \
-  --device cuda --sim-backend gpu --render-backend gpu --formal-evidence
+  --device cuda --sim-backend gpu --render-backend gpu --formal-evidence \
+  --geometry v4
 
 "$PY" tools/audit_stackpyramid_formal_id_gate.py \
   --root "$LOCAL" --expected 100 --minimum-successes 80 \

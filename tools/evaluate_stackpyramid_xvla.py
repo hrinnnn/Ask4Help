@@ -47,6 +47,20 @@ def json_state(value: Any) -> list[float]:
     return np.asarray(value, dtype=np.float32).reshape(-1).tolist()
 
 
+def validate_formal_reset(metadata: dict[str, Any]) -> dict[str, Any]:
+    if metadata.get("ood_geometry") != "v4":
+        raise RuntimeError(f"formal reset geometry mismatch: {metadata.get('ood_geometry')!r}")
+    invariants = metadata.get("reset_invariants", {})
+    if not metadata.get("reset_invariant_pass", False) or invariants.get("red_placed", False):
+        raise RuntimeError(f"formal reset invariant failed: {invariants}")
+    red = np.asarray(metadata["cube_poses"]["red"]["p"], dtype=np.float64)[:3]
+    green = np.asarray(metadata["cube_poses"]["green"]["p"], dtype=np.float64)[:3]
+    distance = float(np.linalg.norm((red - green)[:2]))
+    if not 0.14 <= distance <= 0.18:
+        raise RuntimeError(f"formal v4 red-green distance outside jitter range: {distance}")
+    return {"geometry": "v4", "red_green_xy_distance": distance, "reset_invariants": invariants}
+
+
 def image_array(value: Any) -> np.ndarray:
     if isinstance(value, torch.Tensor):
         value = value.detach().cpu().numpy()
@@ -237,11 +251,16 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Save per-episode actions and full state/event timelines for a formal gate.",
     )
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3", "v4"))
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.formal_evidence and args.geometry != "v4":
+        raise ValueError("formal evidence requires explicit --geometry v4")
+    if args.geometry is not None:
+        os.environ["STACKPYRAMID_OOD_GEOMETRY"] = args.geometry
     # The H20 runtime's CPU image preprocessing path can raise SIGFPE when
     # unrestricted Torch/OMP thread pools are combined with the simulator.
     # Evaluation is low-throughput by design, so keep the runtime deterministic
@@ -258,7 +277,7 @@ def main() -> None:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     import gymnasium as gym
     import mani_skill.envs  # noqa: F401
-    from tools.stackpyramid_task import register_stackpyramid_splits, stackpyramid_env_id
+    from tools.stackpyramid_task import register_stackpyramid_splits, reset_metadata, stackpyramid_env_id, stackpyramid_geometry_version
 
     register_stackpyramid_splits()
     device = torch.device(args.device)
@@ -276,6 +295,8 @@ def main() -> None:
         for episode_index in range(args.episodes):
             seed = args.start_seed + episode_index
             raw_obs, _ = env.reset(seed=seed)
+            reset_meta = reset_metadata(env, split=args.split)
+            formal_reset = validate_formal_reset(reset_meta) if args.formal_evidence else None
             initial_positions = env.unwrapped.cubeA.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
             initial_blue = env.unwrapped.cubeC.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
             initial_z = {"red": float(initial_positions[2]), "blue": float(initial_blue[2])}
@@ -361,6 +382,8 @@ def main() -> None:
                 "video": str(video_path),
             }
             if args.formal_evidence:
+                row["reset_metadata"] = reset_meta
+                row["formal_reset"] = formal_reset
                 actions_path = args.output / "actions" / f"{args.split}_{seed}.npy"
                 states_path = args.output / "states" / f"{args.split}_{seed}.json"
                 actions_path.parent.mkdir(parents=True, exist_ok=True)
@@ -387,6 +410,8 @@ def main() -> None:
         },
         "video_count": len(list(videos.glob("*.mp4"))),
         "formal_evidence": bool(args.formal_evidence),
+        "geometry": stackpyramid_geometry_version(),
+        "env_id": stackpyramid_env_id(args.split),
         "action_array_count": len(list((args.output / "actions").glob("*.npy"))) if args.formal_evidence else None,
         "state_timeline_count": len(list((args.output / "states").glob("*.json"))) if args.formal_evidence else None,
         "rows": rows,
