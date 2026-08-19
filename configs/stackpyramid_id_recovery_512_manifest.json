@@ -9,7 +9,10 @@
     "implementation": "tools/collect_stackpyramid_xvla_dagger.py::StackPyramidOracle",
     "sequence": "single red grasp -> closed direct transport -> target release -> blue stage",
     "max_episode_steps": 300,
-    "fresh_env_per_episode": true
+    "fresh_env_per_episode": true,
+    "canonical_blue_suffix_template": "/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v1/id_collection_256_retry1/accepted_suffixes.h5::traj_000000/actions",
+    "canonical_blue_suffix_start_step": 130,
+    "template_use": "blue suffix only after state-conditioned red prefix; fixed-template-only trajectories are diagnostic"
   },
   "source_exclusion": {
     "old_v1_v2_v3": true,

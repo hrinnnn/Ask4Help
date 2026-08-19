@@ -56,28 +56,29 @@ diagnostic and locks all OOD/PCA/timing/downstream stages.
 
 ## Outputs and stop conditions
 
-The durable root is
-`/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v2/`. Collection,
+The active recovery root is
+`/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/`. Collection,
 audit, merge, smoke, training, selection and formal evaluation use separate
 subdirectories and completion markers. Any missing evidence, geometry or
 reset mismatch, non-finite loss, failed smoke, raw-attempt overflow, or formal
 ID failure stops the pipeline without changing the frozen protocol. GPU0 is
 reserved for this pipeline; GPU1 and unrelated processes remain untouched.
 
-## Oracle Smoke Closure
+## Oracle Provenance Recovery
 
-The pipeline stopped before formal collection. Under the explicit v4 reset
-and red event contract, five fresh-environment smoke retries and seed
-comparisons consistently reached red placement but produced no blue grasp or
-blue lift. The first smoke retry was separately invalid because the controller
-did not export geometry=v4; it is retained as an engineering diagnostic. The
-v4 retries used full fresh lifecycle and reset metadata, and none produced an
-accepted demonstration. The reconciliation is
-`ORACLE_SMOKE_FAILED_BLUE_STAGE` under
-`/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v2/`.
+The previous `ORACLE_SMOKE_FAILED_BLUE_STAGE` conclusion is retracted as a
+scientific claim. Its v2 smoke outputs remain engineering diagnostics. The
+canonical 256-ID video/HDF5 action replay was audited at the event level:
+red close occurs around step 47, red release around step 120, blue close
+around step 196, blue lift begins around step 210, and blue release occurs
+around step 260. Replaying the 280-action canonical template succeeds on
+seeds `886000`, `886280`, `886281`, `886300`, and `886301` in the current v4
+runtime.
 
-The historical 256-ID collection is not evidence for this protocol because
-its successful episodes retained the red cube into the blue phase. Continuing
-to alter blue waypoints would change the Oracle design rather than repair the
-approved pipeline. Therefore no new 256-ID collection, 512 merge, training,
-selection probe, formal gate, or OOD/PCA/timing stage was started.
+The active collector therefore uses a hybrid path: it plans the red
+single-grasp, lift, direct transport and target release from the current
+reset, then appends only the known-good blue suffix beginning at historical
+step 130. This preserves state-conditioned red trajectories and avoids
+expanding a fixed action template as if it were new data. The first hybrid
+smoke (`retry10`) passed on `886280/886281` with strict success and red/blue
+event evidence; formal collection is continuing in a fresh retry2 directory.
