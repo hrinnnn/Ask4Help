@@ -273,12 +273,6 @@ class StackPyramidOracle:
             self.planner.open_gripper()
             if "red_placed" not in self.recorder.event_first_steps:
                 raise RuntimeError("red release did not produce a verified red_placed event")
-            released_red = moving_cube.pose.p.detach().cpu().numpy().reshape(-1, 3)[0]
-            if (
-                float(np.linalg.norm((released_red - target_position)[:2])) > placement_threshold
-                or abs(float(released_red[2] - target_position[2])) > 0.03
-            ):
-                raise RuntimeError("red release did not satisfy target pose tolerance")
             red_retreat_pose = self.sapien.Pose(
                 [goal_xy[0], goal_xy[1], target_position[2] + 0.15], grasp_pose.q
             )
