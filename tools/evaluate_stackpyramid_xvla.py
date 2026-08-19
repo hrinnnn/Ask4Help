@@ -252,6 +252,7 @@ def parse_args() -> argparse.Namespace:
         help="Save per-episode actions and full state/event timelines for a formal gate.",
     )
     parser.add_argument("--geometry", choices=("v1", "v2", "v3", "v4"))
+    parser.add_argument("--fresh-env-per-episode", action="store_true")
     return parser.parse_args()
 
 
@@ -282,17 +283,23 @@ def main() -> None:
     register_stackpyramid_splits()
     device = torch.device(args.device)
     model, processor = make_policy(args.checkpoint, args.xvla_root, device)
-    env = gym.make(
-        stackpyramid_env_id(args.split),
-        obs_mode="rgb+state",
-        control_mode="pd_joint_pos",
-        render_mode="rgb_array",
-        sim_backend=args.sim_backend,
-        render_backend=args.render_backend,
-    )
+    def make_env() -> Any:
+        return gym.make(
+            stackpyramid_env_id(args.split),
+            obs_mode="rgb+state",
+            control_mode="pd_joint_pos",
+            render_mode="rgb_array",
+            sim_backend=args.sim_backend,
+            render_backend=args.render_backend,
+        )
+
+    env = make_env()
     rows: list[dict[str, Any]] = []
     try:
         for episode_index in range(args.episodes):
+            if args.fresh_env_per_episode and episode_index > 0:
+                env.close()
+                env = make_env()
             seed = args.start_seed + episode_index
             raw_obs, _ = env.reset(seed=seed)
             reset_meta = reset_metadata(env, split=args.split)
