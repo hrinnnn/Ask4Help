@@ -164,11 +164,12 @@ def _install_rrt_fallback() -> None:
 class StackPyramidOracle:
     """Official Panda motion-planning recipe, continuing from the current state."""
 
-    def __init__(self, recorder: StepRecorder):
+    def __init__(self, recorder: StepRecorder, template_actions: np.ndarray | None = None):
         import sapien
         from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
 
         self.recorder = recorder
+        self.template_actions = template_actions
         self.sapien = sapien
         self.planner = PandaArmMotionPlanningSolver(
             recorder,
@@ -180,6 +181,10 @@ class StackPyramidOracle:
         )
 
     def run(self) -> None:
+        if self.template_actions is not None:
+            for action in self.template_actions:
+                self.recorder.step(action)
+            return
         from transforms3d.euler import euler2quat
         from mani_skill.examples.motionplanning.panda.solutions.stack_pyramid import (
             compute_grasp_info_by_obb,
@@ -416,6 +421,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="cpu")
     parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="cpu")
     parser.add_argument(
+        "--oracle-template-h5",
+        type=Path,
+        help="Replay the audited canonical expert action template from traj_000000.",
+    )
+    parser.add_argument(
         "--fresh-env-per-episode",
         action="store_true",
         help="Close and recreate the simulator before each raw attempt.",
@@ -448,6 +458,14 @@ def main() -> None:
         raise ValueError("bridge_pca needs --asset and --pca-threshold")
     if args.method == "diffdagger" and args.diff_threshold is None:
         raise ValueError("diffdagger needs --diff-threshold")
+    template_actions = None
+    if args.oracle_template_h5 is not None:
+        if args.method != "offline_oracle":
+            raise ValueError("--oracle-template-h5 is only valid for offline_oracle")
+        with h5py.File(args.oracle_template_h5, "r") as handle:
+            template_actions = np.asarray(handle["traj_000000/actions"], dtype=np.float32)
+        if template_actions.ndim != 2 or template_actions.shape[1] != REAL_ACTION_DIM:
+            raise ValueError(f"invalid oracle template action shape: {template_actions.shape}")
     def make_env() -> StepRecorder:
         return StepRecorder(gym.make(
             stackpyramid_env_id(args.split), obs_mode="rgb+state", control_mode="pd_joint_pos",
@@ -518,7 +536,7 @@ def main() -> None:
             if expert_start is not None and not success:
                 env.current_source = "expert"
                 try:
-                    StackPyramidOracle(env).run()
+                    StackPyramidOracle(env, template_actions=template_actions).run()
                 except Exception as exc:
                     oracle_error = repr(exc)
             final = _summary(env)
@@ -587,6 +605,7 @@ def main() -> None:
         "raw_attempts": len(raw_rows),
         "raw_successes": sum(int(row["success"]) for row in raw_rows),
         "expert_action_steps": sum(len(item["actions"]) for item in accepted),
+        "oracle_template_h5": str(args.oracle_template_h5.resolve()) if args.oracle_template_h5 else None,
         "dataset": str((args.output_dir / "accepted_suffixes.h5").resolve()),
         "selection_metrics": {
             "raw_attempts": len(raw_rows),

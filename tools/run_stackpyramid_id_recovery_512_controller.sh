@@ -14,7 +14,7 @@ ORIGINAL_ROOT="/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v1/id_
 MANIFEST="$ROOT/configs/stackpyramid_id_recovery_512_manifest.json"
 PYTHONPATH_VALUE="$ROOT:$XVLA_ROOT:${PYTHONPATH:-}"
 
-COLLECTION_SMOKE="$WORK/id_collection_smoke_retry8"
+COLLECTION_SMOKE="$WORK/id_collection_smoke_retry9"
 COLLECTION="$WORK/id_collection_additional_256_retry1"
 COLLECTION_AUDIT="$WORK/id_collection_additional_256_audit_retry1"
 MERGED="$WORK/id_training_collection_512_retry1"
@@ -91,6 +91,7 @@ if [[ ! -f "$COLLECTION_SMOKE/COLLECTION_COMPLETE" ]]; then
     --method offline_oracle --checkpoint "$BASE_MODEL" --xvla-root "$XVLA_ROOT" \
     --output-dir "$COLLECTION_SMOKE" --split id --target 2 \
     --seed-start 886280 --max-attempts 2 --fresh-env-per-episode \
+    --oracle-template-h5 "$ORIGINAL_ROOT/accepted_suffixes.h5" \
     --sim-backend gpu --render-backend gpu
   test -f "$COLLECTION_SMOKE/COLLECTION_COMPLETE"
   write_state "collection_smoke" "PASSED"
@@ -102,6 +103,7 @@ if [[ ! -f "$COLLECTION/COLLECTION_COMPLETE" ]]; then
     --method offline_oracle --checkpoint "$BASE_MODEL" --xvla-root "$XVLA_ROOT" \
     --output-dir "$COLLECTION" --split id --target 256 \
     --seed-start 886300 --max-attempts 320 --fresh-env-per-episode \
+    --oracle-template-h5 "$ORIGINAL_ROOT/accepted_suffixes.h5" \
     --sim-backend gpu --render-backend gpu
   test -f "$COLLECTION/COLLECTION_COMPLETE"
   copy_once "$COLLECTION" "$PERSIST/$(basename "$COLLECTION")"
