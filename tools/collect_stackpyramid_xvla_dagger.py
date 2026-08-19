@@ -164,12 +164,18 @@ def _install_rrt_fallback() -> None:
 class StackPyramidOracle:
     """Official Panda motion-planning recipe, continuing from the current state."""
 
-    def __init__(self, recorder: StepRecorder, template_actions: np.ndarray | None = None):
+    def __init__(
+        self,
+        recorder: StepRecorder,
+        template_actions: np.ndarray | None = None,
+        template_blue_start_step: int = 130,
+    ):
         import sapien
         from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
 
         self.recorder = recorder
         self.template_actions = template_actions
+        self.template_blue_start_step = template_blue_start_step
         self.sapien = sapien
         self.planner = PandaArmMotionPlanningSolver(
             recorder,
@@ -181,10 +187,6 @@ class StackPyramidOracle:
         )
 
     def run(self) -> None:
-        if self.template_actions is not None:
-            for action in self.template_actions:
-                self.recorder.step(action)
-            return
         from transforms3d.euler import euler2quat
         from mani_skill.examples.motionplanning.panda.solutions.stack_pyramid import (
             compute_grasp_info_by_obb,
@@ -282,6 +284,15 @@ class StackPyramidOracle:
                 [goal_xy[0], goal_xy[1], target_position[2] + 0.15], grasp_pose.q
             )
             self.planner.move_to_pose_with_screw(red_retreat_pose)
+
+        if self.template_actions is not None:
+            # The red prefix is planned from the current reset. The canonical
+            # suffix starts after red settling and supplies only the known-good
+            # blue approach/grasp/lift/place path.
+            for action in self.template_actions[self.template_blue_start_step:]:
+                self.recorder.step(action)
+            return
+
         # This is the historical blue approach path; the only change is that
         # red is now released immediately before the blue reach.
         safe_pose = self.sapien.Pose([0, 0, 0.15]) * grasp_pose
@@ -425,6 +436,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Replay the audited canonical expert action template from traj_000000.",
     )
+    parser.add_argument("--template-blue-start-step", type=int, default=130)
     parser.add_argument(
         "--fresh-env-per-episode",
         action="store_true",
@@ -536,7 +548,11 @@ def main() -> None:
             if expert_start is not None and not success:
                 env.current_source = "expert"
                 try:
-                    StackPyramidOracle(env, template_actions=template_actions).run()
+                    StackPyramidOracle(
+                        env,
+                        template_actions=template_actions,
+                        template_blue_start_step=args.template_blue_start_step,
+                    ).run()
                 except Exception as exc:
                     oracle_error = repr(exc)
             final = _summary(env)
@@ -606,6 +622,7 @@ def main() -> None:
         "raw_successes": sum(int(row["success"]) for row in raw_rows),
         "expert_action_steps": sum(len(item["actions"]) for item in accepted),
         "oracle_template_h5": str(args.oracle_template_h5.resolve()) if args.oracle_template_h5 else None,
+        "template_blue_start_step": args.template_blue_start_step if args.oracle_template_h5 else None,
         "dataset": str((args.output_dir / "accepted_suffixes.h5").resolve()),
         "selection_metrics": {
             "raw_attempts": len(raw_rows),

@@ -92,6 +92,7 @@ if [[ ! -f "$COLLECTION_SMOKE/COLLECTION_COMPLETE" ]]; then
     --output-dir "$COLLECTION_SMOKE" --split id --target 2 \
     --seed-start 886280 --max-attempts 2 --fresh-env-per-episode \
     --oracle-template-h5 "$ORIGINAL_ROOT/accepted_suffixes.h5" \
+    --template-blue-start-step 130 \
     --sim-backend gpu --render-backend gpu
   test -f "$COLLECTION_SMOKE/COLLECTION_COMPLETE"
   write_state "collection_smoke" "PASSED"
@@ -104,6 +105,7 @@ if [[ ! -f "$COLLECTION/COLLECTION_COMPLETE" ]]; then
     --output-dir "$COLLECTION" --split id --target 256 \
     --seed-start 886300 --max-attempts 320 --fresh-env-per-episode \
     --oracle-template-h5 "$ORIGINAL_ROOT/accepted_suffixes.h5" \
+    --template-blue-start-step 130 \
     --sim-backend gpu --render-backend gpu
   test -f "$COLLECTION/COLLECTION_COMPLETE"
   copy_once "$COLLECTION" "$PERSIST/$(basename "$COLLECTION")"
