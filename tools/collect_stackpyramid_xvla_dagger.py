@@ -291,11 +291,6 @@ class StackPyramidOracle:
         # not the v4 reset geometry or task success definition.
         neutral_pose = self.sapien.Pose([0.0, 0.0, 0.30], grasp_pose.q)
         self.planner.move_to_pose_with_screw(neutral_pose)
-        # Move above the tabletop before translating to the blue cube.  The
-        # direct low sweep can disturb the freshly placed red/green pair in
-        # the tightly separated ID geometry.
-        safe_pose = self.sapien.Pose([0, 0, 0.15]) * grasp_pose
-        self.planner.move_to_pose_with_screw(safe_pose)
         reach_pose = grasp_pose * self.sapien.Pose([0, 0, -0.05])
         self.planner.move_to_pose_with_screw(reach_pose)
         self.planner.move_to_pose_with_screw(grasp_pose)
@@ -306,22 +301,14 @@ class StackPyramidOracle:
         goal_pose_b = base.cubeB.pose * self.sapien.Pose([0, 0, base.cube_half_size[2] * 2])
         goal_p = (goal_pose_a.p + goal_pose_b.p) / 2
         goal_p_np = goal_p.detach().cpu().numpy().reshape(-1, 3)[0]
-        # Translate at a high clearance, then descend to the actual stacking
-        # height.  A single lifted-pose translation can undershoot the final
-        # z target and disturb the adjacent red/green pair in ID.
-        high_goal_pose = self.sapien.Pose(
-            [goal_p_np[0], goal_p_np[1], goal_p_np[2] + 0.10], lift_pose.q
-        )
-        self.planner.move_to_pose_with_screw(high_goal_pose)
-        place_pose = self.sapien.Pose(
-            [goal_p_np[0], goal_p_np[1], goal_p_np[2] + 0.03], lift_pose.q
-        )
-        self.planner.move_to_pose_with_screw(place_pose)
+        # Use the official relative alignment after the explicit red release;
+        # this preserves the original blue placement geometry while keeping
+        # the red phase monotone and independently verified.
+        offset = (goal_p - base.cubeC.pose.p).detach().cpu().numpy().reshape(-1, 3)[0]
+        align_pose = self.sapien.Pose(lift_pose.p + offset, lift_pose.q)
+        self.planner.move_to_pose_with_screw(align_pose)
         self.planner.open_gripper()
-        retreat_pose = self.sapien.Pose(
-            [goal_p_np[0], goal_p_np[1], goal_p_np[2] + 0.10], lift_pose.q
-        )
-        self.planner.move_to_pose_with_screw(retreat_pose)
+        self.planner.close()
 
 
 def _load_asset(path: Path, device: torch.device):
