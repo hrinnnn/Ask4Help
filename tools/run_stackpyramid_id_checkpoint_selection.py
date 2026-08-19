@@ -48,6 +48,8 @@ def run_probe(args: argparse.Namespace, checkpoint: Path, output: Path, log: Pat
         "--sim-backend", "gpu",
         "--render-backend", "gpu",
     ]
+    if args.fresh_env_per_episode:
+        command.append("--fresh-env-per-episode")
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = args.gpu
     env["STACKPYRAMID_OOD_GEOMETRY"] = "v4"
@@ -99,6 +101,7 @@ def main() -> None:
         default="",
         help="Comma-separated checkpoint steps; empty preserves the original 2000..20000 schedule.",
     )
+    parser.add_argument("--fresh-env-per-episode", action="store_true")
     args = parser.parse_args()
     if args.output_root.exists():
         raise FileExistsError(f"refusing to overwrite {args.output_root}")
