@@ -23,7 +23,7 @@
     }
   },
   "additional_collection": {
-    "root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v2/id_collection_additional_256_retry1/",
+    "root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/id_collection_additional_256_retry1/",
     "split": "id",
     "seed_start": 886300,
     "seed_end_exclusive": 886556,
@@ -43,7 +43,7 @@
     ]
   },
   "merged_training_data": {
-    "root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v2/id_training_collection_512_retry1/",
+    "root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/id_training_collection_512_retry1/",
     "expected_episodes": 512,
     "ood_included": false,
     "norm_mode": "xvla_action_space",
