@@ -286,6 +286,11 @@ class StackPyramidOracle:
                 break
         if need_move_a_b and "red_placed" not in self.recorder.event_first_steps:
             raise RuntimeError("blue phase cannot start before verified red placement")
+        # Leave the released red/green pair through a fixed high-clearance
+        # waypoint before approaching blue. This changes only the Oracle path,
+        # not the v4 reset geometry or task success definition.
+        neutral_pose = self.sapien.Pose([0.0, 0.0, 0.30], grasp_pose.q)
+        self.planner.move_to_pose_with_screw(neutral_pose)
         # Move above the tabletop before translating to the blue cube.  The
         # direct low sweep can disturb the freshly placed red/green pair in
         # the tightly separated ID geometry.
