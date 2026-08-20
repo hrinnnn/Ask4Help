@@ -291,6 +291,7 @@ def main() -> None:
             render_mode="rgb_array",
             sim_backend=args.sim_backend,
             render_backend=args.render_backend,
+            max_episode_steps=args.max_episode_steps,
         )
 
     env = make_env()
