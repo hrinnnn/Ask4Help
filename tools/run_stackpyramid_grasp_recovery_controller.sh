@@ -34,8 +34,8 @@ if [[ ! -f "$ROOT_OUT/baseline_failure_audit.json" ]]; then
   state baseline_failure_audit PASSED
 fi
 
-HORIZON_LOCAL="$WORK/horizon_450_diagnostic_20"
-HORIZON_OUT="$ROOT_OUT/horizon_450_diagnostic_20"
+HORIZON_LOCAL="$WORK/horizon_450_diagnostic_20_retry2"
+HORIZON_OUT="$ROOT_OUT/horizon_450_diagnostic_20_retry2"
 if [[ ! -f "$HORIZON_OUT/EVAL_COMPLETE" ]]; then
   state horizon_450_diagnostic_20 RUNNING
   rm -rf "$HORIZON_LOCAL"
