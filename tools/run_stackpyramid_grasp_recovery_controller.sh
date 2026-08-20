@@ -9,6 +9,7 @@ BASELINE="/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/final_ch
 ROOT_OUT="/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/grasp_recovery_v1"
 WORK="/tmp/stackpyramid_grasp_recovery_v1"
 STATE="$ROOT_OUT/pipeline_state.json"
+STATE_LOCAL="$WORK/pipeline_state.json"
 LOG="/root/ask4help_stage2_logs/stackpyramid_grasp_recovery_v1_controller.log"
 
 export CUDA_VISIBLE_DEVICES=0
@@ -19,7 +20,8 @@ mkdir -p "$ROOT_OUT" "$WORK"
 
 state() {
   printf '{"format":"stackpyramid_grasp_recovery_controller_v1","stage":"%s","status":"%s","updated_at":"%s"}\n' \
-    "$1" "$2" "$(date '+%Y-%m-%dT%H:%M:%S%z')" > "$STATE"
+    "$1" "$2" "$(date '+%Y-%m-%dT%H:%M:%S%z')" > "$STATE_LOCAL"
+  cp "$STATE_LOCAL" "$STATE"
 }
 
 if [[ ! -f "$BASELINE/EVAL_COMPLETE" ]]; then
