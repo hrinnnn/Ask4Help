@@ -27,7 +27,7 @@ def main() -> None:
         "format": "stackpyramid_grasp_adapter_audit_v1",
         "baseline_root": str(args.baseline_root),
         "episodes": len(rows),
-        "action_shapes": sorted({list(array.shape) for array in arrays}),
+        "action_shapes": [list(shape) for shape in sorted({tuple(array.shape) for array in arrays})],
         "real_action_dim": int(actions.shape[1]),
         "gripper_min": float(gripper.min()),
         "gripper_max": float(gripper.max()),
