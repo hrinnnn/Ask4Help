@@ -1,0 +1,80 @@
+{
+  "format": "stackpyramid_grasp_recovery_exposure_proposal_v1",
+  "status": "NEEDS_USER_DECISION",
+  "pipeline_id": "stackpyramid_grasp_recovery_v1",
+  "scientific_scope": "ID-only grasp recovery; no OOD, PCA, timing, or two-way gate",
+  "evidence": {
+    "existing_512": {
+      "episodes": 512,
+      "anchors": 138979,
+      "tail_anchors": 4608,
+      "source_root": "/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v3/id_training_collection_512_external_links_retry1"
+    },
+    "recovery_128": {
+      "episodes": 128,
+      "raw_attempts": 128,
+      "raw_successes": 128,
+      "accepted": 128,
+      "anchors": 33293,
+      "tail_anchors": 1152,
+      "videos_decodable": "128/128",
+      "audit": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/grasp_recovery_v1/recovery_collection_128_audit/audit.json",
+      "collection_root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/grasp_recovery_v1/recovery_collection_128_retry1"
+    },
+    "combined": {
+      "episodes": 640,
+      "anchors": 172272,
+      "tail_anchors": 5760,
+      "old_anchor_fraction": 0.8067,
+      "recovery_anchor_fraction": 0.1933
+    }
+  },
+  "recommendation": {
+    "dataset": "merge the audited existing 512-ID source with the audited recovery-128 source; no diagnostic/template/OOD data",
+    "source_balance": {
+      "mode": "fixed_source_balanced_batches",
+      "existing_512_fraction": 0.8,
+      "recovery_128_fraction": 0.2,
+      "reason": "matches the natural episode ratio while making recovery exposure explicit and reproducible"
+    },
+    "initialization": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-40000",
+    "additional_optimizer_steps": 20000,
+    "batch_size": 8,
+    "sampled_anchors": 160000,
+    "effective_combined_passes": 0.9288,
+    "effective_source_passes": {
+      "existing_512": 0.9210,
+      "recovery_128": 0.9612
+    },
+    "learning_rate": 0.0001,
+    "learning_coefficient": 0.1,
+    "freeze_steps": 0,
+    "warmup_steps": 2000,
+    "precision": "bf16",
+    "checkpoint_nodes": [5000, 10000, 15000, 20000],
+    "selection_manifest": "88500--88519, one independent 20-ID probe per checkpoint",
+    "formal_manifest": "84400--84499, one fresh 100-ID formal gate after selection",
+    "formal_threshold": ">=80/100 strict success",
+    "formal_protocol": {
+      "geometry": "v4",
+      "max_episode_steps": 300,
+      "execute_horizon": 5,
+      "fresh_env_per_episode": true,
+      "formal_evidence": ["video", "actions", "states", "phase events", "reset metadata"]
+    }
+  },
+  "interpretation": {
+    "branch_exposure_only": true,
+    "cumulative_model_exposure_not_recomputed": true,
+    "norm_policy": "reuse the frozen 512-ID custom-adapter normalization; do not refit after approval unless separately authorized",
+    "adapter_policy": "preserve task-specific real_action_dim=8, max_action_dim=20, num_actions=10, domain_id=0",
+    "stop_conditions": [
+      "missing merged-data or temporal-mask audit",
+      "non-finite training or incomplete checkpoint evidence",
+      "formal evidence count below 100/100",
+      "formal strict success below 80/100"
+    ]
+  },
+  "approval_required": true,
+  "forbidden_until_approval": ["training", "OOD", "PCA", "timing", "two_way_gate"]
+}
