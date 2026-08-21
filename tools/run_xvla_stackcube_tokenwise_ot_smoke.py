@@ -99,7 +99,7 @@ def main() -> None:
         "token_count": int(features.shape[1]),
         "hidden_dim": int(features.shape[2]),
         "finite_features": bool(torch.isfinite(features).all()),
-        "finite_asset": bool(all(torch.isfinite(value).all() for value in asset_state_dict(assets).values() if isinstance(value, torch.Tensor))),
+        "finite_asset": bool(all(torch.isfinite(value).all() for value in asset_state_dict(assets[0]).values() if isinstance(value, torch.Tensor))),
         "first_ot_cost": float(score_first["ot_cost"][0].item()),
         "last_ot_cost": float(score_last["ot_cost"][0].item()),
         "first_aligned_topk_cost": float(score_first["aligned_topk_cost"][0].item()),
