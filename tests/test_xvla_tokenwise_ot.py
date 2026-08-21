@@ -42,7 +42,9 @@ def test_ot_ignores_invalid_query_tokens() -> None:
     valid[:, -1] = False
     query[:, -1] = 10_000.0
     result = token_ot_score(query, valid, assets[0], topk=2)
-    reference = token_ot_score(features[:1], mask[:1], assets[0], topk=2)
+    reference_query = features[:1].clone()
+    reference_query[:, -1] = -10_000.0
+    reference = token_ot_score(reference_query, valid, assets[0], topk=2)
     torch.testing.assert_close(result["ot_cost"], reference["ot_cost"], atol=1e-4, rtol=1e-4)
 
 

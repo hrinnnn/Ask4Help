@@ -320,5 +320,7 @@ def select_monotonic_phase(
         (phase, token_ot_score(query, valid_mask, assets[phase], epsilon=epsilon, iterations=iterations))
         for phase in range(start, stop)
     ]
-    phase = min(candidates, key=lambda item: float(item[1]["ot_cost"].mean().item()))[0]
-    return phase, dict(candidates[phase][1])
+    selected_phase, selected_scores = min(
+        candidates, key=lambda item: float(item[1]["ot_cost"].mean().item())
+    )
+    return selected_phase, dict(selected_scores)
