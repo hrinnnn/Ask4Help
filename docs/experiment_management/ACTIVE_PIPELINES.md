@@ -10,17 +10,18 @@
 - `authorized`: `true`
 - `owner_thread`: `019fdb64-2df4-7a53-9a66-7a5c9b9fe97a`
 - `server`: `zhaozhixuan@111.198.58.150:12001`
-- `current_stage`: `waiting_for_idle_gpus` (CPU adapter dataset complete)
-- `next_stage`: `controller_smoke` (then automatic 50k adaptation)
-- `controller`: remote PID `1066744`
-- `pipeline_state`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v2/pipeline_state.json`
-- `design_root`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v2/`
+- `current_stage`: `training_50000` (corrected v7 gripper contract; execution audit passed)
+- `next_stage`: training completion, final checkpoint selection, then formal 100-ID gate
+- `controller`: remote PID `3735453`; training launcher PID `3739073`; post-training gate controller PID `3744600`
+- `pipeline_state`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v6/pipeline_state.json`
+- `design_root`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v7/`
 - `foundation`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_airplane_v1/model_cache/X-VLA-Pt-local`
 - `domain_id`: `19` (audited unused; no domain table resize)
 - `data_root`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v2/dataset/xvla_id_512_adapter_space/` (512 episodes, 91,533 frames; CPU adapter complete)
 - `plan`: `docs/experiment_management/plans/OpenDrawer_XVLA_Foundation_Adaptation.md`
 - `manifest`: `configs/pipelines/open_drawer_xvla_foundation_v1.json`
 - `completion`: X-VLA 50k adaptation、checkpoint selection、独立100-ID gate与证据注册完成并写 `PIPELINE_COMPLETE`
+- `execution_audit`: formal gate 前必须独立核对实际 X-VLA entrypoint、foundation/checkpoint、完整 prompt、512-ID manifest、domain id、8D-to-20D adapter、norm、temporal mask、effective batch/gradient accumulation、freeze/warmup、checkpoint reload，以及每个 selection/formal episode 的 video/actions/states/timeline/reset metadata。任一 mismatch 写 `ENGINEERING_PROTOCOL_DIAGNOSTIC`，不得进入正式 gate。
 
 不可变条件：X-VLA foundation、完整 canonical prompt、原 ID 任务/成功定义、512-ID 数据 provenance、temporal/action mask。禁止恢复任何 pi0.5 resume 路线，禁止使用 Airplane/StackCube task checkpoint，ID `<80/100` 禁止 OOD/PCA/DAgger/two-way。
 
@@ -41,15 +42,16 @@
 - `authorized`: `true`
 - `owner_thread`: `019ff58e-8e47-7ca3-a028-07a2705e2c28`
 - `server`: `root@39.101.70.188:1012`
-- `current_stage`: `recovery_training`
-- `next_stage`: `checkpoint_selection_20_id`
-- `controller`: remote PID `1805974`; training PID `1806224`
+- `current_stage`: `passive_pca_failure_detection_complete`
+- `next_stage`: `needs_user_decision`
+- `controller`: passive PCA retry8 complete; protocol audit passed; no active process
 - `pipeline_state`: `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/grasp_recovery_v1/pipeline_state.json`
 - `baseline_checkpoint`: `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-40000`
 - `baseline_formal`: `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/final_checkpoint_formal_id_gate_100_retry3/`
 - `plan`: `docs/experiment_management/plans/StackPyramid_ID_Grasp_Recovery_From_ckpt40000.md`
 - `manifest`: `configs/pipelines/stackpyramid_grasp_recovery_v1.json`
 - `completion`: recovery checkpoint达到独立100-ID `>=80/100` 并注册为 ID base，或写入预注册科学停止 marker
+- `execution_audit`: passive PCA 只读评测在每个 split 收口前独立核对固定 `ckpt-40000`、v4 geometry、green/blue-only shift、paired seeds、600-step horizon、ID-calibrated threshold、原 policy actions、完整分母及 video/actions/states/timeline/reset metadata。PCA 不得改变动作；任一 mismatch 写 `ENGINEERING_PROTOCOL_DIAGNOSTIC`，不得注册最终指标。
 
 Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift `51/100`，证据100/100完整。该 checkpoint 是 recovery baseline，不是已接受 ID base。
 
@@ -61,7 +63,7 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 2. 同 checkpoint 做独立20条 `450`-step diagnostic，正式300-step协议不变；
 3. 审计 8D/20D adapter、gripper sign、normalization、chunk execution；
 4. 若确认数据覆盖不足，新增128--256条同ID pre-grasp/contact/close/lift demonstrations；
-5. 已批准从 `ckpt-40000` 建立独立 recovery branch，额外训练50k，checkpoint/retry不覆盖 baseline；
+5. passive PCA failure-detection evaluation 已完成：retry8 固定 `ckpt-40000`、v4、600 steps、ID q=.95 threshold、score-only policy rollout；Stage2/Stage3 ID/OOD 四组均 `100/100` evidence，paired reset/runtime metadata audit PASS，最终 metrics 位于 `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/grasp_recovery_v1/failure_detection_pca_v1_retry8/`。旧 root 因 runtime metadata 缺失保留为 diagnostic；Oracle失败分支仍完全隔离；
 6. 固定20-ID selection和独立100-ID gate；
 7. `>=80/100` 后才允许进入下游，失败则写科学停止 marker。
 

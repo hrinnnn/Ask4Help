@@ -4,10 +4,25 @@
   "authorized": true,
   "owner_thread": "019ff58e-8e47-7ca3-a028-07a2705e2c28",
   "server": "root@39.101.70.188:1012",
-  "current_stage": "recovery_training",
-  "next_stage": "checkpoint_selection_20_id",
+  "current_stage": "passive_pca_failure_detection_complete",
+  "next_stage": "needs_user_decision",
+  "execution_audit": {
+    "required": true,
+    "final_metrics_blocked_until_pass": true,
+    "failure_marker": "ENGINEERING_PROTOCOL_DIAGNOSTIC",
+    "checks": [
+      "fixed_ckpt40000_and_v4_geometry_match",
+      "stage2_moves_green_only_and_stage3_moves_blue_only_with_non_target_invariants",
+      "paired_seed_manifest_and_600_step_horizon_match",
+      "pca_is_score_only_and_policy_actions_are_unchanged",
+      "id_calibrated_threshold_and_failure_labels_match_protocol",
+      "each_split_has_complete_denominator_videos_actions_states_timelines_reset_metadata"
+    ],
+    "required_before": ["failure_detection_metrics_registration", "PIPELINE_COMPLETE"]
+  },
   "controller_pid_file": "/root/ask4help_stage2_logs/stackpyramid_grasp_recovery_v1_controller.pid",
-  "controller_pid": 1805974,
+  "controller_pid": null,
+  "training_pid": null,
   "training_pid": 1806224,
   "baseline_checkpoint": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-40000",
   "baseline_formal_root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/final_checkpoint_formal_id_gate_100_retry3/",
@@ -77,6 +92,112 @@
     "interpretation": "diagnostic trend only; does not replace final selection or ID gate",
     "ood_started": false
   },
+  "historical_checkpoint_audit": {
+    "authorized": true,
+    "checkpoint_scope": [
+      "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-10000",
+      "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-20000",
+      "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-30000",
+      "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-40000",
+      "recovery_training_50k_retry1/training/ckpt-5000",
+      "recovery_training_50k_retry1/training/ckpt-10000",
+      "recovery_training_50k_retry1/training/ckpt-15000",
+      "recovery_training_50k_retry1/training/ckpt-20000"
+    ],
+    "episodes_per_checkpoint": 20,
+    "seed_start": 889000,
+    "formal_protocol": "v4 ID, fresh environment per episode, max_episode_steps=300, execute_horizon=5, formal evidence",
+    "interpretation": "same-seed A/B diagnostic audit only; no ID promotion or OOD unlock",
+    "ood_started": false
+  },
+  "horizon_diagnostic": {
+    "authorized": true,
+    "max_episode_steps": 600,
+    "episodes_per_checkpoint": 20,
+    "seed_start": 891000,
+    "checkpoint_scope": ["continuation_ckpt-30000", "continuation_ckpt-40000"],
+    "formal_protocol_unchanged": true,
+    "interpretation": "diagnostic only: distinguish timeout from grasp/transport/control degradation",
+    "ood_started": false
+  },
+  "user_scope_override": {
+    "approved_at": "2026-08-21",
+    "stop_current_50k_training": true,
+    "preserve_all_existing_checkpoints": true,
+    "primary_checkpoint": "continuation_ckpt-40000",
+    "comparison_checkpoint": "continuation_ckpt-30000",
+    "future_diagnostic_horizon_steps": 600,
+    "historical_300_step_results_immutable": true
+  },
+  "conditional_reporting_metric": {
+    "authorized": true,
+    "primary_metric": "strict_success_given_red_grasp",
+    "numerator": "strict_success_and_red_grasp",
+    "denominator": "episodes_with_valid_red_grasp_event",
+    "retain_ungrasped_episodes": true,
+    "always_report_unconditional_secondary": true,
+    "protocol_document": "docs/experiment_management/plans/StackPyramid_Conditional_Success_Given_Grasp.md"
+  },
+  "horizon600_result": {
+    "marker": "HORIZON_600_AB_COMPLETE",
+    "seed_manifest": "891000--891019",
+    "continuation_ckpt30000": {"episodes": 20, "strict_success": 1, "ever_grasped": 11, "ever_base_completed": 11, "timeouts": 19},
+    "continuation_ckpt40000": {"episodes": 20, "strict_success": 12, "ever_grasped": 15, "ever_base_completed": 15, "timeouts": 8},
+    "diagnostic_only": true,
+    "formal_300_step_gate_unchanged": true
+  },
+  "user_ood_scope": {
+    "authorized": true,
+    "plan_only_until_owner_proposal": false,
+    "base_checkpoint": "continuation_ckpt-40000",
+    "splits": ["stage2_green_target_ood", "stage3_blue_object_ood"],
+    "geometry": "v4",
+    "horizon_steps": 600,
+    "primary_metric": "strict_success_given_red_grasp",
+    "required_evidence": ["video", "actions", "states", "timeline", "reset_metadata"],
+    "forbidden_before_smoke_pass": ["training", "PCA_collection", "DAgger", "threshold_tuning"]
+  },
+  "ood_execution_approval": {
+    "approved_at": "2026-08-21",
+    "approved_stage": "paired_reset_oracle_smoke_only",
+    "policy_evaluation_requires_smoke_pass": true,
+    "training": false,
+    "pca_collection": false,
+    "passive_pca_failure_detection": true,
+    "dagger": false,
+    "threshold_tuning": false
+  },
+  "latest_user_scope_override": {
+    "approved_at": "2026-08-21",
+    "stage": "passive_pca_failure_detection",
+    "base_checkpoint": "continuation_ckpt-40000",
+    "splits": ["stage2_green_target_ood", "stage3_blue_object_ood"],
+    "mode": "passive_score_only",
+    "expert_takeover": false,
+    "training": false,
+    "dagger": false,
+    "threshold_tuning_to_increase_acceptance": false,
+    "plan_document": "docs/experiment_management/proposals/StackPyramid_Passive_PCA_Failure_Detection_User_Override.md"
+  },
+  "policy_ood_gate_status": {
+    "status": "BLOCKED_STAGE2_ID_ORACLE_FAILED",
+    "stage2_id_oracle": {"episodes": 20, "strict_success": 0, "event_order_failures": 20},
+    "stage3_oracle_and_policy_eval": "not_started",
+    "pca_passive_track_isolated": true,
+    "historical_results_unchanged": true
+  },
+  "passive_pca_progress": {
+    "asset": {"status": "complete", "anchors": 138979, "hidden_dim": 1024, "principal_dim": 512},
+    "calibration": {"status": "complete", "method": "successful_id_trajectory_maxima_q95"},
+    "stage2_id": {"status": "complete", "episodes": 100, "strict_success": 55, "ever_grasped": 59, "evidence_complete": true},
+    "stage2_ood": {"status": "complete", "episodes": 100, "evidence_complete": true, "distribution": "green-only target-position OOD"},
+    "stage3_id": {"status": "complete", "episodes": 100, "evidence_complete": true},
+    "stage3_ood": {"status": "diagnostic_old_root_complete_but_protocol_invalid", "distribution": "blue-only object-position OOD"},
+    "retry8": {"status": "complete", "stage": "protocol_audit_passed", "output_root": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/grasp_recovery_v1/failure_detection_pca_v1_retry8", "metadata_runtime_horizon": 600, "metrics": "failure_detection_metrics.json", "protocol_audit": "protocol_audit.json"},
+    "next_recovery": "needs_user_decision"
+  },
+  "ood_plan_proposal": "docs/experiment_management/proposals/StackPyramid_v4_OOD_TwoSplit_600_Proposal.json",
+  "ood_plan_summary": "docs/experiment_management/proposals/StackPyramid_v4_OOD_TwoSplit_600_Proposal.md",
   "decision_summary": "docs/experiment_management/proposals/StackPyramid_Grasp_Recovery_Exposure_Decision_Summary.md",
   "forbidden_before_id_gate": ["ood", "pca", "timing", "two_way_gate"],
   "terminal_markers": ["PIPELINE_COMPLETE", "NEEDS_USER_DECISION", "ID_BASE_NOT_ACCEPTED"]
