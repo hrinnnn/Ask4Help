@@ -39,6 +39,9 @@ def main() -> None:
 
     sys.path.insert(0, str(args.xvla_root.resolve()))
     from datasets.dataset import InfiniteDataReader
+    # StackCube's historical manifest uses the panda_airplane domain handler;
+    # importing it registers the handler before InfiniteDataReader iterates.
+    import datasets.domain_handler.panda_airplane  # noqa: F401
     from models.modeling_xvla import XVLA
     from models.processing_xvla import XVLAProcessor
 
