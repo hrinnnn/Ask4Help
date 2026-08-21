@@ -41,9 +41,9 @@
 - `authorized`: `true`
 - `owner_thread`: `019ff58e-8e47-7ca3-a028-07a2705e2c28`
 - `server`: `root@39.101.70.188:1012`
-- `current_stage`: `recovery_training_authorized`
-- `next_stage`: `recovery_training`
-- `controller`: Owner must start/recover a restart-tolerant training controller on H20
+- `current_stage`: `recovery_training`
+- `next_stage`: `checkpoint_selection_20_id`
+- `controller`: remote PID `1805974`; training PID `1806224`
 - `pipeline_state`: `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/grasp_recovery_v1/pipeline_state.json`
 - `baseline_checkpoint`: `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-40000`
 - `baseline_formal`: `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/final_checkpoint_formal_id_gate_100_retry3/`
