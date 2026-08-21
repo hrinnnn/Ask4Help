@@ -37,7 +37,6 @@ if [[ ! -f "$ASSET_DURABLE" ]]; then
     --collection-root /root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v3/id_training_collection_512_external_links_retry1 \
     --output "$ASSET_LOCAL" --target-episodes 512 >> "$LOG" 2>&1
   cp "$ASSET_LOCAL" "$ASSET_DURABLE"
-  cp "$ASSET_LOCAL.json" "$OUT/bridge_pca.json"
 else
   [[ -f "$ASSET_LOCAL" ]] || cp "$ASSET_DURABLE" "$ASSET_LOCAL"
 fi
