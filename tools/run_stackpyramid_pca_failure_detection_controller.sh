@@ -60,7 +60,27 @@ THRESHOLD="$($PY -c 'import json,sys; print(json.load(open(sys.argv[1]))["thresh
 run_condition() {
   local name="$1" split="$2" seed="$3"
   local local_out="$WORK/$name" durable_out="$OUT/$name"
-  if [[ -f "$durable_out/EVAL_COMPLETE" ]]; then return 0; fi
+  if [[ -f "$durable_out/EVAL_COMPLETE" ]]; then
+    if [[ ! -f "$durable_out/episodes.jsonl" ]]; then
+      "$PY" - "$durable_out" "/tmp/stackpyramid_failure_detection_pca_v1/$name" <<'PY'
+import json
+import sys
+from pathlib import Path
+durable, local = Path(sys.argv[1]), sys.argv[2]
+summary_path = durable / "summary.json"
+summary = json.loads(summary_path.read_text())
+def rewrite(value):
+    if isinstance(value, str) and value.startswith(local): return value.replace(local, str(durable), 1)
+    if isinstance(value, dict): return {key: rewrite(item) for key, item in value.items()}
+    if isinstance(value, list): return [rewrite(item) for item in value]
+    return value
+summary["rows"] = [rewrite(row) for row in summary.get("rows", [])]
+summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+(durable / "episodes.jsonl").write_text("".join(json.dumps(row) + "\n" for row in summary["rows"]))
+PY
+    fi
+    return 0
+  fi
   rm -rf "$local_out" "$durable_out"
   state "${name}_running"
   "$PY" "$ROOT/tools/evaluate_stackpyramid_pca_failure_detection.py" \
@@ -76,6 +96,26 @@ import json
 import sys
 from pathlib import Path
 durable, local = Path(sys.argv[1]), sys.argv[2]
+summary_path = durable / "summary.json"
+summary = json.loads(summary_path.read_text())
+rows = summary.get("rows", [])
+def rewrite(value):
+    if isinstance(value, str) and value.startswith(local): return value.replace(local, str(durable), 1)
+    if isinstance(value, dict): return {key: rewrite(item) for key, item in value.items()}
+    if isinstance(value, list): return [rewrite(item) for item in value]
+    return value
+rows = [rewrite(row) for row in rows]
+summary["rows"] = rows
+summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+(durable / "episodes.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows))
+PY
+  "$PY" - "$durable_out" "$local_out" <<'PY'
+import json
+import sys
+from pathlib import Path
+durable, local = Path(sys.argv[1]), sys.argv[2]
+if not (durable / "episodes.jsonl").exists():
+    raise SystemExit("missing rewritten episodes.jsonl")
 rows = []
 for line in (durable / "episodes.jsonl").read_text().splitlines():
     if not line.strip(): continue
