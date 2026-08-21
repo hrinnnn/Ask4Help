@@ -41,7 +41,8 @@ def main() -> None:
     from datasets.dataset import InfiniteDataReader
     # StackCube's historical manifest uses the panda_airplane domain handler;
     # importing it registers the handler before InfiniteDataReader iterates.
-    import datasets.domain_handler.panda_airplane  # noqa: F401
+    from datasets.domain_handler import panda_airplane, registry
+    registry._REGISTRY.setdefault("panda_airplane", panda_airplane.PandaAirplaneHandler)
     from models.modeling_xvla import XVLA
     from models.processing_xvla import XVLAProcessor
 
