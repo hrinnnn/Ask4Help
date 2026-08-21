@@ -68,6 +68,15 @@
     "additional_optimizer_steps": 50000,
     "keep_existing_recovery_contract": true
   },
+  "early_diagnostic_probe": {
+    "authorized": true,
+    "checkpoint_scope": [5000, 10000, 15000, 20000],
+    "episodes_per_checkpoint": 20,
+    "seed_start": 888000,
+    "formal_protocol": "v4 ID, fresh environment per episode, max_episode_steps=300, execute_horizon=5",
+    "interpretation": "diagnostic trend only; does not replace final selection or ID gate",
+    "ood_started": false
+  },
   "decision_summary": "docs/experiment_management/proposals/StackPyramid_Grasp_Recovery_Exposure_Decision_Summary.md",
   "forbidden_before_id_gate": ["ood", "pca", "timing", "two_way_gate"],
   "terminal_markers": ["PIPELINE_COMPLETE", "NEEDS_USER_DECISION", "ID_BASE_NOT_ACCEPTED"]
