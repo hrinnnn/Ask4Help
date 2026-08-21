@@ -18,7 +18,7 @@ LOG="/root/ask4help_stage2_logs/stackpyramid_failure_detection_pca_v1.log"
 export CUDA_VISIBLE_DEVICES=0
 export PYTHONUNBUFFERED=1
 export STACKPYRAMID_OOD_GEOMETRY=v4
-export PYTHONPATH="$ROOT:$XVLA_ROOT:${PYTHONPATH:-}"
+export PYTHONPATH="$ROOT:$ROOT/RLinf:$XVLA_ROOT:${PYTHONPATH:-}"
 mkdir -p "$WORK" "$OUT"
 
 [[ -d "$CHECKPOINT" ]] || exit 2
