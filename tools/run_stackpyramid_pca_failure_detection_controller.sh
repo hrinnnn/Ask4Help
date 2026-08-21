@@ -7,13 +7,13 @@ XVLA_ROOT="${XVLA_ROOT:-/root/X-VLA}"
 CHECKPOINT="/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-40000"
 ID_H5="/root/ask4help_stage2_work/xvla_stackpyramid_oracle_repair_v3/id_training_collection_512_external_links_retry1/id/accepted_suffixes.h5"
 PIPE="/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/grasp_recovery_v1"
-OUT="$PIPE/failure_detection_pca_v1"
-WORK="/tmp/stackpyramid_failure_detection_pca_v1"
+OUT="${OUT:-$PIPE/failure_detection_pca_v1}"
+WORK="${WORK:-/tmp/stackpyramid_failure_detection_pca_v1}"
 ASSET_LOCAL="$WORK/bridge_pca.pt"
 ASSET_DURABLE="$OUT/bridge_pca.pt"
 CAL_LOCAL="$WORK/calibration.json"
 CAL_DURABLE="$OUT/calibration.json"
-LOG="/root/ask4help_stage2_logs/stackpyramid_failure_detection_pca_v1.log"
+LOG="${LOG:-/root/ask4help_stage2_logs/stackpyramid_failure_detection_pca_v1.log}"
 STATE_LOCAL="$WORK/pipeline_state.txt"
 
 export CUDA_VISIBLE_DEVICES=0
@@ -141,6 +141,13 @@ run_condition stage2_id id 892100
 run_condition stage2_ood stage2_ood 892100
 run_condition stage3_id id 893100
 run_condition stage3_ood stage3_ood 893100
+
+state protocol_audit
+"$PY" "$ROOT/tools/audit_stackpyramid_passive_pca_protocol.py" \
+  --root "$OUT" --output "$OUT/protocol_audit.json" >> "$LOG" 2>&1 || {
+  state ENGINEERING_PROTOCOL_DIAGNOSTIC
+  exit 1
+}
 
 state summarizing_passive_failure_detection
 "$PY" - "$OUT" <<'PY'

@@ -90,6 +90,8 @@ def main() -> None:
             seed = args.start_seed + episode_index
             raw_obs, _ = env.reset(seed=seed)
             metadata = reset_metadata(env, split=args.split)
+            metadata["runtime_max_episode_steps"] = args.max_episode_steps
+            metadata["runtime_execute_horizon"] = args.execute_horizon
             invariants = metadata.get("reset_invariants", {})
             if metadata.get("ood_geometry") != "v4" or any(invariants.values()):
                 raise RuntimeError(f"invalid v4 reset for {args.split}: {metadata}")
