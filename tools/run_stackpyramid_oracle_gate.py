@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import imageio
 
 
 REQUIRED_EVENT_ORDER = ("red_grasped", "red_lifted", "red_placed", "blue_grasped", "blue_lifted")
@@ -54,6 +55,9 @@ def main() -> None:
     parser.add_argument("--seed-manifest", type=Path)
     parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="cpu")
     parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="cpu")
+    parser.add_argument("--max-episode-steps", type=int, default=300)
+    parser.add_argument("--fresh-env-per-episode", action="store_true")
+    parser.add_argument("--formal-evidence", action="store_true")
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
@@ -79,25 +83,31 @@ def main() -> None:
         StepRecorder,
         _install_rrt_fallback,
     )
-    from tools.stackpyramid_task import register_stackpyramid_splits, stackpyramid_env_id
+    from tools.stackpyramid_task import register_stackpyramid_splits, reset_metadata, stackpyramid_env_id
 
     _install_rrt_fallback()
     register_stackpyramid_splits()
-    env = StepRecorder(
-        gym.make(
+    def make_recorder():
+        return StepRecorder(gym.make(
             stackpyramid_env_id(args.split),
             obs_mode="rgb+state",
             control_mode="pd_joint_pos",
             render_mode="rgb_array",
             sim_backend=args.sim_backend,
             render_backend=args.render_backend,
-        )
-    )
+            max_episode_steps=args.max_episode_steps,
+        ))
+
+    env = make_recorder()
     rows: list[dict[str, object]] = []
     try:
         for index in range(args.episodes):
+            if args.fresh_env_per_episode and index > 0:
+                env.env.close()
+                env = make_recorder()
             seed = int(seeds[index])
             env.reset(seed=seed)
+            metadata = reset_metadata(env, split=args.split)
             error = None
             try:
                 StackPyramidOracle(env).run()
@@ -116,8 +126,26 @@ def main() -> None:
                     "reset_invariants": dict(env.reset_invariants),
                     "reset_invariant_pass": not any(env.reset_invariants.values()),
                     "event_order": _event_order(env),
+                    "reset_metadata": metadata,
                 }
             )
+            if args.formal_evidence:
+                video_path = args.output / "videos" / f"{args.split}_{seed}.mp4"
+                actions_path = args.output / "actions" / f"{args.split}_{seed}.npy"
+                states_path = args.output / "states" / f"{args.split}_{seed}.json"
+                video_path.parent.mkdir(parents=True, exist_ok=True)
+                actions_path.parent.mkdir(parents=True, exist_ok=True)
+                states_path.parent.mkdir(parents=True, exist_ok=True)
+                with imageio.get_writer(video_path, fps=30, codec="libx264", macro_block_size=None) as writer:
+                    for frame in env.frames:
+                        writer.append_data(frame)
+                np.save(actions_path, np.asarray(env.actions, dtype=np.float32))
+                timeline = [
+                    {"step": step, "state": record["state"].tolist(), "events": env.event_history[min(step, len(env.event_history) - 1)]}
+                    for step, record in enumerate(env.records)
+                ]
+                states_path.write_text(json.dumps(timeline) + "\n", encoding="utf-8")
+                rows[-1].update({"video": str(video_path), "actions_path": str(actions_path), "state_timeline": str(states_path)})
             print(json.dumps(rows[-1]), flush=True)
     finally:
         env.env.close()
@@ -133,14 +161,22 @@ def main() -> None:
         "render_backend": args.render_backend,
         "reset_invariant_failures": sum(not row["reset_invariant_pass"] for row in rows),
         "event_order_failures": sum(not row["event_order"]["event_order_pass"] for row in rows),
+        "max_episode_steps": args.max_episode_steps,
+        "fresh_env_per_episode": args.fresh_env_per_episode,
+        "formal_evidence": args.formal_evidence,
+        "video_count": len(list((args.output / "videos").glob("*.mp4"))) if args.formal_evidence else None,
+        "action_array_count": len(list((args.output / "actions").glob("*.npy"))) if args.formal_evidence else None,
+        "state_timeline_count": len(list((args.output / "states").glob("*.json"))) if args.formal_evidence else None,
         "rows": rows,
     }
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    (args.output / "episodes.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     if (
         summary["episodes"] != args.episodes
         or summary["success_rate"] < 0.90
         or summary["reset_invariant_failures"]
         or summary["event_order_failures"]
+        or (args.formal_evidence and (summary["video_count"] != args.episodes or summary["action_array_count"] != args.episodes or summary["state_timeline_count"] != args.episodes))
     ):
         raise RuntimeError(f"Oracle gate failed: {summary}")
     (args.output / "ORACLE_GATE_COMPLETE").write_text("complete\n", encoding="utf-8")
