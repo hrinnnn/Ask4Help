@@ -77,6 +77,41 @@ class TokenwisePCAOTAsset:
         )
 
 
+def asset_state_dict(asset: TokenwisePCAOTAsset) -> dict[str, torch.Tensor | int]:
+    """Return a portable tensor-only representation for checkpointing."""
+
+    asset.validate()
+    return {
+        "mean": asset.mean.cpu(),
+        "components": asset.components.cpu(),
+        "residual_mean": asset.residual_mean.cpu(),
+        "residual_std": asset.residual_std.cpu(),
+        "feature_scale": asset.feature_scale.cpu(),
+        "prototype": asset.prototype.cpu(),
+        "observation_counts": asset.observation_counts.cpu(),
+        "principal_dim": int(asset.principal_dim),
+    }
+
+
+def asset_from_state_dict(
+    payload: dict[str, torch.Tensor | int], *, device: torch.device | str = "cpu"
+) -> TokenwisePCAOTAsset:
+    """Reconstruct and validate an asset saved by :func:`asset_state_dict`."""
+
+    asset = TokenwisePCAOTAsset(
+        mean=torch.as_tensor(payload["mean"], device=device),
+        components=torch.as_tensor(payload["components"], device=device),
+        residual_mean=torch.as_tensor(payload["residual_mean"], device=device),
+        residual_std=torch.as_tensor(payload["residual_std"], device=device),
+        feature_scale=torch.as_tensor(payload["feature_scale"], device=device),
+        prototype=torch.as_tensor(payload["prototype"], device=device),
+        observation_counts=torch.as_tensor(payload["observation_counts"], device=device),
+        principal_dim=int(payload["principal_dim"]),
+    )
+    asset.validate()
+    return asset
+
+
 def _fit_one_phase(
     values: torch.Tensor,
     mask: torch.Tensor,
