@@ -24,7 +24,6 @@ mkdir -p "$WORK" "$OUT"
 
 state() {
   printf '%s\n' "$1" > "$STATE_LOCAL"
-  cp "$STATE_LOCAL" "$OUT/pipeline_state.txt"
 }
 
 [[ -d "$CHECKPOINT" ]] || exit 2
