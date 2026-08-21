@@ -36,7 +36,7 @@ def main() -> None:
     sys.path[:0] = [str(root), str(args.xvla_root)]
     from models.modeling_xvla import XVLA
     from models.processing_xvla import XVLAProcessor
-    from rlinf.algorithms.vla_fail import PCAResidualStatistics, pca_residual_score
+    from tools.stackpyramid_pca_compat import PCAResidualStatistics, pca_residual_score
     from tools.collect_stackpyramid_xvla_dagger import _predict, _summary, register_stackpyramid_splits
     from tools.stackpyramid_task import stackpyramid_env_id
 

@@ -43,7 +43,7 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     sys.path[:0] = [str(root), str(args.xvla_root)]
     os.environ["STACKPYRAMID_OOD_GEOMETRY"] = "v4"
-    from rlinf.algorithms.vla_fail import PCAResidualStatistics, pca_residual_score
+    from tools.stackpyramid_pca_compat import PCAResidualStatistics, pca_residual_score
     from tools.collect_stackpyramid_xvla_dagger import _predict
     from tools.evaluate_stackpyramid_xvla import (
         bool_scalar,

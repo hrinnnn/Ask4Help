@@ -33,7 +33,7 @@ def main() -> None:
     sys.path[:0] = [str(root), str(args.xvla_root)]
     from models.modeling_xvla import XVLA
     from models.processing_xvla import XVLAProcessor
-    from rlinf.algorithms.vla_fail import fit_pca_residual_statistics
+    from tools.stackpyramid_pca_compat import fit_pca_residual_statistics
 
     device = torch.device("cuda")
     model = XVLA.from_pretrained(args.checkpoint, torch_dtype=torch.bfloat16).to(device).eval()
