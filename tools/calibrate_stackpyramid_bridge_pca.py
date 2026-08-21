@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -23,6 +24,9 @@ def main() -> None:
     parser.add_argument("--max-attempts", type=int, default=60)
     parser.add_argument("--start-seed", type=int, default=45000)
     parser.add_argument("--flow-steps", type=int, default=5)
+    parser.add_argument("--max-episode-steps", type=int, default=600)
+    parser.add_argument("--geometry", choices=("v1", "v2", "v3", "v4"), default="v4")
+    parser.add_argument("--fresh-env-per-episode", action="store_true")
     parser.add_argument("--sim-backend", choices=("gpu", "cpu"), default="cpu")
     parser.add_argument("--render-backend", choices=("gpu", "cpu"), default="cpu")
     args = parser.parse_args()
@@ -36,6 +40,7 @@ def main() -> None:
     from tools.collect_stackpyramid_xvla_dagger import _predict, _summary, register_stackpyramid_splits
     from tools.stackpyramid_task import stackpyramid_env_id
 
+    os.environ["STACKPYRAMID_OOD_GEOMETRY"] = args.geometry
     register_stackpyramid_splits()
     import gymnasium as gym
     import mani_skill.envs  # noqa: F401
@@ -45,18 +50,32 @@ def main() -> None:
     processor = XVLAProcessor.from_pretrained(args.checkpoint)
     payload = torch.load(args.asset, map_location="cpu", weights_only=False)
     stats = PCAResidualStatistics.from_state_dict(payload["statistics"])
-    env = gym.make(stackpyramid_env_id("id"), obs_mode="rgb+state", control_mode="pd_joint_pos", render_mode="rgb_array", sim_backend=args.sim_backend, render_backend=args.render_backend)
+    def make_env():
+        return gym.make(
+            stackpyramid_env_id("id"),
+            obs_mode="rgb+state",
+            control_mode="pd_joint_pos",
+            render_mode="rgb_array",
+            sim_backend=args.sim_backend,
+            render_backend=args.render_backend,
+            max_episode_steps=args.max_episode_steps,
+        )
+
+    env = make_env()
     maxima = []
     rows = []
     try:
         attempt = 0
         while attempt < args.max_attempts and len(maxima) < args.successful_rollouts:
+            if args.fresh_env_per_episode and attempt > 0:
+                env.close()
+                env = make_env()
             seed = args.start_seed + attempt
             raw_obs, _ = env.reset(seed=seed)
             values = []
             executed = 0
             success = False
-            while executed < 150 and not success:
+            while executed < args.max_episode_steps and not success:
                 generated, bridge, _inputs, _encoding = _predict(model, processor, raw_obs, device, seed + executed, args.flow_steps)
                 values.append(float(pca_residual_score(bridge.unsqueeze(1), stats)[0].item()))
                 for action in np.asarray(generated[:10], dtype=np.float32)[:5]:
@@ -90,6 +109,9 @@ def main() -> None:
         "successful_id_rollouts": sum(int(row["success"]) for row in rows),
         "successful_finite_rollouts": len(finite),
         "max_attempts": args.max_attempts,
+        "geometry": args.geometry,
+        "max_episode_steps": args.max_episode_steps,
+        "fresh_env_per_episode": args.fresh_env_per_episode,
         "threshold": float(threshold),
         "trajectory_maxima": maxima,
         "rows": rows,
