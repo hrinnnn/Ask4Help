@@ -85,7 +85,7 @@ def main() -> None:
     assets = fit_tokenwise_pca_ot(
         features,
         valid_mask,
-        principal_dim=min(args.principal_dim, features.shape[-1]),
+        principal_dim=min(args.principal_dim, features.shape[0] - 1, features.shape[-1] - 1),
         min_observations=4,
     )
     score_first = token_ot_score(features[:1], valid_mask[:1], assets[0], topk=min(4, features.shape[1]))

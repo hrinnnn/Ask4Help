@@ -125,8 +125,8 @@ def _fit_one_phase(
         raise ValueError("valid_mask must have shape [observations, tokens]")
     if principal_dim < 1 or principal_dim > hidden_dim:
         raise ValueError("principal_dim must lie within hidden_dim")
-    if min_observations < principal_dim + 1:
-        raise ValueError("min_observations must exceed principal_dim")
+    if min_observations < 2:
+        raise ValueError("min_observations must be at least two")
     values = values.float()
     mask = mask.bool()
     counts = mask.sum(dim=0, dtype=torch.int64)
