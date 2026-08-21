@@ -13,7 +13,12 @@ from torch.utils.data import DataLoader
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tools.xvla_tokenwise_ot import asset_state_dict, fit_tokenwise_pca_ot, token_ot_score
+from tools.xvla_tokenwise_ot import (
+    asset_state_dict,
+    fit_tokenwise_pca_ot,
+    select_monotonic_phase,
+    token_ot_score,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=2)
     parser.add_argument("--view-index", type=int, default=0)
     parser.add_argument("--principal-dim", type=int, default=8)
+    parser.add_argument("--phase-count", type=int, default=1)
     parser.add_argument("--device", default="cuda")
     return parser.parse_args()
 
@@ -36,6 +42,8 @@ def main() -> None:
         raise FileExistsError(f"refusing to overwrite {args.output}")
     if args.max_observations < 4 or args.batch_size < 1:
         raise ValueError("smoke requires at least four observations and a positive batch size")
+    if args.phase_count < 1:
+        raise ValueError("phase-count must be positive")
 
     sys.path.insert(0, str(args.xvla_root.resolve()))
     from datasets.dataset import InfiniteDataReader
@@ -45,6 +53,15 @@ def main() -> None:
     registry._REGISTRY.setdefault("panda_airplane", panda_airplane.PandaAirplaneHandler)
     from models.modeling_xvla import XVLA
     from models.processing_xvla import XVLAProcessor
+
+    metadata_payload = json.loads(args.metadata.read_text(encoding="utf-8"))
+    phase_stream: list[int] = []
+    for item in metadata_payload.get("datalist", []):
+        length = int(item["length"])
+        phase_stream.extend(
+            min(args.phase_count - 1, int(frame * args.phase_count / max(length, 1)))
+            for frame in range(length)
+        )
 
     device = torch.device(args.device)
     model = XVLA.from_pretrained(args.checkpoint, torch_dtype=torch.bfloat16).to(device).eval()
@@ -58,6 +75,7 @@ def main() -> None:
     )
     loader = DataLoader(dataset, batch_size=args.batch_size, num_workers=0)
     token_parts: list[torch.Tensor] = []
+    phase_parts: list[torch.Tensor] = []
     observations = 0
     token_count = None
     with torch.inference_mode(), torch.autocast(device_type=device.type, dtype=torch.bfloat16):
@@ -76,20 +94,40 @@ def main() -> None:
             if int(image_tokens.shape[1]) != token_count:
                 raise RuntimeError("image token count changed across StackCube observations")
             token_parts.append(image_tokens.float().cpu())
+            start = observations
+            stop = start + int(image_tokens.shape[0])
+            if stop > len(phase_stream):
+                raise RuntimeError(
+                    f"metadata phase stream ended at {len(phase_stream)} before observation {stop}"
+                )
+            phase_parts.append(torch.tensor(phase_stream[start:stop], dtype=torch.long))
             observations += int(image_tokens.shape[0])
             if observations >= args.max_observations:
                 break
 
     features = torch.cat(token_parts, dim=0)[: args.max_observations]
+    phase_ids = torch.cat(phase_parts, dim=0)[: args.max_observations]
     valid_mask = torch.ones(features.shape[:2], dtype=torch.bool)
     assets = fit_tokenwise_pca_ot(
         features,
         valid_mask,
+        phase_ids=phase_ids,
         principal_dim=min(args.principal_dim, features.shape[0] - 1, features.shape[-1] - 1),
         min_observations=4,
     )
-    score_first = token_ot_score(features[:1], valid_mask[:1], assets[0], topk=min(4, features.shape[1]))
-    score_last = token_ot_score(features[-1:], valid_mask[-1:], assets[0], topk=min(4, features.shape[1]))
+    first_phase, score_first = select_monotonic_phase(
+        features[:1],
+        valid_mask[:1],
+        assets,
+        topk=min(4, features.shape[1]),
+    )
+    last_phase, score_last = select_monotonic_phase(
+        features[-1:],
+        valid_mask[-1:],
+        assets,
+        previous_phase=first_phase,
+        topk=min(4, features.shape[1]),
+    )
     result = {
         "format": "xvla_stackcube_tokenwise_ot_smoke_v1",
         "checkpoint": str(args.checkpoint),
@@ -98,8 +136,19 @@ def main() -> None:
         "observations": int(features.shape[0]),
         "token_count": int(features.shape[1]),
         "hidden_dim": int(features.shape[2]),
+        "phase_count": len(assets),
+        "phase_ids_seen": sorted(set(int(value) for value in phase_ids.tolist())),
         "finite_features": bool(torch.isfinite(features).all()),
-        "finite_asset": bool(all(torch.isfinite(value).all() for value in asset_state_dict(assets[0]).values() if isinstance(value, torch.Tensor))),
+        "finite_asset": bool(
+            all(
+                torch.isfinite(value).all()
+                for asset in assets
+                for value in asset_state_dict(asset).values()
+                if isinstance(value, torch.Tensor)
+            )
+        ),
+        "first_selected_phase": int(first_phase),
+        "last_selected_phase": int(last_phase),
         "first_ot_cost": float(score_first["ot_cost"][0].item()),
         "last_ot_cost": float(score_last["ot_cost"][0].item()),
         "first_aligned_topk_cost": float(score_first["aligned_topk_cost"][0].item()),
@@ -112,7 +161,7 @@ def main() -> None:
             "checkpoint": str(args.checkpoint),
             "metadata": str(args.metadata),
             "view_index": args.view_index,
-            "asset": asset_state_dict(assets[0]),
+            "assets": [asset_state_dict(asset) for asset in assets],
         },
         args.output / "tokenwise_ot_asset.pt",
     )

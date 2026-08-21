@@ -339,6 +339,7 @@ def select_monotonic_phase(
     lookahead: int | None = None,
     epsilon: float = 0.05,
     iterations: int = 50,
+    topk: int = 1,
 ) -> tuple[int, dict[str, torch.Tensor]]:
     """Select the lowest-cost phase within a monotonic candidate window."""
 
@@ -352,7 +353,17 @@ def select_monotonic_phase(
     if start >= stop:
         raise ValueError("phase candidate window is empty")
     candidates = [
-        (phase, token_ot_score(query, valid_mask, assets[phase], epsilon=epsilon, iterations=iterations))
+        (
+            phase,
+            token_ot_score(
+                query,
+                valid_mask,
+                assets[phase],
+                epsilon=epsilon,
+                iterations=iterations,
+                topk=topk,
+            ),
+        )
         for phase in range(start, stop)
     ]
     selected_phase, selected_scores = min(
