@@ -370,3 +370,73 @@ def select_monotonic_phase(
         candidates, key=lambda item: float(item[1]["ot_cost"].mean().item())
     )
     return selected_phase, dict(selected_scores)
+
+
+def select_monotonic_multiview_phase(
+    queries: Sequence[torch.Tensor],
+    valid_masks: Sequence[torch.Tensor],
+    assets_by_view: Sequence[Sequence[TokenwisePCAOTAsset]],
+    *,
+    previous_phase: int | None = None,
+    backtrack: int = 0,
+    lookahead: int | None = None,
+    view_weights: Sequence[float] | None = None,
+    epsilon: float = 0.05,
+    iterations: int = 50,
+    topk: int = 1,
+) -> tuple[int, dict[str, object]]:
+    """Select one monotonic phase jointly from multiple camera token sets."""
+
+    if not queries or len(queries) != len(valid_masks) or len(queries) != len(assets_by_view):
+        raise ValueError("queries, valid_masks, and assets_by_view must have equal non-zero length")
+    phase_count = len(assets_by_view[0])
+    if phase_count < 1 or any(len(assets) != phase_count for assets in assets_by_view):
+        raise ValueError("all views must provide the same non-empty phase asset list")
+    if view_weights is None:
+        weights = [1.0] * len(queries)
+    else:
+        if len(view_weights) != len(queries) or any(float(weight) < 0 for weight in view_weights):
+            raise ValueError("view_weights must be non-negative and match the number of views")
+        weights = [float(weight) for weight in view_weights]
+    if sum(weights) <= 0:
+        raise ValueError("view_weights must have a positive sum")
+    weight_tensor = torch.tensor(weights, dtype=torch.float32)
+
+    if previous_phase is None:
+        start = 0
+    else:
+        start = max(0, int(previous_phase) - int(backtrack))
+    stop = phase_count if lookahead is None else min(phase_count, start + int(lookahead) + 1)
+    if start >= stop:
+        raise ValueError("phase candidate window is empty")
+
+    candidates: list[tuple[int, list[dict[str, torch.Tensor]]]] = []
+    for phase in range(start, stop):
+        view_scores = [
+            token_ot_score(
+                query,
+                valid_mask,
+                assets_by_view[view][phase],
+                epsilon=epsilon,
+                iterations=iterations,
+                topk=topk,
+            )
+            for view, (query, valid_mask) in enumerate(zip(queries, valid_masks))
+        ]
+        candidates.append((phase, view_scores))
+
+    def aggregate(view_scores: Sequence[dict[str, torch.Tensor]], key: str) -> torch.Tensor:
+        values = torch.stack([score[key].float() for score in view_scores])
+        normalized_weights = weight_tensor.to(values.device) / weight_tensor.sum()
+        return (values * normalized_weights).sum(dim=0)
+
+    selected_phase, selected_views = min(
+        candidates,
+        key=lambda item: float(aggregate(item[1], "ot_cost").mean().item()),
+    )
+    return selected_phase, {
+        "ot_cost": aggregate(selected_views, "ot_cost"),
+        "aligned_topk_cost": aggregate(selected_views, "aligned_topk_cost"),
+        "pca_topk_z": aggregate(selected_views, "pca_topk_z"),
+        "views": selected_views,
+    }

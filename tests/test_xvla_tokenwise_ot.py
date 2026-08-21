@@ -4,6 +4,7 @@ import torch
 
 from tools.xvla_tokenwise_ot import (
     fit_tokenwise_pca_ot,
+    select_monotonic_multiview_phase,
     select_monotonic_phase,
     token_ot_score,
 )
@@ -64,3 +65,16 @@ def test_phase_selection_can_move_forward_but_not_jump_back() -> None:
     assert phase == 1
     phase, _scores = select_monotonic_phase(features[0:1], mask[0:1], assets, previous_phase=1, backtrack=0)
     assert phase == 1
+
+
+def test_multiview_phase_selection_aggregates_views() -> None:
+    features, mask, phases = _phase_features()
+    assets = fit_tokenwise_pca_ot(features, mask, phase_ids=phases, principal_dim=2, min_observations=4)
+    phase, scores = select_monotonic_multiview_phase(
+        [features[9:10], features[9:10] + 0.01],
+        [mask[9:10], mask[9:10]],
+        [assets, assets],
+        topk=2,
+    )
+    assert phase == 1
+    assert torch.isfinite(scores["ot_cost"]).all()
