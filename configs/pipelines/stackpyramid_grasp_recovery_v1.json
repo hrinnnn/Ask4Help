@@ -4,7 +4,7 @@
   "authorized": true,
   "owner_thread": "019ff58e-8e47-7ca3-a028-07a2705e2c28",
   "server": "root@39.101.70.188:1012",
-  "current_stage": "needs_user_decision",
+  "current_stage": "recovery_training_authorized",
   "next_stage": "recovery_training",
   "controller_pid_file": "/root/ask4help_stage2_logs/stackpyramid_grasp_recovery_v1_controller.pid",
   "controller_pid": null,
@@ -61,6 +61,12 @@
     }
   },
   "exposure_proposal": "docs/experiment_management/proposals/StackPyramid_Grasp_Recovery_Exposure_Proposal.json",
+  "user_approval": {
+    "approved_at": "2026-08-21",
+    "initialization": "/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-40000",
+    "additional_optimizer_steps": 50000,
+    "keep_existing_recovery_contract": true
+  },
   "decision_summary": "docs/experiment_management/proposals/StackPyramid_Grasp_Recovery_Exposure_Decision_Summary.md",
   "forbidden_before_id_gate": ["ood", "pca", "timing", "two_way_gate"],
   "terminal_markers": ["PIPELINE_COMPLETE", "NEEDS_USER_DECISION", "ID_BASE_NOT_ACCEPTED"]

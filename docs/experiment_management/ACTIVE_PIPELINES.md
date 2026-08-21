@@ -10,14 +10,14 @@
 - `authorized`: `true`
 - `owner_thread`: `019fdb64-2df4-7a53-9a66-7a5c9b9fe97a`
 - `server`: `zhaozhixuan@111.198.58.150:12001`
-- `current_stage`: `dataset_manifest_audit`
-- `next_stage`: `controller_smoke`
-- `controller`: `not_created`
-- `pipeline_state`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v1/pipeline_state.json`
-- `design_root`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v1/`
+- `current_stage`: `waiting_for_idle_gpus` (CPU adapter dataset complete)
+- `next_stage`: `controller_smoke` (then automatic 50k adaptation)
+- `controller`: remote PID `1066744`
+- `pipeline_state`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v2/pipeline_state.json`
+- `design_root`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v2/`
 - `foundation`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_airplane_v1/model_cache/X-VLA-Pt-local`
 - `domain_id`: `19` (audited unused; no domain table resize)
-- `data_root`: `/sdd/ask4help-open-drawer/results/open_drawer_canonical_id_recovery_v3/`
+- `data_root`: `/sdd/ask4help-open-drawer/results/xvla_opendrawer_foundation_adaptation_v2/dataset/xvla_id_512_adapter_space/` (512 episodes, 91,533 frames; CPU adapter complete)
 - `plan`: `docs/experiment_management/plans/OpenDrawer_XVLA_Foundation_Adaptation.md`
 - `manifest`: `configs/pipelines/open_drawer_xvla_foundation_v1.json`
 - `completion`: X-VLA 50k adaptation、checkpoint selection、独立100-ID gate与证据注册完成并写 `PIPELINE_COMPLETE`
@@ -41,9 +41,9 @@
 - `authorized`: `true`
 - `owner_thread`: `019ff58e-8e47-7ca3-a028-07a2705e2c28`
 - `server`: `root@39.101.70.188:1012`
-- `current_stage`: `needs_user_decision`
+- `current_stage`: `recovery_training_authorized`
 - `next_stage`: `recovery_training`
-- `controller`: stopped after collection audit; no training process
+- `controller`: Owner must start/recover a restart-tolerant training controller on H20
 - `pipeline_state`: `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/grasp_recovery_v1/pipeline_state.json`
 - `baseline_checkpoint`: `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/continuation_50k_from_ckpt10000_lr1e-4_retry1/training/ckpt-40000`
 - `baseline_formal`: `/mnt/data/ask4help/results/xvla_stackpyramid_oracle_repair_v3/final_checkpoint_formal_id_gate_100_retry3/`
@@ -53,7 +53,7 @@
 
 Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift `51/100`，证据100/100完整。该 checkpoint 是 recovery baseline，不是已接受 ID base。
 
-已完成 baseline failure audit、horizon-450 diagnostic `20/20`（strict `11/20`）和 adapter/gripper audit。ID-only recovery collection 与 audit 已通过：`128/128` accepted、`33,293` anchors、`1,152` tail anchors、`128/128` 视频可解码。训练配置尚未批准，当前停在 `needs_user_decision`；proposal 和一页决策摘要位于 `docs/experiment_management/proposals/`。
+已完成 baseline failure audit、horizon-450 diagnostic `20/20`（strict `11/20`）和 adapter/gripper audit。ID-only recovery collection 与 audit 已通过：`128/128` accepted、`33,293` anchors、`1,152` tail anchors、`128/128` 视频可解码。用户已于 2026-08-21 批准从 `ckpt-40000` 继续训练额外 `50,000` optimizer steps。沿用已审计的640条ID-only数据、80/20 source-balanced batches、`lr=1e-4`、soft-prompt coefficient `0.1`、`bf16`、batch 8、冻结norm/adapter/formal contract；原proposal中的20k暴露长度由本次用户明确授权覆盖。
 
 当前推进顺序：
 
@@ -61,7 +61,7 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 2. 同 checkpoint 做独立20条 `450`-step diagnostic，正式300-step协议不变；
 3. 审计 8D/20D adapter、gripper sign、normalization、chunk execution；
 4. 若确认数据覆盖不足，新增128--256条同ID pre-grasp/contact/close/lift demonstrations；
-5. 等待 exposure proposal 批准后，从 `ckpt-40000` 建立独立 recovery branch，checkpoint/retry不覆盖 baseline；
+5. 已批准从 `ckpt-40000` 建立独立 recovery branch，额外训练50k，checkpoint/retry不覆盖 baseline；
 6. 固定20-ID selection和独立100-ID gate；
 7. `>=80/100` 后才允许进入下游，失败则写科学停止 marker。
 

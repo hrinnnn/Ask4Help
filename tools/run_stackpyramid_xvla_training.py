@@ -56,6 +56,7 @@ class Episode:
     wrist_rgb: np.ndarray
     state: np.ndarray
     actions: np.ndarray
+    source: str
 
 
 class StackPyramidH5Dataset(Dataset):
@@ -92,6 +93,10 @@ class StackPyramidH5Dataset(Dataset):
                     key=_numeric_group_key,
                 )
                 for group_name in groups:
+                    if "merged_640_external_links" in str(h5_path):
+                        source = "recovery128" if int(group_name.rsplit("_", 1)[1]) >= 512 else "existing512"
+                    else:
+                        source = "recovery128" if "recovery" in str(h5_path).lower() else "existing512"
                     group = handle[group_name]
                     base = np.asarray(group["obs/sensor_data/base_camera/rgb"], dtype=np.uint8)
                     wrist = np.asarray(group["obs/sensor_data/hand_camera/rgb"], dtype=np.uint8)
@@ -116,6 +121,7 @@ class StackPyramidH5Dataset(Dataset):
                             wrist_rgb=wrist,
                             state=state,
                             actions=actions,
+                            source=source,
                         )
                     )
                     if target_episodes is not None and len(episodes) >= target_episodes:
@@ -129,6 +135,9 @@ class StackPyramidH5Dataset(Dataset):
             raise ValueError(f"{split}: no episodes")
         self.episodes = episodes
         self.entries = [(episode_index, anchor) for episode_index, episode in enumerate(episodes) for anchor in range(len(episode.actions))]
+        self.source_entries = {"existing512": [], "recovery128": []}
+        for entry_index, (episode_index, _anchor) in enumerate(self.entries):
+            self.source_entries[episodes[episode_index].source].append(entry_index)
         self.report = self._build_report()
 
     def _build_report(self) -> dict[str, Any]:
@@ -149,6 +158,11 @@ class StackPyramidH5Dataset(Dataset):
             "action_horizon": self.horizon,
             "real_action_dim": REAL_ACTION_DIM,
             "model_action_dim": MODEL_ACTION_DIM,
+            "source_anchor_counts": {name: len(indices) for name, indices in self.source_entries.items()},
+            "source_episode_counts": {
+                name: sum(episode.source == name for episode in self.episodes)
+                for name in self.source_entries
+            },
         }
 
     def __len__(self) -> int:
@@ -167,6 +181,36 @@ class StackPyramidH5Dataset(Dataset):
             "actions": chunk.astype(np.float32),
             "action_valid_mask": mask,
         }
+
+
+class FixedSourceBatchSampler(torch.utils.data.Sampler[list[int]]):
+    """Yield exact 80/20 source-balanced batches with replacement."""
+
+    def __init__(self, source_entries, batch_size, existing_fraction, seed, batches):
+        if batch_size != 8:
+            raise ValueError("the registered 80/20 protocol requires batch_size=8")
+        existing_batch = int(round(batch_size * existing_fraction))
+        recovery_batch = batch_size - existing_batch
+        if existing_batch <= 0 or recovery_batch <= 0:
+            raise ValueError("both sources must contribute to every batch")
+        if not source_entries["existing512"] or not source_entries["recovery128"]:
+            raise ValueError("source-balanced training requires both source groups")
+        self.source_entries = source_entries
+        self.existing_batch = existing_batch
+        self.recovery_batch = recovery_batch
+        self.seed = seed
+        self.batches = batches
+
+    def __iter__(self):
+        rng = random.Random(self.seed)
+        for _ in range(self.batches):
+            batch = [rng.choice(self.source_entries["existing512"]) for _ in range(self.existing_batch)]
+            batch.extend(rng.choice(self.source_entries["recovery128"]) for _ in range(self.recovery_batch))
+            rng.shuffle(batch)
+            yield batch
+
+    def __len__(self):
+        return self.batches
 
 
 def collate_fn(batch: list[dict[str, Any]], processor: Any) -> dict[str, torch.Tensor]:
@@ -317,14 +361,30 @@ def run_training(args: argparse.Namespace) -> None:
         (args.output / "anchor_report.json").write_text(json.dumps(dataset.report, indent=2) + "\n", encoding="utf-8")
         (args.output / "training_config.json").write_text(json.dumps(vars(args), default=str, indent=2) + "\n", encoding="utf-8")
     model, processor = load_model(args.model, args.xvla_root, dtype=args.dtype)
-    loader = DataLoader(
-        dataset,
-        batch_size=args.batch_size,
-        shuffle=True,
-        num_workers=0,
-        collate_fn=lambda rows: collate_fn(rows, processor),
-        drop_last=False,
-    )
+    if args.source_balanced:
+        batches = max(1, math.ceil(len(dataset) / args.batch_size))
+        batch_sampler = FixedSourceBatchSampler(
+            dataset.source_entries,
+            args.batch_size,
+            args.existing_source_fraction,
+            args.seed,
+            batches,
+        )
+        loader = DataLoader(
+            dataset,
+            batch_sampler=batch_sampler,
+            num_workers=0,
+            collate_fn=lambda rows: collate_fn(rows, processor),
+        )
+    else:
+        loader = DataLoader(
+            dataset,
+            batch_size=args.batch_size,
+            shuffle=True,
+            num_workers=0,
+            collate_fn=lambda rows: collate_fn(rows, processor),
+            drop_last=False,
+        )
     optimizer = _make_optimizer(model, args.learning_rate, args.learning_coef, args.weight_decay)
     model, optimizer, loader = accelerator.prepare(model, optimizer, loader)
     model.train()
@@ -408,6 +468,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--steps", type=int, default=2)
     parser.add_argument("--save-interval", type=int, default=500)
     parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument("--source-balanced", action="store_true")
+    parser.add_argument("--existing-source-fraction", type=float, default=0.8)
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--learning-coef", type=float, default=0.1)
     parser.add_argument("--weight-decay", type=float, default=0.0)

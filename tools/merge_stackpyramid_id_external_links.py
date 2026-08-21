@@ -16,6 +16,7 @@ def main() -> None:
     parser.add_argument("--additional-h5", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--expected-episodes", type=int, default=512)
     args = parser.parse_args()
     if args.output_root.exists():
         raise FileExistsError(args.output_root)
@@ -32,16 +33,17 @@ def main() -> None:
                 for name in names:
                     destination[f"traj_{index:06d}"] = h5py.ExternalLink(str(source_path), name)
                     index += 1
-    if index != 512:
-        raise ValueError(f"expected 512 trajectories, found {index}")
+    if index != args.expected_episodes:
+        raise ValueError(f"expected {args.expected_episodes} trajectories, found {index}")
     provenance = {
-        "format": "stackpyramid_id_recovery_512_external_links_v1",
+        "format": "stackpyramid_id_external_links_v2",
         "geometry_version": "v4",
         "split": "id_only",
         "instruction": "stack the red cube next to the green cube and place the blue cube on top",
         "source_h5_paths": [str(path) for path in sources],
         "source_episode_counts": counts,
         "merged_episode_count": index,
+        "expected_episode_count": args.expected_episodes,
         "external_links": True,
         "manifest": str(args.manifest.resolve()),
         "ood_included": False,
