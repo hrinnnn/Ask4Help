@@ -14,6 +14,7 @@ ASSET_DURABLE="$OUT/bridge_pca.pt"
 CAL_LOCAL="$WORK/calibration.json"
 CAL_DURABLE="$OUT/calibration.json"
 LOG="/root/ask4help_stage2_logs/stackpyramid_failure_detection_pca_v1.log"
+STATE_LOCAL="$WORK/pipeline_state.txt"
 
 export CUDA_VISIBLE_DEVICES=0
 export PYTHONUNBUFFERED=1
@@ -21,12 +22,16 @@ export STACKPYRAMID_OOD_GEOMETRY=v4
 export PYTHONPATH="$ROOT:$ROOT/RLinf:$XVLA_ROOT:${PYTHONPATH:-}"
 mkdir -p "$WORK" "$OUT"
 
+state() {
+  printf '%s\n' "$1" > "$STATE_LOCAL"
+  cp "$STATE_LOCAL" "$OUT/pipeline_state.txt"
+}
+
 [[ -d "$CHECKPOINT" ]] || exit 2
 [[ -f "$ID_H5" ]] || exit 2
 
 if [[ ! -f "$ASSET_DURABLE" ]]; then
-  state=building_id_only_pca_asset
-  printf '%s\n' "$state" > "$OUT/pipeline_state.txt"
+  state building_id_only_pca_asset
   rm -f "$ASSET_LOCAL"
   "$PY" "$ROOT/tools/build_stackpyramid_bridge_pca.py" \
     --checkpoint "$CHECKPOINT" --xvla-root "$XVLA_ROOT" \
@@ -34,10 +39,12 @@ if [[ ! -f "$ASSET_DURABLE" ]]; then
     --output "$ASSET_LOCAL" --target-episodes 512 >> "$LOG" 2>&1
   cp "$ASSET_LOCAL" "$ASSET_DURABLE"
   cp "$ASSET_LOCAL.json" "$OUT/bridge_pca.json"
+else
+  [[ -f "$ASSET_LOCAL" ]] || cp "$ASSET_DURABLE" "$ASSET_LOCAL"
 fi
 
 if [[ ! -f "$CAL_DURABLE" ]]; then
-  printf '%s\n' calibrating_successful_id_threshold > "$OUT/pipeline_state.txt"
+  state calibrating_successful_id_threshold
   rm -f "$CAL_LOCAL"
   "$PY" "$ROOT/tools/calibrate_stackpyramid_bridge_pca.py" \
     --checkpoint "$CHECKPOINT" --xvla-root "$XVLA_ROOT" \
@@ -46,6 +53,8 @@ if [[ ! -f "$CAL_DURABLE" ]]; then
     --flow-steps 5 --max-episode-steps 600 --geometry v4 \
     --fresh-env-per-episode --sim-backend gpu --render-backend gpu >> "$LOG" 2>&1
   cp "$CAL_LOCAL" "$CAL_DURABLE"
+else
+  [[ -f "$CAL_LOCAL" ]] || cp "$CAL_DURABLE" "$CAL_LOCAL"
 fi
 
 THRESHOLD="$($PY -c 'import json,sys; print(json.load(open(sys.argv[1]))["threshold"])' "$CAL_LOCAL")"
@@ -55,7 +64,7 @@ run_condition() {
   local local_out="$WORK/$name" durable_out="$OUT/$name"
   if [[ -f "$durable_out/EVAL_COMPLETE" ]]; then return 0; fi
   rm -rf "$local_out" "$durable_out"
-  printf '%s\n' "${name}_running" > "$OUT/pipeline_state.txt"
+  state "${name}_running"
   "$PY" "$ROOT/tools/evaluate_stackpyramid_pca_failure_detection.py" \
     --checkpoint "$CHECKPOINT" --xvla-root "$XVLA_ROOT" \
     --asset "$ASSET_LOCAL" --threshold "$THRESHOLD" --output "$local_out" \
@@ -95,7 +104,7 @@ run_condition stage2_ood stage2_ood 892100
 run_condition stage3_id id 893100
 run_condition stage3_ood stage3_ood 893100
 
-printf '%s\n' summarizing_passive_failure_detection > "$OUT/pipeline_state.txt"
+state summarizing_passive_failure_detection
 "$PY" - "$OUT" <<'PY'
 import json
 import sys
@@ -134,5 +143,6 @@ for stage in ("stage2", "stage3"):
 (root / "failure_detection_metrics.json").write_text(json.dumps(report, indent=2) + "\n")
 (root / "PASSIVE_FAILURE_DETECTION_ONLY").write_text("no expert intervention; no training; no PCA collection\n")
 (root / "FAILURE_DETECTION_COMPLETE").write_text("complete\n")
-(root / "pipeline_state.txt").write_text("complete\n")
+Path("/tmp/stackpyramid_failure_detection_pca_v1_complete_state").write_text("complete\n")
 PY
+cp /tmp/stackpyramid_failure_detection_pca_v1_complete_state "$OUT/pipeline_state.txt" 2>/dev/null || true
