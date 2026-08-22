@@ -12,7 +12,7 @@
 - `server`: `zhaozhixuan@111.198.58.150:12001`
 - `current_stage`: `training_retry_v9_sdd_disk_safe` (v1 Ray socket; v2/v3 multi-GPU illegal-memory; v4 DCP-load; v5 controller-path; v6 step-offset; v7 disk-capacity; v8 smoke migration; v9 dual-GPU FSDP diagnostics retained)
 - `next_stage`: continue the already-passed smoke-backed training to cumulative `global_step_20000`, then checkpoint audit, checkpoint selection, and independent ID gate
-- `controller`: v9 PID `1153921`; training PID `1153937`; checkpoint watcher PID `1820718`; repaired post-training controller PID `2124796`; state enricher PID `2133260`; last observed native additional step `1910/10000` at `2026-08-22T21:36+08:00`, cumulative `11910/20000`, loss `0.0224`, valid-action-ratio `0.952`, marker `TRAINING_IN_PROGRESS`, next stage `native_2500_checkpoint_audit`; first formal checkpoint expected at `/sdd/ask4help-open-drawer/results/open_drawer_pi05_resume_from10000_v9/training/pi05_weights_from10000_to20000/pi05_weights_from10000_to20000/checkpoints/global_step_2500`
+- `controller`: v9 PID `1153921`; training PID `1153937`; checkpoint watcher PID `1820718`; repaired post-training controller PID `2124796`; state enricher PID `2133260`; last observed native additional step `2797/10000` at `2026-08-23T00:22+08:00`, cumulative `12797/20000`, loss `0.024`, valid-action-ratio `0.97`, marker `TRAINING_IN_PROGRESS`; `global_step_2500` checkpoint is present and under audit; next formal checkpoint is native `5000`; first checkpoint path `/sdd/ask4help-open-drawer/results/open_drawer_pi05_resume_from10000_v9/training/pi05_weights_from10000_to20000/pi05_weights_from10000_to20000/checkpoints/global_step_2500`
 - `run_root`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_resume_from10000_v9/`
 - `retry_diagnostic`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_resume_from10000_v1/ENGINEERING_RAY_SOCKET_PATH_DIAGNOSTIC`
 - `ray_tmp_root`: `/sdd/od_pi05_10k_v9`
@@ -118,3 +118,5 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 ## Heartbeat Watchdog Rule
 
 Heartbeat 每次只做：读取本文件、读取两个 manifest、核对实际 PID/controller/marker/progress。如果 `authorized=true` 且 `next_stage` 非空，但没有健康进程或完成 marker，必须唤醒 Owner 启动/修复，不得返回“无变化”。
+
+对已授权的完整 pipeline，Heartbeat/Owner 必须持续监测并推进到 `PIPELINE_COMPLETE`、预注册科学停止、`NEEDS_USER_DECISION` 或用户明确暂停；不得因为设计、smoke、Oracle、collection、checkpoint、partial evaluation 或任一中间阶段完成就停止。用户要求“持续完成这个任务，直到完成目标”时，该要求属于本 pipeline 的持续监督契约。
