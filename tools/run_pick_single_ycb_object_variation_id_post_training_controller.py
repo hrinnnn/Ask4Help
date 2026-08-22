@@ -124,7 +124,7 @@ def run_eval(checkpoint: Path, output: Path, episodes: int, seed: int) -> None:
     ]
     log = output.parent / f"{output.name}.log"
     with log.open("w", encoding="utf-8") as stream:
-        subprocess.run(
+        result = subprocess.run(
             ["taskset", "-c", "0-19", *command],
             env=env,
             stdout=stream,
@@ -133,6 +133,18 @@ def run_eval(checkpoint: Path, output: Path, episodes: int, seed: int) -> None:
         )
     if not evidence_complete(output, episodes):
         raise RuntimeError(f"incomplete evaluation evidence: {output}")
+    if result.returncode != 0:
+        (output / "SIMULATOR_EXIT_AFTER_ARTIFACTS").write_text(
+            json.dumps(
+                {
+                    "returncode": result.returncode,
+                    "accepted_because": "summary and complete video denominator are present",
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
 
 
 def main() -> None:
