@@ -268,6 +268,42 @@ def main() -> None:
     state(current_stage="four_method_collection", next_stage="four_dataset_audit")
     collections = RUN / "collections_v1"
     datasets = RUN / "datasets"
+    path_manifest = RUN / "audit/collection_paths_v1.json"
+    if path_manifest.is_file():
+        collection_paths = json.loads(path_manifest.read_text(encoding="utf-8"))["methods"]
+    else:
+        collection_paths = {}
+        for method in methods:
+            base_collection = collections / method
+            base_dataset = datasets / f"{method}_v1"
+            if (base_collection / "COLLECTION_COMPLETE").is_file() and base_dataset.is_dir():
+                collection_dir, dataset_dir = base_collection, base_dataset
+            elif base_collection.exists() or base_dataset.exists():
+                retry = 1
+                while True:
+                    collection_dir = collections / f"{method}_retry{retry}"
+                    dataset_dir = datasets / f"{method}_v1_retry{retry}"
+                    if not collection_dir.exists() and not dataset_dir.exists():
+                        break
+                    retry += 1
+            else:
+                collection_dir, dataset_dir = base_collection, base_dataset
+            collection_paths[method] = {
+                "collection_dir": str(collection_dir),
+                "dataset_dir": str(dataset_dir),
+            }
+        path_manifest.parent.mkdir(parents=True, exist_ok=True)
+        path_manifest.write_text(
+            json.dumps(
+                {
+                    "format": "pick_single_ycb_object_variation_collection_paths_v1",
+                    "methods": collection_paths,
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     collection_gpus = select_idle_gpus(4)
     method_gpus = dict(zip(methods, collection_gpus))
     method_commands = [
@@ -278,13 +314,17 @@ def main() -> None:
     ]
     commands = []
     for method, gpu, extras in method_commands:
-        out = collections / method
-        repo = datasets / f"{method}_v1"
+        out = Path(collection_paths[method]["collection_dir"])
+        repo = Path(collection_paths[method]["dataset_dir"])
         common = [str(PY), str(ROOT / "tools/collect_pick_single_ycb_object_variation_gated.py"), "--method", method, "--output-dir", str(out), "--repo-id", str(repo), "--target-expert-trajectories", "100", "--max-attempts", "600", "--id-seed", "16000", "--ood-seed", "16001"]
         if method != "offline_oracle":
             common += ["--checkpoint", str(checkpoint), "--pi05-base", str(MODEL_BASE), "--norm-stats", str(norm)]
         commands.append((common + extras, RUN / "logs" / f"collect_{method}.log", gpu))
-    missing_collection = [item for item in method_commands if not (collections / item[0] / "COLLECTION_COMPLETE").is_file()]
+    missing_collection = [
+        item
+        for item in method_commands
+        if not (Path(collection_paths[item[0]]["collection_dir"]) / "COLLECTION_COMPLETE").is_file()
+    ]
     if missing_collection:
         run_parallel(
             [command for command in commands if command[0][command[0].index("--method") + 1] in {item[0] for item in missing_collection}]
@@ -299,6 +339,7 @@ def main() -> None:
                 str(ROOT / "tools/audit_pick_single_ycb_object_variation_gated_collection.py"),
                 "--collections-root", str(collections),
                 "--datasets-root", str(datasets),
+                "--paths-manifest", str(path_manifest),
                 "--output", str(collection_audit),
                 "--expected", "100",
             ],
@@ -316,7 +357,7 @@ def main() -> None:
                 str(ROOT / "tools/prepare_pick_single_ycb_object_variation_matched_budget.py"),
                 "--output-root", str(budget_root),
                 "--expert-action-cap", "12000",
-                *sum(([f"--{method.replace('_', '-')}", str(datasets / f"{method}_v1")] for method in methods), []),
+                *sum(([f"--{method.replace('_', '-')}", str(Path(collection_paths[method]["dataset_dir"]))] for method in methods), []),
             ],
             log=RUN / "logs/matched_budget_selection.log",
         )

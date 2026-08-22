@@ -57,6 +57,7 @@ def audit_method(method: str, collection: Path, dataset: Path, expected: int) ->
         }
     )
     action_steps = [int(row.get("expert_action_steps", 0)) for row in accepted]
+    dataset_action_total = sum(int(row["length"]) for row in episodes)
     all_videos_readable = all(video_is_readable(path) for path in raw_videos + accepted_videos)
     passed = (
         (collection / "COLLECTION_COMPLETE").is_file()
@@ -66,7 +67,8 @@ def audit_method(method: str, collection: Path, dataset: Path, expected: int) ->
         and len(accepted_videos) == expected
         and len(raw_videos) == len(attempts)
         and all(bool(row.get("success")) and steps > 0 for row, steps in zip(accepted, action_steps))
-        and int(info.get("total_frames", -1)) == sum(int(row["length"]) for row in episodes)
+        and int(info.get("total_frames", -1)) == dataset_action_total
+        and dataset_action_total == sum(action_steps)
         and all_videos_readable
         and (method == "offline_oracle" or alternating)
         and (method != "offline_oracle" or split_counts == {"id": 0, "ood": expected})
@@ -82,7 +84,8 @@ def audit_method(method: str, collection: Path, dataset: Path, expected: int) ->
         "accepted_id_ood": split_counts,
         "dataset_episodes": len(episodes),
         "dataset_total_frames": int(info.get("total_frames", -1)),
-        "dataset_episode_frame_sum": sum(int(row["length"]) for row in episodes),
+        "dataset_episode_frame_sum": dataset_action_total,
+        "accepted_metadata_expert_action_steps": sum(action_steps),
         "accepted_expert_action_steps": sum(action_steps),
         "expert_action_min": min(action_steps) if action_steps else 0,
         "expert_action_max": max(action_steps) if action_steps else 0,
@@ -99,19 +102,20 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--collections-root", type=Path, required=True)
     parser.add_argument("--datasets-root", type=Path, required=True)
+    parser.add_argument("--paths-manifest", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--expected", type=int, default=100)
     args = parser.parse_args()
 
-    reports = {
-        method: audit_method(
-            method,
-            args.collections_root / method,
-            args.datasets_root / f"{method}_v1",
-            args.expected,
-        )
-        for method in METHODS
-    }
+    paths = {}
+    if args.paths_manifest and args.paths_manifest.is_file():
+        payload = json.loads(args.paths_manifest.read_text(encoding="utf-8"))
+        paths = payload.get("methods", {})
+    reports = {}
+    for method in METHODS:
+        collection = Path(paths.get(method, {}).get("collection_dir", args.collections_root / method))
+        dataset = Path(paths.get(method, {}).get("dataset_dir", args.datasets_root / f"{method}_v1"))
+        reports[method] = audit_method(method, collection, dataset, args.expected)
     payload = {
         "format": "pick_single_ycb_object_variation_gated_collection_audit_v1",
         "expected_accepted_episodes_per_method": args.expected,
