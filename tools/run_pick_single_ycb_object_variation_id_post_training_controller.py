@@ -104,8 +104,24 @@ def main() -> None:
     run_eval(Path(selected["checkpoint"]), formal, 100, 50000)
     summary = json.loads((formal / "summary.json").read_text())
     if summary["successes"] < 80:
-        (RUN / "ID_BASE_NOT_ACCEPTED").write_text(json.dumps({"selected": selected, "formal_summary": summary}, indent=2) + "\n", encoding="utf-8")
-        write_state(current_stage="id_base_not_accepted", next_stage="needs_user_decision_or_scientific_recovery", terminal_marker="ID_BASE_NOT_ACCEPTED")
+        payload = {"selected": selected, "formal_summary": summary}
+        (RUN / "ID_BASE_NOT_ACCEPTED").write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        (RUN / "NEEDS_USER_DECISION").write_text(
+            json.dumps(
+                {
+                    "reason": "selected ID policy did not meet the predeclared 80/100 strict-success gate",
+                    "evidence": payload,
+                    "allowed_next_decisions": [
+                        "inspect the failure evidence and approve a new scientifically declared ID recovery",
+                        "stop the object-variation pipeline without downstream claims",
+                    ],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        write_state(current_stage="id_base_not_accepted", next_stage="needs_user_decision_or_scientific_recovery", terminal_marker="NEEDS_USER_DECISION")
         return
     (RUN / "ID_BASE_VALIDATED").write_text(json.dumps({"selected": selected, "formal_summary": summary}, indent=2) + "\n", encoding="utf-8")
     write_state(current_stage="id_base_validated", next_stage="passive_failure_detection", terminal_marker="ID_BASE_VALIDATED")
@@ -113,4 +129,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
