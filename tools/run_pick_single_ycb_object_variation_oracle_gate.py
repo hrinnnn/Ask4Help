@@ -25,6 +25,12 @@ from toolkits.lerobot.diagnose_pick_single_ycb_object_variation_oracle import (
 )
 
 
+def frame_to_numpy(frame):
+    if hasattr(frame, "detach"):
+        frame = frame.detach().cpu().numpy()
+    return frame
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--split", choices=("id", "ood"), required=True)
@@ -65,12 +71,12 @@ def main() -> None:
             def reset_hook(*reset_args, **reset_kwargs):
                 frames.clear()
                 result = original_reset(*reset_args, **reset_kwargs)
-                frames.append(env.render())
+                frames.append(frame_to_numpy(env.render()))
                 return result
 
             def step_hook(action, *step_args, **step_kwargs):
                 result = original_step(action, *step_args, **step_kwargs)
-                frames.append(env.render())
+                frames.append(frame_to_numpy(env.render()))
                 return result
 
             env.reset = reset_hook  # type: ignore[method-assign]
