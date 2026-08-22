@@ -29,6 +29,9 @@ def state(**updates: object) -> None:
 def env_for(gpu: int | None = None) -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = f"{OVERLAY}:{ROOT}:{ROOT / 'RLinf'}"
+    env["OMP_NUM_THREADS"] = "20"
+    env["MKL_NUM_THREADS"] = "20"
+    env["TOKENIZERS_PARALLELISM"] = "false"
     if gpu is not None:
         env["CUDA_VISIBLE_DEVICES"] = str(gpu)
         env["ASK4HELP_RLINF_PLACEMENT"] = f"{gpu}-{gpu}"
@@ -38,7 +41,13 @@ def env_for(gpu: int | None = None) -> dict[str, str]:
 def run(command: list[str], *, log: Path, gpu: int | None = None, check: bool = True) -> int:
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("w", encoding="utf-8") as stream:
-        result = subprocess.run(command, env=env_for(gpu), stdout=stream, stderr=subprocess.STDOUT, check=False)
+        result = subprocess.run(
+            ["taskset", "-c", ",".join(str(cpu) for cpu in cpu_sets(1)[0]), *command],
+            env=env_for(gpu),
+            stdout=stream,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
     if check and result.returncode != 0:
         raise RuntimeError(f"stage failed rc={result.returncode}: {' '.join(command)}")
     return result.returncode
@@ -83,15 +92,27 @@ def run_parallel(commands: list[tuple], allowed_returncodes: set[int] | None = N
     gpus = [item[2] for item in commands]
     if len(gpus) != len(set(gpus)):
         raise RuntimeError(f"parallel stage reuses a GPU: {gpus}")
+    cpu_allocations = cpu_sets(len(commands))
     processes = []
-    for item in commands:
+    for index, item in enumerate(commands):
         command, log, gpu = item[:3]
         extra_env = item[3] if len(item) > 3 else {}
         log.parent.mkdir(parents=True, exist_ok=True)
         stream = log.open("w", encoding="utf-8")
         process_env = env_for(gpu)
         process_env.update(extra_env)
-        processes.append((subprocess.Popen(command, env=process_env, stdout=stream, stderr=subprocess.STDOUT), stream, command))
+        processes.append(
+            (
+                subprocess.Popen(
+                    ["taskset", "-c", ",".join(str(cpu) for cpu in cpu_allocations[index]), *command],
+                    env=process_env,
+                    stdout=stream,
+                    stderr=subprocess.STDOUT,
+                ),
+                stream,
+                command,
+            )
+        )
     allowed = allowed_returncodes or {0}
     failures = []
     for process, stream, command in processes:
@@ -107,6 +128,18 @@ def run_parallel_waves(commands: list[tuple], wave_size: int = 4) -> None:
     """Run independent GPU jobs in bounded waves, never oversubscribing a GPU."""
     for start in range(0, len(commands), wave_size):
         run_parallel(commands[start : start + wave_size])
+
+
+def cpu_sets(count: int, cores_per_job: int = 20) -> list[list[int]]:
+    available = sorted(os.sched_getaffinity(0))
+    if len(available) < count * cores_per_job:
+        raise RuntimeError(
+            f"need {count * cores_per_job} available CPUs for {count} jobs, found {len(available)}"
+        )
+    return [
+        available[index * cores_per_job : (index + 1) * cores_per_job]
+        for index in range(count)
+    ]
 
 
 def select_idle_gpus(count: int = 4, max_used_mib: int = 512) -> list[int]:
