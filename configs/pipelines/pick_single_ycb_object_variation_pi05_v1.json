@@ -90,6 +90,15 @@
   "execution_audit": {
     "required": ["manifest_vs_command", "runtime_import_gpu", "asset_presence", "paired_reset", "oracle_evidence", "checkpoint_reload_forward", "evaluation_denominator_evidence"],
     "failure_marker": "ENGINEERING_PROTOCOL_DIAGNOSTIC",
+    "stage_contracts": {
+      "id_sft": "all global_step_500..10000 checkpoints, then common 20-episode selection and independent 100-ID gate",
+      "passive_detection": "ID-only detector assets, separate successful-ID calibration, 100 ID and 100 object-OOD episodes with actions/videos/timelines",
+      "four_method_collection": "raw and accepted evidence audit, paired ID/OOD stream audit, complete suffix and video audit",
+      "matched_budget": "largest exact common expert-action budget at or below 12000; source datasets remain immutable",
+      "matched_training": "four independent 2-step train/reload smokes, then four fresh 5000-step updates from the same selected ID checkpoint",
+      "final_evaluation": "four methods times held-out 100 ID and 100 object-OOD episodes, bounded to one process per GPU"
+    },
+    "required_markers": ["GATED_COLLECTION_AUDIT_PASSED", "BUDGET_SELECTION_COMPLETE", "MATCHED_SMOKE_RELOAD_PASSED", "FORMAL_TRAINING_COMPLETE", "PIPELINE_COMPLETE"],
     "current": "id_data_audit_and_reload_smoke_passed",
     "stage": "id_sft_formal_training_retry1",
     "evidence": {
