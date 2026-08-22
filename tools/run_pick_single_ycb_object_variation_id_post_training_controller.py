@@ -43,6 +43,9 @@ def run_eval(checkpoint: Path, output: Path, episodes: int, seed: int) -> None:
         return
     env = os.environ.copy()
     env["CUDA_VISIBLE_DEVICES"] = "1"
+    env["OMP_NUM_THREADS"] = "20"
+    env["MKL_NUM_THREADS"] = "20"
+    env["TOKENIZERS_PARALLELISM"] = "false"
     env["PYTHONPATH"] = f"{RUN / 'runtime_overlay' / 'numpy126'}:{ROOT / 'RLinf'}:{ROOT}"
     command = [
         str(PY),
@@ -68,7 +71,13 @@ def run_eval(checkpoint: Path, output: Path, episodes: int, seed: int) -> None:
     ]
     log = output.parent / f"{output.name}.log"
     with log.open("w", encoding="utf-8") as stream:
-        subprocess.run(command, env=env, stdout=stream, stderr=subprocess.STDOUT, check=False)
+        subprocess.run(
+            ["taskset", "-c", "0-19", *command],
+            env=env,
+            stdout=stream,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
     if not evidence_complete(output, episodes):
         raise RuntimeError(f"incomplete evaluation evidence: {output}")
 
@@ -82,13 +91,19 @@ def main() -> None:
             break
         time.sleep(300)
 
-    steps = [2000, 4000, 6000, 8000, 10000]
-    checkpoints = {step: checkpoint_for(step) for step in steps}
-    if any(value is None for value in checkpoints.values()):
-        (RUN / "ID_TRAINING_CHECKPOINT_AUDIT_FAILED").write_text(json.dumps({str(k): str(v) for k, v in checkpoints.items()}, indent=2) + "\n", encoding="utf-8")
+    all_steps = list(range(500, 10001, 500))
+    all_checkpoints = {step: checkpoint_for(step) for step in all_steps}
+    if any(value is None for value in all_checkpoints.values()):
+        (RUN / "ID_TRAINING_CHECKPOINT_AUDIT_FAILED").write_text(json.dumps({str(k): str(v) for k, v in all_checkpoints.items()}, indent=2) + "\n", encoding="utf-8")
         write_state(current_stage="id_checkpoint_audit_failed", next_stage="needs_user_decision_or_engineering_retry", terminal_marker="ID_TRAINING_CHECKPOINT_AUDIT_FAILED")
         raise SystemExit(2)
+    (RUN / "id_training_v1/formal_10000_retry1/checkpoint_audit_all_500.json").write_text(
+        json.dumps({str(k): str(v) for k, v in all_checkpoints.items()}, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
+    steps = [2000, 4000, 6000, 8000, 10000]
+    checkpoints = {step: all_checkpoints[step] for step in steps}
     selection: list[dict] = []
     write_state(current_stage="id_checkpoint_selection", next_stage="formal_id_gate")
     for index, step in enumerate(steps):
