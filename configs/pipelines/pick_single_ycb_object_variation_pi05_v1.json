@@ -5,8 +5,8 @@
   "owner_thread": "019ffbc4-f3a9-78f3-8684-e0b4cba3552a",
   "owner_label": "codex-object-variation-pick-single-ycb",
   "server": "zhaozhixuan@111.198.58.150:12001",
-  "current_stage": "preflight",
-  "next_stage": "oracle_smoke",
+  "current_stage": "id_sft_formal_training_retry1",
+  "next_stage": "id_checkpoint_selection_and_formal_gate",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/",
   "task": {
     "env_ids": {
@@ -90,8 +90,16 @@
   "execution_audit": {
     "required": ["manifest_vs_command", "runtime_import_gpu", "asset_presence", "paired_reset", "oracle_evidence", "checkpoint_reload_forward", "evaluation_denominator_evidence"],
     "failure_marker": "ENGINEERING_PROTOCOL_DIAGNOSTIC",
-    "current": "not_started",
-    "stage": "preflight"
+    "current": "id_data_audit_and_reload_smoke_passed",
+    "stage": "id_sft_formal_training_retry1",
+    "evidence": {
+      "oracle_gate": "oracle_gate_v4",
+      "id_collection": "id_collection_v1_retry1",
+      "id_data_audit": "id_data_audit_v1/report.json",
+      "id_norm": "datasets/id_v1_retry1/norm_stats.json",
+      "reload_forward_smoke": "id_training_v1/smoke_2step/reload_forward_eval/summary.json",
+      "reload_forward_reconciliation": "id_training_v1/smoke_2step/SIMULATOR_EXIT_AFTER_ARTIFACTS"
+    }
   },
   "terminal_markers": ["PIPELINE_COMPLETE", "NEEDS_USER_DECISION", "ORACLE_NOT_ACCEPTED", "ID_BASE_NOT_ACCEPTED", "PIPELINE_FAILED"]
 }

@@ -102,8 +102,8 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `owner_thread`: `019ffbc4-f3a9-78f3-8684-e0b4cba3552a`
 - `owner_label`: `codex-object-variation-pick-single-ycb`
 - `server`: `zhaozhixuan@111.198.58.150:12001`
-- `current_stage`: `preflight`
-- `next_stage`: `oracle_smoke`
+- `current_stage`: `id_sft_formal_training_retry1`
+- `next_stage`: `id_checkpoint_selection_and_formal_gate`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/`
 - `manifest`: `configs/pipelines/pick_single_ycb_object_variation_pi05_v1.json`
 - `plan`: `docs/experiment_management/plans/PickSingleYCB_ObjectVariation_OOD.md`
@@ -111,7 +111,8 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `placement`: 5090 selected because native RLinf/OpenPI/ManiSkill, pretrained pi0.5 base and YCB assets are co-located on persistent `/data`; H20 rejected because an existing Ray owner occupies its resource pool and root filesystem is full
 - `runtime_repair`: shared NumPy 2.4.4 remains untouched; pipeline-only NumPy 1.26.4 overlay restores the official MPlib Panda planner, which otherwise exits during `mplib.Planner` construction
 - `gpu_plan`: reserve only independently idle GPU0/1/3/4; GPU2 belongs to existing PID `1198612`; never touch existing owners
-- `next_action`: deploy preflight/controller and run one ID plus one OOD Oracle smoke; no training or formal collection before the Oracle gate
+- `next_action`: let single-GPU ID SFT retry1 finish; post-training controller then selects a checkpoint and runs the independent 100-ID gate
+- `evidence_so_far`: Oracle gate `20/20 ID + 20/20 OOD`; ID collection `128/128` with `128/128` videos; data audit `6634` anchors / `1152` tail anchors; ID norm and 2-step reload/forward smoke passed; dual-GPU formal launch is preserved as engineering diagnostic
 - `completion`: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ORACLE_NOT_ACCEPTED`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED`
 
 ## Heartbeat Watchdog Rule
