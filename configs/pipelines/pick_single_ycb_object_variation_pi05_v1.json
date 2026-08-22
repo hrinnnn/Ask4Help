@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "pipeline_id": "pick_single_ycb_object_variation_pi05_v1",
+  "authorized": true,
+  "owner_thread": "019ffbc4-f3a9-78f3-8684-e0b4cba3552a",
+  "owner_label": "codex-object-variation-pick-single-ycb",
+  "server": "zhaozhixuan@111.198.58.150:12001",
+  "current_stage": "preflight",
+  "next_stage": "oracle_smoke",
+  "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/",
+  "task": {
+    "env_ids": {
+      "id": "RLinfPickSingleYCBObjectVariationID-v1",
+      "ood": "RLinfPickSingleYCBObjectVariationOOD-v1"
+    },
+    "instruction": "pick up the object and move it to the green goal",
+    "ood_family": "object_variation",
+    "id_model_id": "005_tomato_soup_can",
+    "ood_model_id": "008_pudding_box",
+    "object_variation_only": true,
+    "success_predicate": "stock PickSingleYCB: object within goal radius and robot static",
+    "supporting_predicates": ["stable_grasp", "accepted_lift", "placed", "episode_success"]
+  },
+  "model": {
+    "family": "openpi_pi05",
+    "pretrained_base": "/data/zhaozhixuan/Ask4Help-open-drawer/results/model_cache/pi05_base_pytorch_v1",
+    "task_checkpoint_reuse_forbidden": true,
+    "noise_method": "flow_sde",
+    "train_expert_only": true,
+    "awbc": false,
+    "action_dim": 8,
+    "action_horizon": 10,
+    "temporal_mask": true,
+    "norm": "computed only from this pipeline's ID demonstrations and frozen"
+  },
+  "data": {
+    "id_demonstrations": 128,
+    "gated_success_target": 100,
+    "offline_ood_demonstrations": 100,
+    "matched_low_level_expert_actions": 12000,
+    "source_balance": "1:1 original ID:new expert",
+    "no_old_task_data": true
+  },
+  "seeds": {
+    "id_demo": [10000, 10127],
+    "oracle_id": [11000, 11019],
+    "oracle_ood": [12000, 12019],
+    "detector_calibration_id": [13000, 13024],
+    "passive_id": [14000, 14099],
+    "passive_ood": [15000, 15099],
+    "mixed_collection": [16000, 16199],
+    "final_id": [17000, 17099],
+    "final_ood": [18000, 18099]
+  },
+  "training": {
+    "id_target_steps": 10000,
+    "id_checkpoint_interval": 500,
+    "update_target_steps": 5000,
+    "update_checkpoint_interval": 500,
+    "global_batch_size": 128,
+    "micro_batch_size": 32,
+    "optimizer": "fresh per independent method from immutable ID base"
+  },
+  "placement_preflight": {
+    "selected_server": "zhaozhixuan@111.198.58.150:12001",
+    "selected_reason": "native RLinf/OpenPI/ManiSkill runtime, pi0.5 base and YCB assets co-located, /data persistent with approximately 926 GiB free, and four idle GPUs available without touching GPU2",
+    "rejected_alternatives": [
+      {
+        "server": "root@39.101.70.188:1012",
+        "reason": "two-GPU Ray/online-awbc owner is active and owns the H20 resource pool; root filesystem is full, so it is not safe for this new long pipeline"
+      }
+    ],
+    "resource_snapshot": {
+      "timestamp": "2026-08-22T21:14:41+08:00",
+      "gpu_in_use": {"2": "PID 1198612 existing Ray FSDP worker"},
+      "gpu_selected": [0, 1, 3, 4],
+      "gpu_other_idle": [5, 6, 7],
+      "data_free_gib_approx": 926,
+      "sdd_free_gib_approx": 355,
+      "runtime": "RLinf/.venv torch 2.7.1+cu128, CUDA available, 8 RTX 5090 visible, ManiSkill 3.0.0b22",
+      "assets": [
+        "/data/zhaozhixuan/Ask4Help-open-drawer/results/model_cache/pi05_base_pytorch_v1",
+        "YCB 005_tomato_soup_can",
+        "YCB 008_pudding_box"
+      ]
+    },
+    "persistent_output_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/"
+  },
+  "execution_audit": {
+    "required": ["manifest_vs_command", "runtime_import_gpu", "asset_presence", "paired_reset", "oracle_evidence", "checkpoint_reload_forward", "evaluation_denominator_evidence"],
+    "failure_marker": "ENGINEERING_PROTOCOL_DIAGNOSTIC",
+    "current": "not_started",
+    "stage": "preflight"
+  },
+  "terminal_markers": ["PIPELINE_COMPLETE", "NEEDS_USER_DECISION", "ORACLE_NOT_ACCEPTED", "ID_BASE_NOT_ACCEPTED", "PIPELINE_FAILED"]
+}
