@@ -63,7 +63,7 @@
   },
   "placement_preflight": {
     "selected_server": "zhaozhixuan@111.198.58.150:12001",
-    "selected_reason": "native RLinf/OpenPI/ManiSkill runtime, pi0.5 base and YCB assets co-located, /data persistent with approximately 926 GiB free, and four idle GPUs available without touching GPU2",
+    "selected_reason": "native RLinf/OpenPI/ManiSkill runtime, pi0.5 base and YCB assets co-located, /data persistent with approximately 926 GiB free, and four idle GPUs available without touching GPU2; official mplib planner requires a per-pipeline NumPy 1.26 overlay",
     "rejected_alternatives": [
       {
         "server": "root@39.101.70.188:1012",
@@ -77,7 +77,8 @@
       "gpu_other_idle": [5, 6, 7],
       "data_free_gib_approx": 926,
       "sdd_free_gib_approx": 355,
-      "runtime": "RLinf/.venv torch 2.7.1+cu128, CUDA available, 8 RTX 5090 visible, ManiSkill 3.0.0b22",
+      "runtime": "RLinf/.venv torch 2.7.1+cu128, CUDA available, 8 RTX 5090 visible, ManiSkill 3.0.0b22, shared NumPy 2.4.4 unchanged",
+      "runtime_overlay": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/runtime_overlay/numpy126 (NumPy 1.26.4; pipeline-only, shared venv untouched)",
       "assets": [
         "/data/zhaozhixuan/Ask4Help-open-drawer/results/model_cache/pi05_base_pytorch_v1",
         "YCB 005_tomato_soup_can",

@@ -10,6 +10,8 @@
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/`
 - `model`: pretrained pi0.5 Flow-SDE action-expert route; no StackCube, StackPyramid, OpenDrawer, or Airplane task checkpoint is allowed.
 
+The 5090 shared runtime keeps NumPy 2.4.4 for the existing owner. ManiSkill/MPlib planner construction is run only with the pipeline-local `/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/runtime_overlay/numpy126` overlay containing NumPy 1.26.4. The shared environment is never modified.
+
 The task is a single-object pick-and-place. ID uses YCB model `005_tomato_soup_can`; OOD uses held-out YCB model `008_pudding_box`. The instruction remains role-based: `pick up the object and move it to the green goal`. The only intended split factor is `object_model_id`.
 
 ## Frozen task semantics
@@ -49,4 +51,3 @@ Every stage has an independent directory, PID/log, marker, manifest evidence, an
 - Detection: PCA and baselines use only independent ID calibration; passive rollout actions are unchanged by detector scoring.
 - Final evaluation: held-out 100 ID + 100 OOD per method, complete denominator and evidence files.
 - Terminal: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED` ends ownership.
-
