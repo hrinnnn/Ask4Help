@@ -28,6 +28,10 @@ from toolkits.lerobot.diagnose_pick_single_ycb_object_variation_oracle import (
 def frame_to_numpy(frame):
     if hasattr(frame, "detach"):
         frame = frame.detach().cpu().numpy()
+    while getattr(frame, "ndim", 0) > 3 and frame.shape[0] == 1:
+        frame = frame[0]
+    if getattr(frame, "ndim", 0) == 3 and frame.shape[0] in (1, 3, 4) and frame.shape[-1] not in (1, 3, 4):
+        frame = frame.transpose(1, 2, 0)
     return frame
 
 
