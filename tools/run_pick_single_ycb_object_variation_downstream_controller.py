@@ -271,6 +271,38 @@ def main() -> None:
     path_manifest = RUN / "audit/collection_paths_v1.json"
     if path_manifest.is_file():
         collection_paths = json.loads(path_manifest.read_text(encoding="utf-8"))["methods"]
+        changed_paths = False
+        for method in methods:
+            current = collection_paths[method]
+            current_collection = Path(current["collection_dir"])
+            current_dataset = Path(current["dataset_dir"])
+            if (current_collection / "COLLECTION_COMPLETE").is_file() and current_dataset.is_dir():
+                continue
+            if current_collection.exists() or current_dataset.exists():
+                retry = 1
+                while True:
+                    collection_dir = collections / f"{method}_retry{retry}"
+                    dataset_dir = datasets / f"{method}_v1_retry{retry}"
+                    if not collection_dir.exists() and not dataset_dir.exists():
+                        break
+                    retry += 1
+                collection_paths[method] = {
+                    "collection_dir": str(collection_dir),
+                    "dataset_dir": str(dataset_dir),
+                }
+                changed_paths = True
+        if changed_paths:
+            path_manifest.write_text(
+                json.dumps(
+                    {
+                        "format": "pick_single_ycb_object_variation_collection_paths_v1",
+                        "methods": collection_paths,
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
     else:
         collection_paths = {}
         for method in methods:
