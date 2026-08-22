@@ -82,7 +82,7 @@ def run_parallel(commands: list[tuple]) -> None:
 
 def main() -> None:
     RUN.mkdir(parents=True, exist_ok=True)
-    state(controller_downstream_pid=os.getpid(), current_stage="waiting_for_id_base", next_stage="detector_assets")
+    state(controller_downstream_pid=os.getpid(), downstream_stage="waiting_for_id_base")
     wait_for(RUN / "ID_BASE_VALIDATED")
     checkpoint = selected_checkpoint()
     norm = RUN / "datasets/id_v1_retry1/norm_stats.json"
