@@ -20,7 +20,7 @@ from rlinf.envs.maniskill.pick_single_ycb_object_variation import (
     PICK_SINGLE_YCB_OBJECT_OOD_ENV_ID,
     register_controlled_pick_single_ycb_object_variants,
 )
-from rlinf.toolkits.lerobot.diagnose_pick_single_ycb_object_variation_oracle import (
+from toolkits.lerobot.diagnose_pick_single_ycb_object_variation_oracle import (
     run_oracle,
 )
 
@@ -111,4 +111,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
