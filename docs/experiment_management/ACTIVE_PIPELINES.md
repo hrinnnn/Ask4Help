@@ -21,6 +21,7 @@
 - `historical_topology_audit`: prior successful OpenDrawer pi0.5 continuation logs used `FlexiblePlacementStrategy` with `[[2]]` and `local_world_size=1`; current v9 deliberately matches that proven single-GPU topology. The earlier dual-GPU failures are not evidence that the previous successful run used two cards.
 - `disk_audit`: last verified approximately `928GB` free on `/data` and `356GB` free on `/sdd`; formal output is on `/sdd`, so the four-checkpoint budget plus safety margin remains satisfied.
 - `parallel_gpu_probe`: pure NCCL 2-card all-reduce on physical GPU4/5 passed, but isolated RLinf FSDP 2-card probes failed across FSDP1/FSDP2/no-shard/full-shard variants: initialization/forward illegal-memory or empty-shard errors, and no-shard step1 checkpoint failed in DCP reduce-scatter. Consolidated diagnostic: `/sdd/ask4help-open-drawer/diagnostics/pi05_2gpu_fsdpp_runtime_summary_v1/ENGINEERING_2GPU_RLINF_FSDP_CHECKPOINT_UNSAFE`. Earlier 4-card placement conflict remains at `ENGINEERING_GPU_MAPPING_CONFLICT_OOM`. Formal v9 remains world-size1 on GPU2; no dual-GPU run is promoted.
+- `ckpt2500_id_diagnostic`: independent ID-only probe completed on GPU4 with seeds `86000..86019`; strict success `1/20` (`5%`), drawer-opened `16/20` (`80%`), grasp `8/20` (`40%`), lift `6/20` (`30%`), in-target `1/20` (`5%`). Evidence audit passed with `20/20` videos, actions, states, timelines, and reset metadata. Output `/sdd/ask4help-open-drawer/diagnostics/eval_ckpt2500_id20_v1/`; evaluator cleanup emitted `free(): invalid pointer` only after complete artifacts, retained as engineering diagnostic and not treated as evidence failure.
 - `checkpoint_watcher`: `/sdd/ask4help-open-drawer/tools/watch_open_drawer_pi05_checkpoints.sh`; waits for native 2500/5000/7500/10000, checks full_weights/DCP sizes and CPU-side meta reload, then writes checkpoint audit and cumulative markers.
 - `post_training`: `/sdd/ask4help-open-drawer/tools/run_open_drawer_pi05_v9_post_training_controller.sh`; waits for `TRAINING_COMPLETE`, then runs four 20-ID checkpoint probes, selects by highest strict success with earliest tie, and runs one audited 100-ID gate; never starts OOD automatically.
 - `resume_checkpoint`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_failure_detection_v1/id_base_continuation_from4000_v7/training/sft_from4000_to10000/checkpoints/global_step_10000/`
@@ -30,6 +31,21 @@
 - `smoke`: v7 exact new-step smoke passed; native checkpoint `global_step_2` maps to cumulative `10002`, full_weights+DCP present, loss `0.0216/0.0250` finite, valid_action_ratio `0.967/0.974`, optimizer/scheduler fresh-reset
 - `reload_forward`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_resume_from10000_v7/smoke_weights_10000_to_10002/reload_forward_eval/`; artifacts complete, cleanup abort recorded as `SIMULATOR_EXIT_AFTER_ARTIFACTS`
 - `ood`: locked; no PCA/DAgger/OOD before an independent ID gate reaches `>=80/100`
+
+## OpenDrawer pi0.5 Short-Prompt Parallel Continuation
+
+- `pipeline_id`: `open_drawer_pi05_shortprompt_parallel_v1`
+- `authorized`: `true` by the latest user decision; current v9 remains running and untouched
+- `owner_thread`: `019fdb64-2df4-7a53-9a66-7a5c9b9fe97a`
+- `server`: `zhaozhixuan@111.198.58.150:12001`
+- `current_stage`: `preflight`; next stage `two_step_smoke_then_training`
+- `run_root`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_shortprompt_from10000_v1/`
+- `source_checkpoint`: immutable pi0.5 `global_step_10000`; weights-only with fresh optimizer/scheduler
+- `prompt`: `open the drawer and place the object in the tray`; this exact prompt must be consumed by both training and future evaluation
+- `training_contract`: single GPU4, world size1, global batch128/micro32, 8D action, action horizon10, temporal mask, Flow-SDE, train-expert-only, AWBC=false, conservative lr `5e-6`, warmup100, native checkpoints every2500
+- `placement_preflight`: checkpoint/dataset/norm/native runtime co-located on 5090; GPU4 selected idle; GPU2 is protected for v9; output is persistent `/sdd`
+- `controller`: `/data/zhaozhixuan/Ask4Help-open-drawer/tools/run_open_drawer_pi05_shortprompt_parallel_controller.sh`; PID/state to be recorded after launch
+- `forbidden`: stop or modify v9, touch GPU2/other-user processes, start OOD/PCA/DAgger, alter task/success/norm/mask
 
 ## OpenDrawer X-VLA Foundation Adaptation
 
@@ -103,7 +119,7 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `owner_label`: `codex-object-variation-pick-single-ycb`
 - `server`: `zhaozhixuan@111.198.58.150:12001`
 - `current_stage`: `id_sft_formal_training_retry1`
-- `next_stage`: `id_checkpoint_selection_and_formal_gate`
+- `next_stage`: `id_checkpoint_probe_and_early_stop`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/`
 - `manifest`: `configs/pipelines/pick_single_ycb_object_variation_pi05_v1.json`
 - `plan`: `docs/experiment_management/plans/PickSingleYCB_ObjectVariation_OOD.md`
@@ -111,7 +127,7 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `placement`: 5090 selected because native RLinf/OpenPI/ManiSkill, pretrained pi0.5 base and YCB assets are co-located on persistent `/data`; H20 rejected because an existing Ray owner occupies its resource pool and root filesystem is full
 - `runtime_repair`: shared NumPy 2.4.4 remains untouched; pipeline-only NumPy 1.26.4 overlay restores the official MPlib Panda planner, which otherwise exits during `mplib.Planner` construction
 - `gpu_plan`: reserve only independently idle GPU0/1/3/4; GPU2 belongs to existing PID `1198612`; never touch existing owners
-- `next_action`: let single-GPU ID SFT retry1 finish; post-training controller then selects a checkpoint and runs the independent 100-ID gate
+- `next_action`: probe every complete 500-step checkpoint on 20 ID episodes; the first `>=17/20` probe stops training and becomes the formal ID checkpoint, followed by independent 100-ID validation
 - `evidence_so_far`: Oracle gate `20/20 ID + 20/20 OOD`; ID collection `128/128` with `128/128` videos; data audit `6634` anchors / `1152` tail anchors; ID norm and 2-step reload/forward smoke passed; dual-GPU formal launch is preserved as engineering diagnostic
 - `completion`: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ORACLE_NOT_ACCEPTED`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED`
 

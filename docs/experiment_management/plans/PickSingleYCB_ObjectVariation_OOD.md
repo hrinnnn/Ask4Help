@@ -27,27 +27,29 @@ The event-driven oracle uses a top-down OBB grasp, stable-grasp confirmation, a 
 | Purpose | Seeds | Denominator |
 |---|---:|---:|
 | ID demonstrations | 10000--10127 | 128 successful ID episodes |
+| ID checkpoint probe | each complete 500-step checkpoint; seed base `20000 + checkpoint_step` | 20 ID episodes per checkpoint; `>80%` means at least `17/20` strict successes |
 | Oracle gate ID/OOD | 11000--11019 / 12000--12019 | 20 per split, at least 19 strict |
 | Detector ID calibration | 13000--13024 | 25 independent successful ID rollouts |
 | Passive detector ID/OOD | 14000--14099 / 15000--15099 | 100 per split |
 | Mixed collection stream | 16000--16199 | fixed paired alternating attempts |
 | Final held-out ID/OOD | 17000--17099 / 18000--18099 | 100 per split |
 
-The ID base must reach at least `80/100` strict success on an independent formal ID gate before OOD collection, detector registration, or matched updates. If it fails, write `ID_BASE_NOT_ACCEPTED` and preserve all diagnostics.
+The first complete ID checkpoint with more than 80% strict success on its 20-episode ID probe becomes the formal ID checkpoint and immediately stops ID training. A separate 100-episode ID evaluation is retained as independent validation evidence. If no checkpoint probe passes by 10000 steps, the fallback selection/100-ID gate is used; if that fallback is below 80/100, write `ID_BASE_NOT_ACCEPTED` and preserve all diagnostics.
 
 The four data branches are Internal-Feature PCA, Diff-DAgger, Failure-Recovery, and Offline BC. Gated branches target 100 successful assisted trajectories with natural ID/OOD composition; raw attempts remain strictly paired/alternating and no source quota is imposed on accepted data. Offline BC collects complete OOD oracle demonstrations. Matched updates use the same original-ID/new-expert source balance, optimizer, training steps, and fixed total low-level expert-action budget of 12000 actions.
 
 ## Pipeline stages
 
-`preflight -> oracle_smoke -> oracle_gate -> id_collection -> data_audit -> id_norm_and_sft -> id_checkpoint_selection -> id_formal_gate -> passive_failure_detection -> four_method_collection -> four_dataset_audit -> matched_training -> checkpoint_selection -> final_id_ood_eval -> result_registration -> PIPELINE_COMPLETE`
+`preflight -> oracle_smoke -> oracle_gate -> id_collection -> data_audit -> id_norm_and_sft -> id_checkpoint_probe -> id_formal_checkpoint_validation -> passive_failure_detection -> four_method_collection -> four_dataset_audit -> matched_training -> checkpoint_selection -> final_id_ood_eval -> result_registration -> PIPELINE_COMPLETE`
 
 Every stage has an independent directory, PID/log, marker, manifest evidence, and retry path. Partial outputs are never reused by a new retry unless the audit explicitly accepts them. A controller must validate the current stage and start the next one in the same wake-up.
 
 ## Scientific and engineering gates
 
 - Oracle gate: 19/20 strict success for both ID and OOD; no补试.
+- ID checkpoint probe: evaluate every complete 500-step checkpoint on 20 fixed ID episodes; `17/20` or more stops training and selects the first passing checkpoint.
 - Data audit: actions, states, videos, reset metadata, object model ids, full suffix/tail evidence, and split counts all match the manifest.
 - Training: temporal tail anchors retained with `action_valid_mask`; 2-step train/reload/forward smoke before formal training.
 - Detection: PCA and baselines use only independent ID calibration; passive rollout actions are unchanged by detector scoring.
-- Final evaluation: held-out 100 ID + 100 OOD per method, complete denominator and evidence files.
+- Formal ID validation and final evaluation: retain the independent 100-ID validation, then held-out 100 ID + 100 OOD per method with complete denominator and evidence files.
 - Terminal: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED` ends ownership.

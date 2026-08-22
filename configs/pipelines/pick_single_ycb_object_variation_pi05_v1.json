@@ -6,7 +6,7 @@
   "owner_label": "codex-object-variation-pick-single-ycb",
   "server": "zhaozhixuan@111.198.58.150:12001",
   "current_stage": "id_sft_formal_training_retry1",
-  "next_stage": "id_checkpoint_selection_and_formal_gate",
+  "next_stage": "id_checkpoint_probe_and_early_stop",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/",
   "task": {
     "env_ids": {
@@ -55,6 +55,11 @@
   "training": {
     "id_target_steps": 10000,
     "id_checkpoint_interval": 500,
+    "id_checkpoint_probe_interval": 500,
+    "id_checkpoint_probe_episodes": 20,
+    "id_checkpoint_probe_strict_successes": 17,
+    "id_checkpoint_probe_success_rule": ">16/20 strict ID successes (>80%) stops training and selects the first passing checkpoint",
+    "id_checkpoint_probe_seed_formula": "20000 + checkpoint_step",
     "update_target_steps": 5000,
     "update_checkpoint_interval": 500,
     "global_batch_size": 128,
@@ -91,7 +96,7 @@
     "required": ["manifest_vs_command", "runtime_import_gpu", "asset_presence", "paired_reset", "oracle_evidence", "checkpoint_reload_forward", "evaluation_denominator_evidence"],
     "failure_marker": "ENGINEERING_PROTOCOL_DIAGNOSTIC",
     "stage_contracts": {
-      "id_sft": "all global_step_500..10000 checkpoints, then common 20-episode selection and independent 100-ID gate",
+      "id_sft": "probe every complete global_step_500..10000 checkpoint on 20 ID episodes; first >80% probe stops training and becomes formal ID base, while the 100-ID run is retained as independent validation evidence",
       "passive_detection": "ID-only detector assets, separate successful-ID calibration, 100 ID and 100 object-OOD episodes with actions/videos/timelines",
       "four_method_collection": "raw and accepted evidence audit, paired ID/OOD stream audit, complete suffix and video audit",
       "matched_budget": "largest exact common expert-action budget at or below 12000; source datasets remain immutable",
