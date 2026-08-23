@@ -5,8 +5,8 @@
   "owner_thread": "019ffbc4-f3a9-78f3-8684-e0b4cba3552a",
   "owner_label": "codex-object-variation-pick-single-ycb",
   "server": "zhaozhixuan@111.198.58.150:12001",
-  "current_stage": "id_sft_formal_training_retry1",
-  "next_stage": "id_checkpoint_probe_and_early_stop",
+  "current_stage": "storage_mount_recovery_needs_user_decision",
+  "next_stage": "mount_existing_data_disk_then_reaudit_original_controller",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/",
   "task": {
     "env_ids": {
@@ -104,8 +104,13 @@
       "final_evaluation": "four methods times held-out 100 ID and 100 object-OOD episodes, bounded to one process per GPU"
     },
     "required_markers": ["GATED_COLLECTION_AUDIT_PASSED", "BUDGET_SELECTION_COMPLETE", "MATCHED_SMOKE_RELOAD_PASSED", "FORMAL_TRAINING_COMPLETE", "PIPELINE_COMPLETE"],
-    "current": "id_data_audit_and_reload_smoke_passed",
-    "stage": "id_sft_formal_training_retry1",
+    "current": "storage_mount_recovery_blocked",
+    "stage": "storage_mount_recovery_needs_user_decision",
+    "runtime_blocker": {
+      "marker": "NEEDS_USER_DECISION",
+      "evidence_path": "/sdd/object_variation_pick_single_ycb_v1_mount_recovery_20260823/NEEDS_USER_DECISION.json",
+      "required_action": "mount the existing fstab data device at /data before any controller or training restart"
+    },
     "evidence": {
       "oracle_gate": "oracle_gate_v4",
       "id_collection": "id_collection_v1_retry1",

@@ -10,9 +10,9 @@
 - `authorized`: `true`
 - `owner_thread`: `019fdb64-2df4-7a53-9a66-7a5c9b9fe97a`
 - `server`: `zhaozhixuan@111.198.58.150:12001`
-- `current_stage`: `training_retry_v9_sdd_disk_safe` (v1 Ray socket; v2/v3 multi-GPU illegal-memory; v4 DCP-load; v5 controller-path; v6 step-offset; v7 disk-capacity; v8 smoke migration; v9 dual-GPU FSDP diagnostics retained)
-- `next_stage`: continue the already-passed smoke-backed training to cumulative `global_step_20000`, then checkpoint audit, checkpoint selection, and independent ID gate
-- `controller`: v9 PID `1153921`; training PID `1153937`; checkpoint watcher PID `1820718`; repaired post-training controller PID `2124796`; state enricher PID `2133260`; last observed native additional step `2797/10000` at `2026-08-23T00:22+08:00`, cumulative `12797/20000`, loss `0.024`, valid-action-ratio `0.97`, marker `TRAINING_IN_PROGRESS`; `global_step_2500` checkpoint is present and under audit; next formal checkpoint is native `5000`; first checkpoint path `/sdd/ask4help-open-drawer/results/open_drawer_pi05_resume_from10000_v9/training/pi05_weights_from10000_to20000/pi05_weights_from10000_to20000/checkpoints/global_step_2500`
+- `current_stage`: `interrupted_server_reboot_data_mount_missing` (v1 Ray socket; v2/v3 multi-GPU illegal-memory; v4 DCP-load; v5 controller-path; v6 step-offset; v7 disk-capacity; v8 smoke migration; v9 dual-GPU FSDP diagnostics retained)
+- `next_stage`: restore `/data` mount and native runtime, reconcile latest complete checkpoint, then resume/evaluate without treating the interruption as scientific failure
+- `controller`: no live process after the 5090 reboot; last log step `6484/10000`, loss `0.0164--0.0205` in the final window, valid-action-ratio about `0.98`; complete checkpoints `global_step_2500` and `global_step_5000` remain on `/sdd`; interruption marker `/sdd/ask4help-open-drawer/results/open_drawer_pi05_resume_from10000_v9/ENGINEERING_SERVER_RESTART_DATA_MOUNT_MISSING`
 - `run_root`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_resume_from10000_v9/`
 - `retry_diagnostic`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_resume_from10000_v1/ENGINEERING_RAY_SOCKET_PATH_DIAGNOSTIC`
 - `ray_tmp_root`: `/sdd/od_pi05_10k_v9`
@@ -38,13 +38,14 @@
 - `authorized`: `true` by the latest user decision; current v9 remains running and untouched
 - `owner_thread`: `019fdb64-2df4-7a53-9a66-7a5c9b9fe97a`
 - `server`: `zhaozhixuan@111.198.58.150:12001`
-- `current_stage`: `preflight`; next stage `two_step_smoke_then_training`
-- `run_root`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_shortprompt_from10000_v1/`
+- `current_stage`: `training_to_20000`; next stage native checkpoint `2500` then continued short-prompt training
+- `run_root`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_shortprompt_from10000_v3/`; v1 Ray path and v2 LR-type failures retained as diagnostics
 - `source_checkpoint`: immutable pi0.5 `global_step_10000`; weights-only with fresh optimizer/scheduler
 - `prompt`: `open the drawer and place the object in the tray`; this exact prompt must be consumed by both training and future evaluation
 - `training_contract`: single GPU4, world size1, global batch128/micro32, 8D action, action horizon10, temporal mask, Flow-SDE, train-expert-only, AWBC=false, conservative lr `5e-6`, warmup100, native checkpoints every2500
-- `placement_preflight`: checkpoint/dataset/norm/native runtime co-located on 5090; GPU4 selected idle; GPU2 is protected for v9; output is persistent `/sdd`
-- `controller`: `/data/zhaozhixuan/Ask4Help-open-drawer/tools/run_open_drawer_pi05_shortprompt_parallel_controller.sh`; PID/state to be recorded after launch
+- `placement_preflight`: checkpoint/dataset/norm/native runtime co-located on 5090; GPU4 selected idle; GPU2 is protected for v9; output is persistent `/sdd`; short Ray root `/sdd/odsp4`
+- `current_stage`: `interrupted_server_reboot_data_mount_missing`; no live process after the 5090 reboot. Last log step `3408/10000`, finite loss about `0.014--0.018`, valid-action-ratio about `0.97`; complete checkpoint `global_step_2500` remains on `/sdd`; interruption marker `/sdd/ask4help-open-drawer/results/open_drawer_pi05_shortprompt_from10000_v3/ENGINEERING_SERVER_RESTART_DATA_MOUNT_MISSING`
+- `controller`: `/data/zhaozhixuan/Ask4Help-open-drawer/tools/run_open_drawer_pi05_shortprompt_parallel_controller.sh`; last controller PID `743424`, training PID `834181`; state file is stale after reboot; 2-step smoke passed with full_weights+DCP; GPU4 was correctly isolated before interruption
 - `forbidden`: stop or modify v9, touch GPU2/other-user processes, start OOD/PCA/DAgger, alter task/success/norm/mask
 
 ## OpenDrawer X-VLA Foundation Adaptation
@@ -118,8 +119,8 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `owner_thread`: `019ffbc4-f3a9-78f3-8684-e0b4cba3552a`
 - `owner_label`: `codex-object-variation-pick-single-ycb`
 - `server`: `zhaozhixuan@111.198.58.150:12001`
-- `current_stage`: `id_sft_formal_training_retry1`
-- `next_stage`: `id_checkpoint_probe_and_early_stop`
+- `current_stage`: `storage_mount_recovery_needs_user_decision`
+- `next_stage`: mount the existing `/dev/sdb1` data disk at `/data`, then re-audit the original controller/checkpoint state before any restart
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/`
 - `manifest`: `configs/pipelines/pick_single_ycb_object_variation_pi05_v1.json`
 - `plan`: `docs/experiment_management/plans/PickSingleYCB_ObjectVariation_OOD.md`
@@ -129,6 +130,7 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `gpu_plan`: reserve only independently idle GPU0/1/3/4; GPU2 belongs to existing PID `1198612`; never touch existing owners
 - `next_action`: probe every complete 500-step checkpoint on 20 ID episodes; the first `>=17/20` probe stops training and becomes the formal ID checkpoint, followed by independent 100-ID validation
 - `evidence_so_far`: Oracle gate `20/20 ID + 20/20 OOD`; ID collection `128/128` with `128/128` videos; data audit `6634` anchors / `1152` tail anchors; ID norm and 2-step reload/forward smoke passed; dual-GPU formal launch is preserved as engineering diagnostic
+- `runtime_blocker`: at `2026-08-23T12:55+08:00`, `/dev/sdb1` with the fstab UUID for `/data` was present but unmounted; the canonical run root, logs, checkpoints, and controller PIDs were not visible. `/sdd/object_variation_pick_single_ycb_v1_mount_recovery_20260823/NEEDS_USER_DECISION.json` records the evidence. Current SSH user lacks passwordless sudo and root SSH is unavailable; do not start replacement work.
 - `completion`: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ORACLE_NOT_ACCEPTED`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED`
 
 ## Heartbeat Watchdog Rule

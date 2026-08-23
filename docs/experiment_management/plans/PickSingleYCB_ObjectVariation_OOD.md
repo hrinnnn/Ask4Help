@@ -53,3 +53,7 @@ Every stage has an independent directory, PID/log, marker, manifest evidence, an
 - Detection: PCA and baselines use only independent ID calibration; passive rollout actions are unchanged by detector scoring.
 - Formal ID validation and final evaluation: retain the independent 100-ID validation, then held-out 100 ID + 100 OOD per method with complete denominator and evidence files.
 - Terminal: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED` ends ownership.
+
+## Runtime Recovery Note
+
+If the selected server loses the `/data` mount, the Owner must stop before any replacement launch. Verify that the original fstab data device is present, write a durable `NEEDS_USER_DECISION` diagnostic, and require a root-level remount of the existing device. After remounting, re-audit the original `pipeline_state.json`, controller PID, checkpoint sequence, logs, and markers; never recreate the task on an empty replacement filesystem.
