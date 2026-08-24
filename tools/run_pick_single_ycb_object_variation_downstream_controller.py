@@ -172,6 +172,17 @@ def select_idle_gpus(count: int = 4, max_used_mib: int = 512) -> list[int]:
     return idle[:count]
 
 
+def wait_for_idle_gpus(count: int, timeout: int = 172800) -> list[int]:
+    start = time.time()
+    while True:
+        try:
+            return select_idle_gpus(count)
+        except RuntimeError:
+            if time.time() - start > timeout:
+                raise
+            time.sleep(300)
+
+
 def checkpoint_for(output: Path, step: int) -> Path | None:
     candidates = list(
         output.glob(f"**/checkpoints/global_step_{step}/actor/model_state_dict/full_weights.pt")
@@ -372,7 +383,7 @@ def main() -> None:
     # remain because the main ID training keeps one GPU occupied.
     for start in range(0, len(missing_methods), 2):
         wave_methods = missing_methods[start : start + 2]
-        wave_gpus = select_idle_gpus(len(wave_methods))
+        wave_gpus = wait_for_idle_gpus(len(wave_methods))
         wave_commands = []
         for method, gpu in zip(wave_methods, wave_gpus):
             out = Path(collection_paths[method]["collection_dir"])
