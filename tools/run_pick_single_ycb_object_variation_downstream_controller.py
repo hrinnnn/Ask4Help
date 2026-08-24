@@ -132,6 +132,17 @@ def run_parallel_waves(commands: list[tuple], wave_size: int = 4) -> None:
 
 def cpu_sets(count: int, cores_per_job: int = 20) -> list[list[int]]:
     available = sorted(os.sched_getaffinity(0))
+    reserved: set[int] = set()
+    for token in os.environ.get("ASK4HELP_RESERVED_CPUSET", "").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if "-" in token:
+            start, end = (int(value) for value in token.split("-", 1))
+            reserved.update(range(start, end + 1))
+        else:
+            reserved.add(int(token))
+    available = [cpu for cpu in available if cpu not in reserved]
     if len(available) < count * cores_per_job:
         raise RuntimeError(
             f"need {count * cores_per_job} available CPUs for {count} jobs, found {len(available)}"
@@ -347,32 +358,30 @@ def main() -> None:
             + "\n",
             encoding="utf-8",
         )
-    collection_gpus = select_idle_gpus(4)
-    method_gpus = dict(zip(methods, collection_gpus))
-    method_commands = [
-        ("bridge_pca", method_gpus["bridge_pca"], ["--detector-assets", str(assets / "detector_assets.pt"), "--bridge-threshold", str(json.loads(calibration.read_text())["pca_threshold"])]),
-        ("diffdagger", method_gpus["diffdagger"], ["--diff-calibration", str(calibration)]),
-        ("failure_recovery", method_gpus["failure_recovery"], []),
-        ("offline_oracle", method_gpus["offline_oracle"], ["--only-split", "ood"]),
+    method_extras = {
+        "bridge_pca": ["--detector-assets", str(assets / "detector_assets.pt"), "--bridge-threshold", str(json.loads(calibration.read_text())["pca_threshold"])],
+        "diffdagger": ["--diff-calibration", str(calibration)],
+        "failure_recovery": [],
+        "offline_oracle": ["--only-split", "ood"],
+    }
+    missing_methods = [
+        method for method in methods
+        if not (Path(collection_paths[method]["collection_dir"]) / "COLLECTION_COMPLETE").is_file()
     ]
-    commands = []
-    for method, gpu, extras in method_commands:
-        out = Path(collection_paths[method]["collection_dir"])
-        repo = Path(collection_paths[method]["dataset_dir"])
-        common = [str(PY), str(ROOT / "tools/collect_pick_single_ycb_object_variation_gated.py"), "--method", method, "--output-dir", str(out), "--repo-id", str(repo), "--target-expert-trajectories", "100", "--max-attempts", "600", "--id-seed", "16000", "--ood-seed", "16001"]
-        if method != "offline_oracle":
-            common += ["--checkpoint", str(checkpoint), "--pi05-base", str(MODEL_BASE), "--norm-stats", str(norm)]
-        commands.append((common + extras, RUN / "logs" / f"collect_{method}.log", gpu))
-    missing_collection = [
-        item
-        for item in method_commands
-        if not (Path(collection_paths[item[0]]["collection_dir"]) / "COLLECTION_COMPLETE").is_file()
-    ]
-    if missing_collection:
-        run_parallel(
-            [command for command in commands if command[0][command[0].index("--method") + 1] in {item[0] for item in missing_collection}],
-            allowed_returncodes={0, -6},
-        )
+    # Collection is allowed to run in bounded waves when only two idle GPUs
+    # remain because the main ID training keeps one GPU occupied.
+    for start in range(0, len(missing_methods), 2):
+        wave_methods = missing_methods[start : start + 2]
+        wave_gpus = select_idle_gpus(len(wave_methods))
+        wave_commands = []
+        for method, gpu in zip(wave_methods, wave_gpus):
+            out = Path(collection_paths[method]["collection_dir"])
+            repo = Path(collection_paths[method]["dataset_dir"])
+            common = [str(PY), str(ROOT / "tools/collect_pick_single_ycb_object_variation_gated.py"), "--method", method, "--output-dir", str(out), "--repo-id", str(repo), "--target-expert-trajectories", "100", "--max-attempts", "600", "--id-seed", "16000", "--ood-seed", "16001"]
+            if method != "offline_oracle":
+                common += ["--checkpoint", str(checkpoint), "--pi05-base", str(MODEL_BASE), "--norm-stats", str(norm)]
+            wave_commands.append((common + method_extras[method], RUN / "logs" / f"collect_{method}.log", gpu))
+        run_parallel(wave_commands, allowed_returncodes={0, -6})
 
     state(current_stage="four_dataset_audit", next_stage="matched_budget_selection")
     collection_audit = RUN / "audit/gated_collection_v1/report.json"
