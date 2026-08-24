@@ -68,7 +68,7 @@
   },
   "placement_preflight": {
     "selected_server": "zhaozhixuan@111.198.58.150:12001",
-    "selected_reason": "native RLinf/OpenPI/ManiSkill runtime, pi0.5 base and YCB assets co-located, /data persistent with approximately 926 GiB free, and four idle GPUs available without touching GPU2; official mplib planner requires a per-pipeline NumPy 1.26 overlay",
+    "selected_reason": "native RLinf/OpenPI/ManiSkill runtime, pi0.5 base and YCB assets co-located, /data persistent, and an actually idle GPU1 available; GPU0 is occupied by another user's bench_fine.py and is not touched; official mplib planner requires a per-pipeline NumPy 1.26 overlay",
     "rejected_alternatives": [
       {
         "server": "root@39.101.70.188:1012",
@@ -77,9 +77,11 @@
     ],
     "resource_snapshot": {
       "timestamp": "2026-08-22T21:14:41+08:00",
-      "gpu_in_use": {"2": "PID 1198612 existing Ray FSDP worker"},
-      "gpu_selected": [0, 1, 3, 4],
-      "gpu_other_idle": [5, 6, 7],
+      "gpu_in_use": {"0": "PID 1023482 qinmujun /ws/bench_fine.py", "2": "PID 1198612 existing Ray FSDP worker"},
+      "gpu_selected": [1],
+      "gpu_other_idle": [3, 4, 5, 6, 7],
+      "active_resume_gpu": 1,
+      "active_resume_cpuset": "20-39",
       "data_free_gib_approx": 926,
       "sdd_free_gib_approx": 355,
       "runtime": "RLinf/.venv torch 2.7.1+cu128, CUDA available, 8 RTX 5090 visible, ManiSkill 3.0.0b22, shared NumPy 2.4.4 unchanged",

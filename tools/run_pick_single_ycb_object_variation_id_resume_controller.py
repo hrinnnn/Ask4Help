@@ -31,6 +31,8 @@ CONFIG_NAME = "pick_single_ycb_object_variation_id_sft_openpi_pi05"
 STATE = RUN / "pipeline_state.json"
 LOG_DIR = RUN / "logs"
 PID_FILE = TRAIN / "train.pid"
+GPU = os.environ.get("OBJECT_VARIATION_GPU", "1")
+CPUSET = os.environ.get("OBJECT_VARIATION_CPUSET", "20-39")
 
 
 def write_state(**updates: object) -> None:
@@ -51,8 +53,8 @@ def run_job(name: str, output: Path, max_steps: int, resume: Path, log: Path) ->
     env = os.environ.copy()
     env.update(
         {
-            "CUDA_VISIBLE_DEVICES": "0",
-            "ASK4HELP_RLINF_PLACEMENT": "0-0",
+            "CUDA_VISIBLE_DEVICES": GPU,
+            "ASK4HELP_RLINF_PLACEMENT": f"{GPU}-{GPU}",
             "EMBODIED_PATH": str(ROOT / "RLinf/examples/sft"),
             "PYTHONPATH": f"{ROOT}:{ROOT / 'RLinf'}:{env.get('PYTHONPATH', '')}",
             "OBJECT_VARIATION_ID_DATASET": str(DATASET),
@@ -71,7 +73,7 @@ def run_job(name: str, output: Path, max_steps: int, resume: Path, log: Path) ->
     command = [
         "taskset",
         "-c",
-        "0-19",
+        CPUSET,
         str(PYTHON),
         str(ROOT / "RLinf/examples/sft/train_vla_sft.py"),
         "--config-path",
@@ -104,7 +106,7 @@ def run_reload_smoke(smoke_checkpoint: Path) -> None:
     env = os.environ.copy()
     env.update(
         {
-            "CUDA_VISIBLE_DEVICES": "0",
+            "CUDA_VISIBLE_DEVICES": GPU,
             "PYTHONPATH": f"{ROOT}:{ROOT / 'RLinf'}:{env.get('PYTHONPATH', '')}",
             "PYTHONUNBUFFERED": "1",
         }
@@ -112,7 +114,7 @@ def run_reload_smoke(smoke_checkpoint: Path) -> None:
     command = [
         "taskset",
         "-c",
-        "0-19",
+        CPUSET,
         str(PYTHON),
         str(ROOT / "tools/evaluate_pick_single_ycb_object_variation_pi05.py"),
         "--checkpoint",
