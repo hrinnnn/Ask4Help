@@ -19,8 +19,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RUN = Path("/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1")
-RETRY = RUN / "id_training_v1/formal_10000_retry6"
-TRAIN = RETRY / "id_sft_10000_retry6"
+RETRY = RUN / "id_training_v1/formal_10000_retry7"
+TRAIN = RETRY / "id_sft_10000_retry7"
 SOURCE = RUN / "id_training_v1/formal_10000_retry1/id_sft_10000_retry1/checkpoints/global_step_3500"
 DATASET = RUN / "datasets/id_v1_retry1"
 NORM = DATASET / "norm_stats.json"
@@ -65,8 +65,8 @@ def run_job(name: str, output: Path, max_steps: int, resume: Path, log: Path) ->
             "OBJECT_VARIATION_MAX_STEPS": str(max_steps),
             "OBJECT_VARIATION_SAVE_INTERVAL": "500",
             "OBJECT_VARIATION_TRAIN_SEED": "7000",
-            "RAY_TMPDIR": os.environ.get("OBJECT_VARIATION_RAY_TMPDIR", "/sdd/ov_ray6"),
-            "TMPDIR": os.environ.get("OBJECT_VARIATION_TMPDIR", "/sdd/ov_tmp6"),
+            "RAY_TMPDIR": os.environ.get("OBJECT_VARIATION_RAY_TMPDIR", "/sdd/ov_ray7"),
+            "TMPDIR": os.environ.get("OBJECT_VARIATION_TMPDIR", "/sdd/ov_tmp7"),
             "PYTHONUNBUFFERED": "1",
         }
     )
@@ -138,7 +138,7 @@ def run_reload_smoke(smoke_checkpoint: Path) -> None:
         "--max-episode-steps",
         "200",
     ]
-    log = LOG_DIR / "id_resume_retry6_reload_forward_smoke.log"
+    log = LOG_DIR / "id_resume_retry7_reload_forward_smoke.log"
     with log.open("w", encoding="utf-8") as stream:
         result = subprocess.run(command, env=env, stdout=stream, stderr=subprocess.STDOUT, check=False)
     summary = output / "summary.json"
@@ -170,14 +170,16 @@ def main() -> int:
         old_retry_preserved=True,
         storage_mount_recovered=True,
     )
-    run_job("id_resume_smoke_from3500_weights_only", RETRY / "smoke_2step", 3502, SOURCE, LOG_DIR / "id_resume_retry6_smoke.log")
-    smoke_checkpoint = RETRY / "smoke_2step/checkpoints/global_step_3502"
+    smoke_name = "id_resume_smoke_from3500_weights_only"
+    run_job(smoke_name, RETRY / "smoke_2step", 3502, SOURCE, LOG_DIR / "id_resume_retry7_smoke.log")
+    smoke_checkpoint = RETRY / f"smoke_2step/{smoke_name}/checkpoints/global_step_3502"
     if not complete_checkpoint(smoke_checkpoint):
         raise RuntimeError(f"resume smoke checkpoint is incomplete: {smoke_checkpoint}")
     run_reload_smoke(smoke_checkpoint)
     write_state(current_stage="id_training_resume_from3500_retry6", next_stage="id_checkpoint_probe_and_early_stop")
-    run_job("id_sft_10000_retry6_weights_only", TRAIN, 10000, SOURCE, LOG_DIR / "id_sft_formal_10000_retry6.log")
-    if not complete_checkpoint(TRAIN / "checkpoints/global_step_10000"):
+    formal_name = "id_sft_10000_retry7_weights_only"
+    run_job(formal_name, TRAIN, 10000, SOURCE, LOG_DIR / "id_sft_formal_10000_retry7.log")
+    if not complete_checkpoint(TRAIN / formal_name / "checkpoints/global_step_10000"):
         raise RuntimeError("formal global_step_10000 checkpoint is incomplete")
     (TRAIN / "TRAINING_COMPLETE").write_text(
         json.dumps({"source_checkpoint": str(SOURCE), "target_step": 10000}, indent=2) + "\n"
