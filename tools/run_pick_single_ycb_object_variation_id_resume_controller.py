@@ -91,8 +91,13 @@ def run_job(name: str, output: Path, max_steps: int, resume: Path, log: Path) ->
         process = subprocess.Popen(command, env=env, stdout=stream, stderr=subprocess.STDOUT)
         PID_FILE.parent.mkdir(parents=True, exist_ok=True)
         PID_FILE.write_text(str(process.pid) + "\n")
+        stage = (
+            f"id_training_resume_from3500_retry{RETRY.name.rsplit('retry', 1)[-1]}"
+            if max_steps == 10000
+            else "id_resume_smoke"
+        )
         write_state(
-            current_stage="id_training_resume_from3500_retry2" if max_steps == 10000 else "id_resume_smoke",
+            current_stage=stage,
             next_stage="id_checkpoint_probe_and_early_stop",
             training_pid=process.pid,
             retry=RETRY.name,
