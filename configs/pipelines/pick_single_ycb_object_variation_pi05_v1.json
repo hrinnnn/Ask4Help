@@ -115,7 +115,8 @@
       "recovered_at": "2026-08-24T03:11:39+08:00",
       "original_run_root_reaudited": true,
       "old_retry_preserved": "id_training_v1/formal_10000_retry1",
-      "new_retry": "id_training_v1/formal_10000_retry2",
+      "new_retry": "id_training_v1/formal_10000_retry3",
+      "retry2_diagnostic": "id_training_v1/formal_10000_retry2/PIPELINE_FAILED (Ray AF_UNIX path too long)",
       "resume_source": "id_training_v1/formal_10000_retry1/id_sft_10000_retry1/checkpoints/global_step_3500",
       "incomplete_checkpoint_preserved": "id_training_v1/formal_10000_retry1/id_sft_10000_retry1/checkpoints/global_step_4000"
     },

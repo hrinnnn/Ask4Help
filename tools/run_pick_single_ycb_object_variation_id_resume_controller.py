@@ -19,8 +19,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 RUN = Path("/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1")
-RETRY = RUN / "id_training_v1/formal_10000_retry2"
-TRAIN = RETRY / "id_sft_10000_retry2"
+RETRY = RUN / "id_training_v1/formal_10000_retry3"
+TRAIN = RETRY / "id_sft_10000_retry3"
 SOURCE = RUN / "id_training_v1/formal_10000_retry1/id_sft_10000_retry1/checkpoints/global_step_3500"
 DATASET = RUN / "datasets/id_v1_retry1"
 NORM = DATASET / "norm_stats.json"
@@ -65,8 +65,8 @@ def run_job(name: str, output: Path, max_steps: int, resume: Path, log: Path) ->
             "OBJECT_VARIATION_MAX_STEPS": str(max_steps),
             "OBJECT_VARIATION_SAVE_INTERVAL": "500",
             "OBJECT_VARIATION_TRAIN_SEED": "7000",
-            "RAY_TMPDIR": str(RUN / "ray_tmp_retry2"),
-            "TMPDIR": str(output / "tmp"),
+            "RAY_TMPDIR": os.environ.get("OBJECT_VARIATION_RAY_TMPDIR", "/sdd/ov_ray3"),
+            "TMPDIR": os.environ.get("OBJECT_VARIATION_TMPDIR", "/sdd/ov_tmp3"),
             "PYTHONUNBUFFERED": "1",
         }
     )
