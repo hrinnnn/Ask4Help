@@ -56,6 +56,7 @@
 - `v9_full_prompt`: resume from complete native `5000` checkpoint, remaining `5000`, target cumulative `20000`, GPU4/CPU80-99, full canonical prompt, original LR `2.5e-5`, PID `3641800`, current recovery step `44`
 - `short_prompt`: resume from complete native `2500` checkpoint, remaining `7500`, target cumulative `20000`, GPU5/CPU100-119, prompt `open the drawer and place the object in the tray`, conservative LR `5e-6`, PID `3641804`, current recovery step `44`
 - `data/norm/task/mask`: same immutable 128-ID dataset, frozen norm, 8D action, horizon10 temporal mask, Flow-SDE and train-expert-only contract
+- `checkpoint_gate_watcher`: PID `191346`, fixed ID seeds `88000..88019`, `max_episode_steps=400`, `execute_horizon=5`; every complete checkpoint is evaluated immediately; `>=16/20` writes `ID_BASE_VALIDATED_*`, otherwise diagnostic; GPU pool6/7
 - `forbidden`: GPUs1/2/3 are protected; no multi-GPU FSDP, OOD, PCA or DAgger before ID gate
 
 ## OpenDrawer X-VLA Foundation Adaptation
@@ -134,6 +135,7 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/`
 - `manifest`: `configs/pipelines/pick_single_ycb_object_variation_pi05_v1.json`
 - `plan`: `docs/experiment_management/plans/PickSingleYCB_ObjectVariation_OOD.md`
+- `baseline_protocol`: `docs/experiment_management/plans/PickSingleYCB_ObjectVariation_FailureDetection_Baseline_Protocol.md` (mandatory passive baselines, internal extensions, four downstream data/training rows, and evidence gate)
 - `task_contract`: generic PickSingleYCB instruction; ID=`005_tomato_soup_can`; OOD=`008_pudding_box`; paired reset differs only in `object_model_id`
 - `placement`: 5090 selected because native RLinf/OpenPI/ManiSkill, pretrained pi0.5 base and YCB assets are co-located on persistent `/data`; H20 rejected because an existing Ray owner occupies its resource pool and root filesystem is full
 - `runtime_repair`: shared NumPy 2.4.4 remains untouched; pipeline-only NumPy 1.26.4 overlay restores the official MPlib Panda planner, which otherwise exits during `mplib.Planner` construction
