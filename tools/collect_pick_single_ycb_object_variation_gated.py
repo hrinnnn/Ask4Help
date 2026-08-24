@@ -214,6 +214,7 @@ def main() -> None:
     parser.add_argument("--id-seed", type=int, default=16000)
     parser.add_argument("--ood-seed", type=int, default=16001)
     parser.add_argument("--only-split", choices=("id", "ood"))
+    parser.add_argument("--execute-horizon", type=int, default=EXECUTE_HORIZON)
     args = parser.parse_args()
     if args.output_dir.exists() or args.repo_id.exists():
         raise FileExistsError("refusing to overwrite gated collection output")
