@@ -5,8 +5,8 @@
   "owner_thread": "019ffbc4-f3a9-78f3-8684-e0b4cba3552a",
   "owner_label": "codex-object-variation-pick-single-ycb",
   "server": "zhaozhixuan@111.198.58.150:12001",
-  "current_stage": "id_formal_checkpoint_validation_user_override",
-  "next_stage": "passive_failure_detection",
+  "current_stage": "diff_collection_scientific_gate_failed",
+  "next_stage": "needs_user_decision",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/",
   "task": {
     "env_ids": {
@@ -115,8 +115,8 @@
       "final_evaluation": "four methods times held-out 100 ID and 100 object-OOD episodes, bounded to one process per GPU"
     },
     "required_markers": ["GATED_COLLECTION_AUDIT_PASSED", "BUDGET_SELECTION_COMPLETE", "MATCHED_SMOKE_RELOAD_PASSED", "FORMAL_TRAINING_COMPLETE", "PIPELINE_COMPLETE"],
-    "current": "id_formal_checkpoint_validation_user_override",
-    "stage": "passive_failure_detection",
+    "current": "diff_collection_scientific_gate_failed",
+    "stage": "needs_user_decision",
     "runtime_recovery": {
       "mount": "/data",
       "device": "/dev/sdb1",
@@ -141,6 +141,9 @@
       "id_norm": "datasets/id_v1_retry1/norm_stats.json",
       "formal_id_checkpoint": "id_training_v1/formal_10000_retry8/id_sft_10000_retry8/id_sft_10000_retry7_weights_only/checkpoints/global_step_4500",
       "formal_id_probe": "id_checkpoint_probe_20id/step_4500_retry8/summary.json",
+      "passive_detection": "passive_detection_v1/PASSIVE_COMPLETE",
+      "collection_audit": "audit/gated_collection_v1/report.json",
+      "scientific_gate_failure": "NEEDS_USER_DECISION",
       "reload_forward_smoke": "id_training_v1/smoke_2step/reload_forward_eval/summary.json",
       "reload_forward_reconciliation": "id_training_v1/smoke_2step/SIMULATOR_EXIT_AFTER_ARTIFACTS"
     }

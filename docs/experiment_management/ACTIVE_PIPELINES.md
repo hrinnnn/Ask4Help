@@ -51,10 +51,10 @@
 ## OpenDrawer pi0.5 Recovery After Runtime Restoration
 
 - `pipeline_id`: `open_drawer_pi05_recovery_v4`; `authorized=true`; owner remains A4H15
-- `current_stage`: `runtime_smoke_pending`; next stage `two_recovery_smokes_then_training`
-- `runtime`: `/sdd/ask4help-open-drawer/runtime/pi05_rlinf_v4/.venv`; torch `2.7.1+cu128`, `sm_120` and CUDA tensor smoke passed
-- `v9_full_prompt`: resume from complete native `5000` checkpoint, remaining `5000`, target cumulative `20000`, GPU4/CPU80-99, full canonical prompt, original LR `2.5e-5`
-- `short_prompt`: resume from complete native `2500` checkpoint, remaining `7500`, target cumulative `20000`, GPU5/CPU100-119, prompt `open the drawer and place the object in the tray`, conservative LR `5e-6`
+- `current_stage`: `training_recovery`; next stage native checkpoint `2500` then ID diagnostic
+- `runtime`: `/sdd/ask4help-open-drawer/runtime/pi05_rlinf_v4/.venv`; torch `2.7.1+cu128`, `sm_120` and CUDA tensor smoke passed; archive `/sdd/ask4help-open-drawer/runtime_archives/pi05_rlinf_v4_20260824.tar.zst` validated
+- `v9_full_prompt`: resume from complete native `5000` checkpoint, remaining `5000`, target cumulative `20000`, GPU4/CPU80-99, full canonical prompt, original LR `2.5e-5`, PID `3641800`, current recovery step `44`
+- `short_prompt`: resume from complete native `2500` checkpoint, remaining `7500`, target cumulative `20000`, GPU5/CPU100-119, prompt `open the drawer and place the object in the tray`, conservative LR `5e-6`, PID `3641804`, current recovery step `44`
 - `data/norm/task/mask`: same immutable 128-ID dataset, frozen norm, 8D action, horizon10 temporal mask, Flow-SDE and train-expert-only contract
 - `forbidden`: GPUs1/2/3 are protected; no multi-GPU FSDP, OOD, PCA or DAgger before ID gate
 
@@ -129,8 +129,8 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `owner_thread`: `019ffbc4-f3a9-78f3-8684-e0b4cba3552a`
 - `owner_label`: `codex-object-variation-pick-single-ycb`
 - `server`: `zhaozhixuan@111.198.58.150:12001`
-- `current_stage`: `id_formal_checkpoint_validation_user_override`
-- `next_stage`: start passive failure detection from the user-selected `global_step_4500`, then continue to four-method object-OOD collection/training
+- `current_stage`: `diff_collection_scientific_gate_failed`
+- `next_stage`: `needs_user_decision` after passive detection, Bridge-PCA, Failure-Recovery and Offline-Oracle completed but Diff-DAgger failed its collection denominator
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/`
 - `manifest`: `configs/pipelines/pick_single_ycb_object_variation_pi05_v1.json`
 - `plan`: `docs/experiment_management/plans/PickSingleYCB_ObjectVariation_OOD.md`
@@ -139,7 +139,7 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `runtime_repair`: shared NumPy 2.4.4 remains untouched; pipeline-only NumPy 1.26.4 overlay restores the official MPlib Panda planner, which otherwise exits during `mplib.Planner` construction
 - `gpu_plan`: current resume uses independently idle GPU1 with CPU `20-39`; GPU0 is occupied by another user's PID `1023482` (`/ws/bench_fine.py`) and GPU2 belongs to existing PID `1198612`; neither is touched
 - `next_action`: user explicitly selected complete `global_step_4500` as the formal ID checkpoint despite its `15/20` ID probe; retain that probe as diagnostic, then run passive failure detection before any OOD data collection
-- `evidence_so_far`: Oracle gate `20/20 ID + 20/20 OOD`; ID collection `128/128` with `128/128` videos; data audit `6634` anchors / `1152` tail anchors; ID norm and resume/reload smoke passed; `step4500` probe `15/20` with `20/20` videos/actions; user override marker `ID_BASE_VALIDATED`; four-GPU retry is preserved as NCCL engineering diagnostic
+- `evidence_so_far`: Oracle gate `20/20 ID + 20/20 OOD`; ID collection `128/128` with `128/128` videos; data audit `6634` anchors / `1152` tail anchors; ID norm and resume/reload smoke passed; `step4500` probe `15/20` with `20/20` videos/actions; passive detection ID/OOD `100/100`; Bridge-PCA `100/100`, Failure-Recovery `100/100`, Offline-Oracle `100/100`; Diff-DAgger `10/100` after `600` raw attempts; `NEEDS_USER_DECISION` written and matched training/final comparison blocked
 - `runtime_recovery`: `/data` was re-mounted from the existing `/dev/sdb1`; the original run root was re-audited on `2026-08-24 11:11+08:00`. The selected formal ID checkpoint is the complete `global_step_4500`; all earlier resume retry diagnostics and the four-GPU NCCL diagnostic remain untouched. The old single-GPU training may finish independently, but downstream experiments use only the frozen user-selected step4500 checkpoint and ID norm.
 - `completion`: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ORACLE_NOT_ACCEPTED`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED`
 
