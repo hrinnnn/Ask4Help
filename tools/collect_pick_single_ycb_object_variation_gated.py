@@ -26,7 +26,7 @@ from rlinf.envs.maniskill.pick_single_ycb_object_variation import (  # noqa: E40
     register_controlled_pick_single_ycb_object_variants,
     reset_metadata,
 )
-from rlinf.toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
+from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     _build_frames,
     _convert_solver_action_to_joint_delta,
     _create_dataset,
@@ -35,7 +35,7 @@ from rlinf.toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa
     _select_camera,
     _to_numpy,
 )
-from rlinf.toolkits.lerobot.diagnose_pick_single_ycb_object_variation_oracle import (  # noqa: E402
+from toolkits.lerobot.diagnose_pick_single_ycb_object_variation_oracle import (  # noqa: E402
     run_oracle,
 )
 from tools.evaluate_pick_single_ycb_object_variation_pi05 import (  # noqa: E402
