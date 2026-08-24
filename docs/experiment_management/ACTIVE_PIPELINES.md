@@ -119,8 +119,8 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `owner_thread`: `019ffbc4-f3a9-78f3-8684-e0b4cba3552a`
 - `owner_label`: `codex-object-variation-pick-single-ycb`
 - `server`: `zhaozhixuan@111.198.58.150:12001`
-- `current_stage`: `storage_mount_recovery_needs_user_decision`
-- `next_stage`: mount the existing `/dev/sdb1` data disk at `/data`, then re-audit the original controller/checkpoint state before any restart
+- `current_stage`: `id_resume_preflight`
+- `next_stage`: run a fresh 2-step resume/reload smoke from complete `global_step_3500`, then resume ID training in `formal_10000_retry2`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/`
 - `manifest`: `configs/pipelines/pick_single_ycb_object_variation_pi05_v1.json`
 - `plan`: `docs/experiment_management/plans/PickSingleYCB_ObjectVariation_OOD.md`
@@ -130,7 +130,27 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `gpu_plan`: reserve only independently idle GPU0/1/3/4; GPU2 belongs to existing PID `1198612`; never touch existing owners
 - `next_action`: probe every complete 500-step checkpoint on 20 ID episodes; the first `>=17/20` probe stops training and becomes the formal ID checkpoint, followed by independent 100-ID validation
 - `evidence_so_far`: Oracle gate `20/20 ID + 20/20 OOD`; ID collection `128/128` with `128/128` videos; data audit `6634` anchors / `1152` tail anchors; ID norm and 2-step reload/forward smoke passed; dual-GPU formal launch is preserved as engineering diagnostic
-- `runtime_blocker`: at `2026-08-23T12:55+08:00`, `/dev/sdb1` with the fstab UUID for `/data` was present but unmounted; the canonical run root, logs, checkpoints, and controller PIDs were not visible. `/sdd/object_variation_pick_single_ycb_v1_mount_recovery_20260823/NEEDS_USER_DECISION.json` records the evidence. Current SSH user lacks passwordless sudo and root SSH is unavailable; do not start replacement work.
+- `runtime_recovery`: `/data` was re-mounted from the existing `/dev/sdb1`; the original run root was re-audited on `2026-08-24 11:11+08:00`. No controller was alive, `global_step_3500` is complete, and the old retry1 `global_step_4000` contains only an incomplete DCP shard without `full_weights.pt`; resume is therefore isolated in new `id_training_v1/formal_10000_retry2` from complete `global_step_3500`. Old retry1 and the mount-recovery diagnostic remain untouched.
+- `completion`: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ORACLE_NOT_ACCEPTED`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED`
+
+## X-VLA Put Vegetable in Basket Object Variation OOD
+
+- `pipeline_id`: `xvla_put_vegetable_basket_object_ood_v1`
+- `authorized`: `true`
+- `owner_label`: `codex-xvla-vegetable-basket-object-ood`
+- `owner_thread`: `current-thread`
+- `server`: `root@39.101.70.188:1012`
+- `current_stage`: `id_gate_scientific_stop_visible_retry1`
+- `next_stage`: `needs_user_decision`
+- `run_root`: `/mnt/data/ask4help/results/xvla_put_vegetable_basket_object_ood_v1/`
+- `manifest`: `configs/pipelines/xvla_put_vegetable_basket_object_ood_v1.json`
+- `plan`: `docs/experiment_management/plans/XVLA_PutVegetableBasket_ObjectVariation_OOD.md`
+- `task_contract`: controlled `PutEggplantInBasketScene-v1`; ID=`eggplant`; OOD=`bridge_carrot_generated_modified`; same WidowX/sink/basket/camera/instruction/reset/success; only object asset changes
+- `model_contract`: X-VLA `widowx-air` domain id `4`, real action 10D, model max action 20D, action chunk 30, fresh adaptation from `/mnt/data/ask4help/models/X-VLA-Pt_from5090_v4`
+- `placement`: H20 X-VLA source/model/runtime are present; GPU0/1 remain registered to existing Ray/RLinf PID `276925`, but the user authorized a scoped shared-idle exception. Repeated pre-launch audits must show zero utilization and stable memory; do not signal or reconfigure the existing PID/Ray session. Root overlay remains 100% full; `/tmp` was cleaned to about 20 GiB free and new outputs/caches go to `/mnt/data` and `/tmp`
+- `retry`: `rgb_visible_retry1`; new run root=`/mnt/data/ask4help/results/xvla_put_vegetable_basket_object_ood_v1_rgb_visible_retry1/`; fixed code now follows the official greenscreen exclusion for ID and OOD. The old hidden-RGB dataset/checkpoint remain diagnostic and are forbidden as retry inputs.
+- `short_term_goal`: visible-object smoke passed; formal Oracle ID/OOD=`20/20` each; fresh ID collection=`128/128`; temporal-mask/norm audit and 2-step reload smoke passed; fresh ID SFT reached `10000` with every 500-step checkpoint; independent ID gate completed `20/20` episodes and `20/20` videos but achieved `0/20` success. OOD remains locked.
+- `scientific_stop`: visible-RGB retry has a complete denominator but failed the ID gate; evidence=`/mnt/data/ask4help/results/xvla_put_vegetable_basket_object_ood_v1_rgb_visible_retry1/provenance/id_gate_evidence_visible_retry1.json`; action diagnostic=`/mnt/data/ask4help/results/xvla_put_vegetable_basket_object_ood_v1_rgb_visible_retry1/diagnostics/policy_action_trace_ckpt10000_seed94000.json`.
 - `completion`: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ORACLE_NOT_ACCEPTED`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED`
 
 ## Heartbeat Watchdog Rule
