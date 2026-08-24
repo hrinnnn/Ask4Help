@@ -193,7 +193,7 @@ def main() -> None:
     state(current_stage="detector_assets", next_stage="gate_calibration")
     assets = RUN / "detector_assets_v1"
     if not (assets / "ASSETS_COMPLETE").is_file():
-        run(
+        calibration_rc = run(
             [
                 str(PY),
                 str(ROOT / "tools/build_pick_single_ycb_object_variation_detector_assets.py"),
@@ -223,7 +223,15 @@ def main() -> None:
             ],
             log=RUN / "logs/gate_calibration_v1.log",
             gpu=select_idle_gpus(1)[0],
+            check=False,
         )
+        if calibration_rc not in {0, -6} or not calibration.is_file():
+            raise RuntimeError(f"gate calibration failed rc={calibration_rc} without calibration.json")
+        if calibration_rc == -6:
+            (calibration.parent / "SIMULATOR_EXIT_AFTER_ARTIFACTS").write_text(
+                json.dumps({"returncode": calibration_rc, "accepted_because": "calibration.json is complete"}, indent=2) + "\n",
+                encoding="utf-8",
+            )
 
     state(current_stage="passive_detection", next_stage="four_method_collection")
     passive = RUN / "passive_detection_v1"
@@ -261,8 +269,11 @@ def main() -> None:
                     RUN / "logs/passive_ood.log",
                     passive_gpus[1],
                 ),
-            ]
+            ],
+            allowed_returncodes={0, -6},
         )
+        if not eval_evidence(passive / "id", 100) or not eval_evidence(passive / "ood", 100):
+            raise RuntimeError("passive detector evidence is incomplete after evaluator exit")
         (passive / "PASSIVE_COMPLETE").write_text("complete\n", encoding="utf-8")
 
     state(current_stage="four_method_collection", next_stage="four_dataset_audit")
@@ -359,7 +370,8 @@ def main() -> None:
     ]
     if missing_collection:
         run_parallel(
-            [command for command in commands if command[0][command[0].index("--method") + 1] in {item[0] for item in missing_collection}]
+            [command for command in commands if command[0][command[0].index("--method") + 1] in {item[0] for item in missing_collection}],
+            allowed_returncodes={0, -6},
         )
 
     state(current_stage="four_dataset_audit", next_stage="matched_budget_selection")
