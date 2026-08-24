@@ -152,9 +152,10 @@ def main() -> None:
                     traces["fidel_official"].append(float(fidel_score[0].item()))
                     traces["crsail_observable_state_k5"].append(float(crsail_score(state_feature, crsail_state)[0].item()))
                     traces["crsail_vision_k5"].append(float(crsail_score(external_feature, crsail_vision, cosine=True)[0].item()))
-                chunk = clip_action_chunk(predicted.detach().float().cpu().numpy(), low, high, args.execute_horizon)
+                full_chunk = clip_action_chunk(predicted.detach().float().cpu().numpy(), low, high, int(model.config.action_horizon))
+                chunk = full_chunk[: args.execute_horizon]
                 qpos = raw_obs["agent"]["qpos"].detach().cpu().numpy()[0]
-                points = projector.project(qpos, chunk)
+                points = projector.project(qpos, full_chunk)
                 acc_ema = None
                 stac = None
                 if previous_points is not None:
