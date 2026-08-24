@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RUN = Path("/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1")
 SOURCE = RUN / "id_training_v1/formal_10000_retry8/id_sft_10000_retry8/id_sft_10000_retry7_weights_only/checkpoints/global_step_4000"
-RETRY = RUN / "id_training_v1/formal_10000_4gpu_retry2"
+RETRY = RUN / "id_training_v1/formal_10000_4gpu_retry3"
 SMOKE = RETRY / "smoke_2step"
 FORMAL = RETRY / "id_sft_10000_4gpu_retry1"
 DATASET = RUN / "datasets/id_v1_retry1"
@@ -30,7 +30,7 @@ STATE = RETRY / "pipeline_state.json"
 
 def write_state(stage: str, **extra: object) -> None:
     payload = json.loads(STATE.read_text()) if STATE.is_file() else {}
-    payload.update({"pipeline": "pick_single_ycb_object_variation_4gpu_retry1", "stage": stage, **extra})
+    payload.update({"pipeline": "pick_single_ycb_object_variation_4gpu_retry3", "stage": stage, **extra})
     payload["updated_at"] = datetime.now(timezone.utc).isoformat()
     STATE.write_text(json.dumps(payload, indent=2) + "\n")
 
@@ -57,8 +57,9 @@ def train(output: Path, experiment: str, max_steps: int, save_interval: int, log
             "OBJECT_VARIATION_MAX_STEPS": str(max_steps),
             "OBJECT_VARIATION_SAVE_INTERVAL": str(save_interval),
             "OBJECT_VARIATION_TRAIN_SEED": "7000",
-            "RAY_TMPDIR": "/sdd/ov_ray_4gpu_retry1",
-            "TMPDIR": "/sdd/ov_tmp_4gpu_retry1",
+            "RAY_TMPDIR": "/sdd/ov_ray_4gpu_retry3",
+            "TMPDIR": "/sdd/ov_tmp_4gpu_retry3",
+            "RLINF_RAY_ADDRESS": "local",
             "PYTHONUNBUFFERED": "1",
         }
     )
