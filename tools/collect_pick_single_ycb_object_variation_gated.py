@@ -206,6 +206,7 @@ def main() -> None:
     parser.add_argument("--norm-stats", type=Path)
     parser.add_argument("--detector-assets", type=Path)
     parser.add_argument("--diff-calibration", type=Path)
+    parser.add_argument("--diff-threshold", type=float)
     parser.add_argument("--bridge-threshold", type=float, default=0.0)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--repo-id", type=Path, required=True)
@@ -236,6 +237,10 @@ def main() -> None:
     if args.method == "diffdagger":
         scores = json.loads(args.diff_calibration.read_text())["scores"]
         diff_gate = DiffDAggerQueryGate(scores, alpha=0.95, patience=2)
+        if args.diff_threshold is not None:
+            if not np.isfinite(args.diff_threshold) or args.diff_threshold < 0:
+                raise ValueError("--diff-threshold must be a finite non-negative value")
+            diff_gate.threshold = float(args.diff_threshold)
     probe_env = _env("id", "pd_joint_delta_pos")
     lower, upper = _joint_delta_arm_bounds(probe_env)
     probe_env.close()
@@ -272,7 +277,7 @@ def main() -> None:
             print(f"accepted={accepted}/{args.target_expert_trajectories} attempts={attempt + 1}", flush=True)
     if dataset is not None and getattr(dataset, "image_writer", None) is not None:
         dataset.image_writer.wait_until_done()
-    summary = {"format": "pick_single_ycb_object_variation_gated_collection_v1", "method": args.method, "accepted": accepted, "target": args.target_expert_trajectories, "raw_attempts": len(rows), "video_count": len(list((args.output_dir / "raw_archive/videos").glob("*.mp4"))), "object_variation_only": True}
+    summary = {"format": "pick_single_ycb_object_variation_gated_collection_v1", "method": args.method, "accepted": accepted, "target": args.target_expert_trajectories, "raw_attempts": len(rows), "video_count": len(list((args.output_dir / "raw_archive/videos").glob("*.mp4"))), "object_variation_only": True, "diff_threshold_override": args.diff_threshold}
     (args.output_dir / "attempts.jsonl").write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     marker = "COLLECTION_COMPLETE" if accepted == args.target_expert_trajectories else "COLLECTION_FAILED"
