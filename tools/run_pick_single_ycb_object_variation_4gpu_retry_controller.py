@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 RUN = Path("/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1")
 SOURCE = RUN / "id_training_v1/formal_10000_retry8/id_sft_10000_retry8/id_sft_10000_retry7_weights_only/checkpoints/global_step_4000"
-RETRY = RUN / "id_training_v1/formal_10000_4gpu_retry1"
+RETRY = RUN / "id_training_v1/formal_10000_4gpu_retry2"
 SMOKE = RETRY / "smoke_2step"
 FORMAL = RETRY / "id_sft_10000_4gpu_retry1"
 DATASET = RUN / "datasets/id_v1_retry1"
