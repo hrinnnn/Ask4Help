@@ -198,6 +198,18 @@ def training_env(gpu: int, method: str, expert: Path, output: Path, steps: int) 
     return env
 
 
+def run_method_waves(methods: tuple[str, ...], builder, *, allowed_returncodes: set[int] | None = None, max_parallel: int = 3) -> None:
+    """Run method branches in bounded waves when fewer than four GPUs are free."""
+
+    for start in range(0, len(methods), max_parallel):
+        wave_methods = methods[start : start + max_parallel]
+        wave_gpus = wait_for_idle_gpus(len(wave_methods))
+        run_parallel(
+            [builder(method, gpu) for method, gpu in zip(wave_methods, wave_gpus)],
+            allowed_returncodes=allowed_returncodes,
+        )
+
+
 def main() -> None:
     if (RUN / "PIPELINE_COMPLETE").is_file():
         raise RuntimeError(f"diagnostic pipeline already complete: {RUN}")
@@ -262,23 +274,22 @@ def main() -> None:
     budget_manifest = json.loads((budget_root / "budget_manifest.json").read_text(encoding="utf-8"))
 
     training = RUN / "matched_training"
-    gpus = wait_for_idle_gpus(4)
-    gpu_map = dict(zip(METHODS, gpus))
-    smoke_commands = []
-    for method in METHODS:
+
+    def smoke_builder(method: str, gpu: int):
         output = training / f"{method}_smoke_2step"
         command = [str(PY), str(ROOT / "RLinf/examples/sft/train_vla_sft.py"), "--config-path", str(ROOT / "RLinf/examples/sft/config"), "--config-name", "pick_single_ycb_object_variation_matched_sft_openpi_pi05", "runner.max_steps=2", "runner.save_interval=2"]
-        smoke_commands.append((command, RUN / "logs" / f"matched_{method}_smoke.log", gpu_map[method], training_env(gpu_map[method], method, budget_root / method, output, 2)))
+        return command, RUN / "logs" / f"matched_{method}_smoke.log", gpu, training_env(gpu, method, budget_root / method, output, 2)
+
     write_state(current_stage="matched_training_smoke", next_stage="matched_training")
-    run_parallel(smoke_commands)
+    run_method_waves(METHODS, smoke_builder)
     for method in METHODS:
         if checkpoint_for(training / f"{method}_smoke_2step", 2) is None:
             raise RuntimeError(f"missing diagnostic 2-step checkpoint: {method}")
     (training / "MATCHED_SMOKE_COMPLETE").write_text("complete\n", encoding="utf-8")
 
     reload_root = training / "reload_forward_smoke"
-    reload_commands = []
-    for method in METHODS:
+
+    def reload_builder(method: str, gpu: int):
         output = reload_root / method
         command = [
             str(PY), str(ROOT / "tools/evaluate_pick_single_ycb_object_variation_pi05.py"),
@@ -287,19 +298,20 @@ def main() -> None:
             "--split", "id", "--episodes", "1", "--seed", str(94000 + METHODS.index(method)),
             "--execute-horizon", "5", "--max-episode-steps", "20",
         ]
-        reload_commands.append((command, RUN / "logs" / f"reload_{method}.log", gpu_map[method]))
-    run_parallel(reload_commands, allowed_returncodes={0, -6, 120})
+        return command, RUN / "logs" / f"reload_{method}.log", gpu
+
+    run_method_waves(METHODS, reload_builder, allowed_returncodes={0, -6, 120})
     if not all(eval_evidence(reload_root / method, 1) for method in METHODS):
         raise RuntimeError("diagnostic reload evidence is incomplete")
     (training / "MATCHED_SMOKE_RELOAD_PASSED").write_text("complete\n", encoding="utf-8")
 
-    formal_commands = []
-    for method in METHODS:
+    def formal_builder(method: str, gpu: int):
         output = training / method
         command = [str(PY), str(ROOT / "RLinf/examples/sft/train_vla_sft.py"), "--config-path", str(ROOT / "RLinf/examples/sft/config"), "--config-name", "pick_single_ycb_object_variation_matched_sft_openpi_pi05", "runner.max_steps=5000", "runner.save_interval=500"]
-        formal_commands.append((command, RUN / "logs" / f"matched_{method}_5000.log", gpu_map[method], training_env(gpu_map[method], method, budget_root / method, output, 5000)))
+        return command, RUN / "logs" / f"matched_{method}_5000.log", gpu, training_env(gpu, method, budget_root / method, output, 5000)
+
     write_state(current_stage="matched_training", next_stage="final_evaluation")
-    run_parallel(formal_commands)
+    run_method_waves(METHODS, formal_builder)
     required = tuple(range(500, 5001, 500))
     checkpoint_audit = {method: {str(step): str(checkpoint_for(training / method, step)) for step in required} for method in METHODS}
     if any(value == "None" for row in checkpoint_audit.values() for value in row.values()):
@@ -310,8 +322,7 @@ def main() -> None:
     eval_root = RUN / "final_evaluation"
     write_state(current_stage="final_evaluation", next_stage="result_registration")
     for split, seed in (("id", 17000), ("ood", 18000)):
-        commands = []
-        for method in METHODS:
+        def eval_builder(method: str, gpu: int):
             output = eval_root / method / split
             command = [
                 str(PY), str(ROOT / "tools/evaluate_pick_single_ycb_object_variation_pi05.py"),
@@ -319,8 +330,9 @@ def main() -> None:
                 "--norm-stats", str(NORM), "--output-dir", str(output), "--split", split,
                 "--episodes", "100", "--seed", str(seed), "--execute-horizon", "5", "--max-episode-steps", "200",
             ]
-            commands.append((command, RUN / "logs" / f"final_{method}_{split}.log", gpu_map[method]))
-        run_parallel(commands, allowed_returncodes={0, -6, 120})
+            return command, RUN / "logs" / f"final_{method}_{split}.log", gpu
+
+        run_method_waves(METHODS, eval_builder, allowed_returncodes={0, -6, 120})
         if not all(eval_evidence(eval_root / method / split, 100) for method in METHODS):
             raise RuntimeError(f"diagnostic final {split} evidence is incomplete")
 
