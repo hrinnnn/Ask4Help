@@ -4,6 +4,22 @@
 
 本文件是当前长实验的执行总表。Owner、Leader 和 Heartbeat 每次接力必须先读本文件，再读对应 manifest、plan 与远端 `pipeline_state.json`。聊天历史中的旧模型路线或旧阶段不得覆盖本文件。
 
+## X-VLA Fixed-Grid Task-Policy Knee Validation
+
+- `pipeline_id`: `xvla_fixedgrid_taskpolicy_knee_v1`
+- `authorized`: `true`; 用户已要求记录并执行 StackCube/Grab Plane fixed-grid task-policy knee validation
+- `owner_thread`: `current-thread`; `owner_label`: `codex-root-xvla-knee-validation`
+- `server_preference`: `zhaozhixuan@111.198.58.150:12001`; H20 `root@39.101.70.188:1012` 为回退
+- `current_stage`: `local_implementation_complete_resource_preflight_blocked`
+- `next_stage`: `runtime_asset_seed_collision_preflight_then_stackcube_smoke`
+- `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/`
+- `manifest`: `configs/pipelines/xvla_fixedgrid_taskpolicy_knee_v1.json`
+- `plan`: `docs/experiment_management/plans/XVLA_FixedGrid_TaskPolicy_Knee_Validation.md`
+- `source_commit`: `9d8af4d`; local branch `codex/xvla-fixed-grid-knee`; GitHub branch pushed
+- `implementation`: fixed-step collector, task-state knee summarizer, contract/knee tests; local and remote 5090 worktree smoke passed (`4 passed`)
+- `resource_preflight_2026-08-25`: 5090 GPUs are occupied/protected by existing owners (GPU0/1/2/4/6/7; GPU5 is OpenDrawer owner; GPU3 is another owner); H20 GPU0/1 are registered to existing online-awbc owner and root overlay is full. No formal process launched, no existing PID touched.
+- `forbidden`: do not use old Stage-2 timing as formal input; do not launch on any protected GPU; do not tune thresholds/anchors on OOD; do not claim completion from smoke or partial calibration
+
 ## OpenDrawer pi0.5 Continuation From global_step_10000
 
 - `pipeline_id`: `open_drawer_pi05_resume_from10000_v9`
@@ -54,10 +70,22 @@
 - `current_stage`: `id_checkpoint_gate_v9_native_5000`; next stage short-prompt native `5000` then `7500` ID gates
 - `runtime`: `/sdd/ask4help-open-drawer/runtime/pi05_rlinf_v4/.venv`; torch `2.7.1+cu128`, `sm_120` and CUDA tensor smoke passed; archive `/sdd/ask4help-open-drawer/runtime_archives/pi05_rlinf_v4_20260824.tar.zst` validated
 - `v9_full_prompt`: complete native `5000/5000`, target cumulative `20000`, GPU4/CPU80-99, full canonical prompt, original LR `2.5e-5`; training exited cleanly. The fixed-ID gate is complete at `10/20` strict (`drawer_opened=19/20`, `grasp=14/20`, `lift=14/20`, `in_target=10/20`), below the `16/20` qualification threshold. Evidence is complete at `20/20` videos/actions/states/timelines/reset metadata under `/sdd/ask4help-open-drawer/results/open_drawer_pi05_recovery_v4_checkpoint_id_gates/v9_full_prompt/native_step_5000/`; the prior empty waiting directory remains preserved as `native_step_5000_waiting_gpu_diagnostic_20260825`.
-- `short_prompt`: native `5207/7500`, target cumulative `20000`, GPU5/CPU100-119, prompt `open the drawer and place the object in the tray`, conservative LR `5e-6`, training PID `3641804`; native checkpoints `2500` and `5000` are complete. The native5000 fixed-ID gate is `6/20` strict, below threshold; all `20/20` videos/actions/states/timelines/reset metadata are complete. The watcher-written gate JSON had a literal newline-escape formatting defect; it is preserved as diagnostic and independently reconciled in `shortprompt/native_step_5000/checkpoint_gate_reconciliation.json`.
+- `short_prompt`: native `7500/7500` complete, target cumulative `10000`, GPU5/CPU100-119, prompt `open the drawer and place the object in the tray`, conservative LR `5e-6`; native checkpoints `2500`, `5000`, and `7500` are complete. The command and log prove this recovery starts at native2500 and runs 7500 new steps, so the stale target cumulative `20000` was reconciled to `10000` in `ENGINEERING_STATE_RECONCILIATION_FINAL`. The native5000 fixed-ID gate is `6/20` strict and native7500 is `5/20`, both below threshold; native7500 evidence is complete at `20/20` videos/actions/states/timelines/reset metadata. The watcher-written native5000 gate JSON formatting defect remains preserved and independently reconciled.
 - `data/norm/task/mask`: same immutable 128-ID dataset, frozen norm, 8D action, horizon10 temporal mask, Flow-SDE and train-expert-only contract
-- `checkpoint_gate_watcher`: old PID `191346` and the first handoff watcher were safely closed after GPU4 became available. Replacement watcher PID `3019067` uses the fixed JSON writer and hard free-memory/no-compute-app GPU pool `[4,6,7]`; it has verified v9 native5000 and shortprompt native5000 and now waits for shortprompt native7500. Fixed ID seeds are `88000..88019`, `max_episode_steps=400`, `execute_horizon=5`; `>=16/20` writes `ID_BASE_VALIDATED_*`, otherwise diagnostic. `/sdd` has only about `26GB` free while short training continues, so no checkpoint cleanup or new copies are allowed without a task-owned manifest decision.
+- `checkpoint_gate_watcher`: watcher PID `2313468` uses the fixed JSON writer and hard free-memory/no-compute-app GPU pool `[4,5,6,7]`; it has verified v9 native5000 and shortprompt native5000 and waits for shortprompt native7500. Fixed ID seeds are `88000..88019`, `max_episode_steps=400`, `execute_horizon=5`; `>=16/20` writes `ID_BASE_VALIDATED_*`, otherwise diagnostic. `/sdd` has about `27GB` free while short training continues, so no checkpoint cleanup or new copies are allowed without a task-owned manifest decision.
+- `disk_risk_repair`: after verifying v9 `training_complete` and no v9 process, the finished v9 `smoke_2step` (~19GB) and `runtime_tmp` (~5.8GB) were migrated to `/data/zhaozhixuan/Ask4Help-open-drawer/archive/open_drawer_pi05_v9_recovery_from5000_v4_20260825/`; original `/sdd` paths remain symlinks. Migration manifest records source/destination byte totals and completion-only guard. `/sdd` free space is now about `44GB`; active short-prompt runtime/checkpoints were not touched.
 - `forbidden`: GPUs1/2/3 are protected; no multi-GPU FSDP, OOD, PCA or DAgger before ID gate
+
+## OpenDrawer v9 Formal Failure Detection and Three-Stage OOD Override
+
+- `pipeline_id`: `open_drawer_pi05_v9_formal_failure_ood_v1`; `authorized=true` by the explicit 2026-08-25 user decision
+- `owner_thread`: `019fdb64-2df4-7a53-9a66-7a5c9b9fe97a`; `server`: `zhaozhixuan@111.198.58.150:12001`
+- `base_checkpoint`: v9 full-prompt native5000 at `/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000`; independent ID probe `10/20`, so `base_policy_status=preliminary_id_checkpoint` and not `ID_BASE_VALIDATED`
+- `user_override`: Oracle gate is `20` independent resets per split with strict `>=18/20`; formal failure-detection rows include FIDeL, CRSAIL, ACC and STAC in addition to internal PCA/LLMD/kNN and Diff-DAgger. The user explicitly permits these benchmark and OOD-training rows to be registered as formal results under the preliminary base; policy qualification remains reported separately.
+- `splits`: `handle_ood` handle offset `0.085`, `grasp_ood` yaw `80--100` degrees, `goal_ood` goal center `y=+0.30`; each split remains independent and paired with ID factors.
+- `current_stage`: `oracle_handle_ood_running`; retry6/8/9 are preserved as Oracle rejections. Retry8 and retry9 both measured Grasp OOD `17/20`; retry9's three failures were planner transient returns on fixed seeds and a same-seed diagnostic rerun succeeded. Retry7 remains `ENGINEERING_ORACLE_SHARED_PLANNER_SERIALIZATION_DIAGNOSTIC`. Retry10 controller PID `321472` is running the three splits serially on GPU5 with output on `/data` because `/sdd` had only about 9.4 GiB free; collector retry policy is reference up to 3 and replay up to 2 on the same seed. Failure-detection waiter PID `321473` and OOD collection/training waiter PID `321474` are active and will only advance after their explicit completion markers.
+- `next_stage`: after a real idle planner GPU appears, run the three 20-ID+20-OOD alternating Oracle gates; then build the OpenDrawer external assets and run the formal detector matrix. Do not copy Airplane/StackCube metric values.
+- `manifest`: `configs/pipelines/open_drawer_pi05_v9_formal_failure_ood_v1.json`
 
 ## OpenDrawer X-VLA Foundation Adaptation
 
