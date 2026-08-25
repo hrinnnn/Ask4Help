@@ -145,6 +145,7 @@ def launch_diff_collection(output: Path, dataset: Path, threshold: float, suffix
 
 def wait_for_diff() -> tuple[Path, Path, float]:
     candidates = (
+        ("005_retry1", COLLECTION_ROOT / "diffdagger_low_threshold_005_retry1", DATASET_ROOT / "diffdagger_low_threshold_005_retry1_v1", 0.05),
         ("005", COLLECTION_ROOT / "diffdagger_low_threshold_005", DATASET_ROOT / "diffdagger_low_threshold_005_v1", 0.05),
         ("002", COLLECTION_ROOT / "diffdagger_low_threshold_002", DATASET_ROOT / "diffdagger_low_threshold_002_v1", 0.02),
         ("001", COLLECTION_ROOT / "diffdagger_low_threshold_001", DATASET_ROOT / "diffdagger_low_threshold_001_v1", 0.01),
