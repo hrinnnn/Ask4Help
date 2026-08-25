@@ -75,6 +75,21 @@
     "reason": "explicit user decision overrides the default >80% probe stop rule; 15/20 is retained as diagnostic evidence",
     "formal_id_validation": "ID_BASE_VALIDATED"
   },
+  "diagnostic_override": {
+    "authorized": true,
+    "authorized_at": "2026-08-25",
+    "reason": "user explicitly authorized a lower Diff-DAgger threshold and parallel provisional training while the Diff diagnostic collection runs",
+    "diff_threshold_override": 0.05,
+    "diff_q": 0.95,
+    "diff_patience": 2,
+    "canonical_diff_threshold": 0.6456781893968583,
+    "canonical_collection_untouched": true,
+    "diagnostic_collection_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/collections_diagnostic_v1/diffdagger_low_threshold_005_retry1",
+    "diagnostic_training_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/diagnostic_low_threshold_005_v1",
+    "provisional_training_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/provisional_training_while_diff_collection_v1",
+    "provisional_methods": ["bridge_pca", "failure_recovery", "offline_oracle"],
+    "provisional_training_is_not_canonical": true
+  },
   "placement_preflight": {
     "selected_server": "zhaozhixuan@111.198.58.150:12001",
     "selected_reason": "native RLinf/OpenPI/ManiSkill runtime, pi0.5 base and YCB assets co-located, /data persistent, and an actually idle GPU1 available; GPU0 is occupied by another user's bench_fine.py and is not touched; official mplib planner requires a per-pipeline NumPy 1.26 overlay",
