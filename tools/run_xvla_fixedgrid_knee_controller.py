@@ -92,6 +92,7 @@ def calibration_command(
     seed_manifest: Path,
     step: int,
     ood_split: str,
+    seed_count: int,
 ) -> list[str]:
     return [
         python,
@@ -103,7 +104,7 @@ def calibration_command(
         "--output-dir", str(output),
         "--repo-id", str(repo_id),
         "--seed-manifest", str(seed_manifest),
-        "--target", "20",
+        "--target", str(seed_count),
         "--consume-all-seeds",
         "--ood-split", ood_split,
         "--flow-steps", "10",
@@ -124,7 +125,12 @@ def run_stackcube_calibration(args: argparse.Namespace) -> None:
         raise FileNotFoundError(worktree / "tools/collect_stackcube_xvla_dagger.py")
     check_gpu(args.gpu)
     root.mkdir(parents=True, exist_ok=True)
-    seed_manifest = make_seed_manifest(root / "manifests/calibration_stackcube_150000_150019.json", 150000, 150019)
+    seed_manifest = make_seed_manifest(
+        root / f"manifests/calibration_stackcube_{args.seed_start}_{args.seed_end}.json",
+        args.seed_start,
+        args.seed_end,
+    )
+    seed_count = args.seed_end - args.seed_start + 1
     state_path = root / "pipeline_state.json"
     state = read_json(state_path) if state_path.exists() else {
         "pipeline_id": manifest["pipeline_id"],
@@ -133,6 +139,8 @@ def run_stackcube_calibration(args: argparse.Namespace) -> None:
         "started_at": _now(),
         "anchors": manifest["timing_anchors_env_steps"],
         "completed_steps": [],
+        "seed_start": args.seed_start,
+        "seed_end": args.seed_end,
     }
     write_json(state_path, state)
     for step in manifest["timing_anchors_env_steps"]:
@@ -155,6 +163,7 @@ def run_stackcube_calibration(args: argparse.Namespace) -> None:
             seed_manifest=seed_manifest,
             step=step,
             ood_split="ood",
+            seed_count=seed_count,
         )
         state.update({"stage": f"calibration_step_{step}", "command": command, "updated_at": _now()})
         write_json(state_path, state)
@@ -184,8 +193,12 @@ def main() -> None:
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--run-root", type=Path)
     parser.add_argument("--gpu", type=int, required=True)
+    parser.add_argument("--seed-start", type=int, default=150000)
+    parser.add_argument("--seed-end", type=int, default=150019)
     parser.add_argument("--stage", choices=("stackcube_calibration",), required=True)
     args = parser.parse_args()
+    if args.seed_end < args.seed_start:
+        raise ValueError("--seed-end must be >= --seed-start")
     if args.stage == "stackcube_calibration":
         run_stackcube_calibration(args)
 

@@ -25,6 +25,7 @@ def test_calibration_command_contains_fixed_timing_step() -> None:
         seed_manifest=Path("/seeds.json"),
         step=45,
         ood_split="ood",
+        seed_count=2,
     )
     assert "fixed_timing" in command
     assert "--timing-step" in command
