@@ -44,11 +44,15 @@ from tools.stackcube_stage2_ood import (  # noqa: E402
 
 METHODS = (
     "internal_pca",
+    "input_pca",
+    "bridge_pca",
+    "action_pca",
     "vlm_bridge_pca",
     "offline_oracle",
     "failure_recovery",
     "diffdagger",
 )
+INTERNAL_PCA_METHODS = {"internal_pca", "input_pca", "action_pca"}
 TIMING_CONDITIONS = (
     "immediate",
     "post_grasp",
@@ -301,7 +305,7 @@ def _run_attempt(
                 failure_recovery_event = failure_state.reason
         if expert_start is None:
             assert policy is not None
-            if method == "internal_pca":
+            if method in INTERNAL_PCA_METHODS:
                 assert internal_probe is not None
                 torch.manual_seed(policy_seed)
                 inputs = policy.prepare(raw_obs, STACK_CUBE_TASK)
@@ -316,7 +320,7 @@ def _run_attempt(
                 predicted, feature, inputs, encoding = policy.predict(
                     raw_obs, STACK_CUBE_TASK, seed=policy_seed, steps=flow_steps
                 )
-            if method in {"internal_pca", "vlm_bridge_pca"}:
+            if method in {*INTERNAL_PCA_METHODS, "bridge_pca", "vlm_bridge_pca"}:
                 assert internal_pca is not None
                 score, threshold = internal_pca.score(feature), pca_threshold
                 gate_count, alarm = consecutive_gate(score, threshold, gate_count, 1)
@@ -483,7 +487,7 @@ def main() -> None:
     device = torch.device("cuda")
     internal_pca = (
         InternalPCA.load(args.internal_assets, device, layer=args.internal_layer)
-        if args.method in {"internal_pca", "vlm_bridge_pca"}
+        if args.method in {*INTERNAL_PCA_METHODS, "bridge_pca", "vlm_bridge_pca"}
         and args.internal_assets is not None
         else None
     )
@@ -496,7 +500,7 @@ def main() -> None:
         XVLAMultilayerProbe(
             policy.model, probe_seed=args.probe_seed, probe_steps=args.probe_steps
         )
-        if args.method == "internal_pca" and policy is not None
+        if args.method in INTERNAL_PCA_METHODS and policy is not None
         else None
     )
     _write_json(

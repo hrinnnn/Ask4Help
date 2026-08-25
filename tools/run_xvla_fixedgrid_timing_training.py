@@ -235,7 +235,9 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, default=MANIFEST_DEFAULT)
     parser.add_argument("--task", choices=("stackcube", "airplane"), required=True)
-    parser.add_argument("--anchor", type=int, required=True)
+    # Stage-B uses numeric timing anchors; Stage-C reuses this restartable
+    # trainer with a method label (for example ``gate_input_pca``).
+    parser.add_argument("--anchor", type=str, required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--dataset-root", type=Path, required=True)
     parser.add_argument("--expected-budget", type=int, required=True)

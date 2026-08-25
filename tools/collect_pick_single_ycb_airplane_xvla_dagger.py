@@ -39,6 +39,10 @@ from tools.collect_pick_single_ycb_airplane_gated_dagger import (  # noqa: E402
     admitted_expert_suffix,
 )
 from tools.pick_single_ycb_airplane_eval_common import clip_action_chunk  # noqa: E402
+from tools.xvla_airplane_failure_detection import (  # noqa: E402
+    XVLAMultilayerProbe,
+    XVLAMultilayerScorer,
+)
 from tools.xvla_airplane_runtime import XVLAAirplanePolicy  # noqa: E402
 
 EXECUTE_HORIZON = 5
@@ -46,6 +50,7 @@ POLICY_EPISODE_HORIZON = 150
 FAILURE_RECOVERY_STEP = 50
 TASK_HORIZON = 250
 FIXED_TIMING_METHOD = "fixed_timing"
+INTERNAL_PCA_METHODS = {"input_pca", "bridge_pca", "action_pca"}
 
 
 def consecutive_gate(score: float, threshold: float, count: int, patience: int) -> tuple[int, bool]:
@@ -118,6 +123,10 @@ def _run_attempt(
     upper: np.ndarray,
     pca_statistics: PCAResidualStatistics,
     pca_threshold: float,
+    internal_probe: XVLAMultilayerProbe | None,
+    internal_scorer: XVLAMultilayerScorer | None,
+    internal_layer: str,
+    admission_endpoint: str,
     diff_threshold: float,
     diff_patience: int,
     diff_timesteps: int,
@@ -156,28 +165,43 @@ def _run_attempt(
             timeline.append({"env_step": step, "controller": "expert", "alarm": True})
             break
         assert policy is not None
-        predicted, feature, inputs, encoding = policy.predict(
-            raw_obs,
-            PICK_SINGLE_YCB_AIRPLANE_TASK,
-            seed=seed * 1000 + step,
-            steps=flow_steps,
-        )
-        score = threshold = None
-        alarm = False
-        if method == "vlm_pool_pca":
-            score = float(pca_residual_score(feature.unsqueeze(1), pca_statistics)[0])
+        if method in INTERNAL_PCA_METHODS:
+            if internal_probe is None or internal_scorer is None:
+                raise RuntimeError("internal PCA method requires multilayer detector assets")
+            torch.manual_seed(seed * 1000 + step)
+            inputs = policy.prepare(raw_obs, PICK_SINGLE_YCB_AIRPLANE_TASK)
+            with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
+                features, encoding = internal_probe.extract(inputs)
+                generated = policy._generate_from_encoding(inputs, encoding, steps=flow_steps)
+                internal_scores = internal_scorer.score(features)
+            predicted = generated.float().cpu().numpy()
+            score = float(internal_scores[f"{internal_layer}_pca"])
             threshold = pca_threshold
             gate_count, alarm = consecutive_gate(score, threshold, gate_count, 1)
-        elif method == "diffdagger":
-            score = policy.diffdagger_score(
-                inputs,
-                encoding,
-                predicted,
-                num_timesteps=diff_timesteps,
-                num_noise_samples=1,
+            feature = None
+        else:
+            predicted, feature, inputs, encoding = policy.predict(
+                raw_obs,
+                PICK_SINGLE_YCB_AIRPLANE_TASK,
+                seed=seed * 1000 + step,
+                steps=flow_steps,
             )
-            threshold = diff_threshold
-            gate_count, alarm = consecutive_gate(score, threshold, gate_count, diff_patience)
+            score = threshold = None
+            alarm = False
+            if method == "vlm_pool_pca":
+                score = float(pca_residual_score(feature.unsqueeze(1), pca_statistics)[0])
+                threshold = pca_threshold
+                gate_count, alarm = consecutive_gate(score, threshold, gate_count, 1)
+            elif method == "diffdagger":
+                score = policy.diffdagger_score(
+                    inputs,
+                    encoding,
+                    predicted,
+                    num_timesteps=diff_timesteps,
+                    num_noise_samples=1,
+                )
+                threshold = diff_threshold
+                gate_count, alarm = consecutive_gate(score, threshold, gate_count, diff_patience)
         if alarm:
             expert_start = step
             timeline.append({"env_step": step, "controller": "expert", "score": score, "threshold": threshold, "alarm": True})
@@ -248,16 +272,22 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--method",
-        choices=("vlm_pool_pca", "offline_oracle", "failure_recovery", "diffdagger", FIXED_TIMING_METHOD),
+        choices=(
+            "vlm_pool_pca", "input_pca", "bridge_pca", "action_pca",
+            "offline_oracle", "failure_recovery", "diffdagger", FIXED_TIMING_METHOD,
+        ),
         required=True,
     )
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--xvla-root", type=Path, required=True)
     parser.add_argument("--calibration", type=Path, required=True)
     parser.add_argument("--pca-asset", type=Path, required=True)
+    parser.add_argument("--multilayer-assets", type=Path)
+    parser.add_argument("--internal-layer", default="vlm_input_pool")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--repo-id", type=Path, required=True)
     parser.add_argument("--target", type=int, default=100)
+    parser.add_argument("--pool-action-target", type=int)
     parser.add_argument("--seed-manifest", type=Path)
     parser.add_argument("--consume-all-seeds", action="store_true")
     parser.add_argument("--only-split", choices=("id", "ood"))
@@ -272,11 +302,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--diff-timesteps", type=int, default=16)
     parser.add_argument("--diff-patience", type=int, default=2)
     parser.add_argument("--timing-step", type=int)
+    parser.add_argument(
+        "--admission-endpoint",
+        choices=("strict_success", "ever_grasped"),
+        default=None,
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.admission_endpoint is None:
+        args.admission_endpoint = (
+            "ever_grasped" if args.method == FIXED_TIMING_METHOD else "strict_success"
+        )
     if args.method == FIXED_TIMING_METHOD and args.timing_step is None:
         raise ValueError("fixed_timing requires --timing-step")
     if args.output_dir.exists() or args.repo_id.exists():
@@ -286,11 +325,46 @@ def main() -> None:
     asset = torch.load(args.pca_asset, map_location="cpu", weights_only=False)
     pca_statistics = PCAResidualStatistics.from_state_dict(asset["statistics"])
     policy = None if args.method == "offline_oracle" else XVLAAirplanePolicy(args.checkpoint, args.xvla_root)
+    internal_probe = None
+    internal_scorer = None
+    if args.method in INTERNAL_PCA_METHODS:
+        if args.multilayer_assets is None:
+            raise ValueError("internal PCA gate requires --multilayer-assets")
+        internal_probe = XVLAMultilayerProbe(
+            policy.model, probe_seed=0, probe_steps=5  # type: ignore[union-attr]
+        )
+        internal_scorer = XVLAMultilayerScorer(args.multilayer_assets, device="cuda", knn_k=10)
+    methods = calibration.get("methods", {})
+    internal_threshold_info = methods.get(f"{args.internal_layer}_pca")
+    if args.method in INTERNAL_PCA_METHODS and internal_threshold_info is None:
+        raise KeyError(f"calibration has no threshold for {args.internal_layer}_pca")
+    internal_threshold = (
+        float(internal_threshold_info["threshold"])
+        if internal_threshold_info is not None
+        else 0.0
+    )
+    diff_threshold_value = calibration.get("diff_threshold")
+    if diff_threshold_value is None:
+        diff_threshold_info = methods.get("diffdagger")
+        if diff_threshold_info is None:
+            raise KeyError("calibration has no diffdagger threshold")
+        diff_threshold_value = diff_threshold_info["threshold"]
+    legacy_pca_threshold = calibration.get("pca_threshold")
+    if legacy_pca_threshold is None:
+        legacy_pca_info = methods.get("vlm_input_pool_pca")
+        if legacy_pca_info is None:
+            legacy_pca_threshold = 0.0
+        else:
+            legacy_pca_threshold = legacy_pca_info["threshold"]
     _write_json(args.output_dir / "collection_provenance.json", {
         "format": "xvla_airplane_ood_dagger_collection_v1",
         "method": args.method,
         "checkpoint": str(args.checkpoint.resolve()),
         "pca_asset": str(args.pca_asset.resolve()),
+        "multilayer_assets": (
+            str(args.multilayer_assets.resolve()) if args.multilayer_assets else None
+        ),
+        "internal_layer": args.internal_layer,
         "calibration": str(args.calibration.resolve()),
         "split_schedule": "offline_exact_50_50" if args.method == "offline_oracle" else "strict_raw_id_ood_alternation",
         "only_split": args.only_split,
@@ -298,15 +372,17 @@ def main() -> None:
         "consume_all_seeds": args.consume_all_seeds,
         "policy_episode_horizon": POLICY_EPISODE_HORIZON,
         "fixed_timing_step": args.timing_step,
+        "admission_endpoint": args.admission_endpoint,
+        "pool_action_target": args.pool_action_target,
         "failure_recovery_step": FAILURE_RECOVERY_STEP,
         "oracle_close": {
             "strategy": "stop_after_stable_grasp",
             "max_steps": ORACLE_CLOSE_MAX_STEPS,
             "stable_steps": ORACLE_STABLE_GRASP_STEPS,
         },
-        "admission": "ever_grasped_and_nonempty_full_expert_suffix"
-        if args.method == FIXED_TIMING_METHOD
-        else "strict_oracle_success_and_nonempty_full_expert_suffix",
+        "admission": (
+            f"{args.admission_endpoint}_and_nonempty_full_expert_suffix"
+        ),
         "tail_handling": "all_real_actions_saved_temporal_mask_at_training",
     })
 
@@ -322,6 +398,7 @@ def main() -> None:
     bounds = {split: _joint_delta_arm_bounds(policy_envs[split]) for split in ("id", "ood")}
     dataset = None
     accepted = 0
+    accepted_expert_actions = 0
     accepted_by_split = {"id": 0, "ood": 0}
     raw_by_split = {"id": 0, "ood": 0}
     next_seed = {"id": args.id_seed, "ood": args.ood_seed}
@@ -333,7 +410,12 @@ def main() -> None:
             raise ValueError("seed manifest contains no seeds")
     try:
         for attempt_index in range(args.max_attempts):
-            if not args.consume_all_seeds and accepted >= args.target:
+            target_reached = (
+                accepted_expert_actions >= args.pool_action_target
+                if args.pool_action_target is not None
+                else accepted >= args.target
+            )
+            if not args.consume_all_seeds and target_reached:
                 break
             if frozen_seeds is not None and attempt_index >= len(frozen_seeds):
                 break
@@ -354,8 +436,16 @@ def main() -> None:
                 policy_env=policy_envs[split], solver_env=solver_envs[split],
                 lower=lower, upper=upper,
                 pca_statistics=pca_statistics,
-                pca_threshold=float(calibration["pca_threshold"]),
-                diff_threshold=float(calibration["diff_threshold"]),
+                pca_threshold=(
+                    internal_threshold
+                    if args.method in INTERNAL_PCA_METHODS
+                    else float(legacy_pca_threshold)
+                ),
+                internal_probe=internal_probe,
+                internal_scorer=internal_scorer,
+                internal_layer=args.internal_layer,
+                admission_endpoint=args.admission_endpoint,
+                diff_threshold=float(diff_threshold_value),
                 diff_patience=args.diff_patience, diff_timesteps=args.diff_timesteps,
                 flow_steps=args.flow_steps, timing_step=args.timing_step,
             )
@@ -377,7 +467,7 @@ def main() -> None:
             )
             admission_success = (
                 row["ever_grasped"]
-                if args.method == FIXED_TIMING_METHOD
+                if args.admission_endpoint == "ever_grasped"
                 else row["strict_success"]
             )
             admitted = admitted_expert_suffix(
@@ -411,6 +501,7 @@ def main() -> None:
                 })
                 accepted += 1
                 accepted_by_split[split] += 1
+                accepted_expert_actions += int(end - begin)
             print(
                 f"[xvla-collector] method={args.method} attempt={attempt_index + 1} "
                 f"accepted={accepted}/{args.target} accepted_by_split={accepted_by_split}",
@@ -419,15 +510,23 @@ def main() -> None:
     finally:
         if dataset is not None and getattr(dataset, "image_writer", None) is not None:
             dataset.image_writer.wait_until_done()
+        if internal_probe is not None:
+            internal_probe.close()
         for env in (*policy_envs.values(), *solver_envs.values()):
             env.close()
-    if not args.consume_all_seeds and accepted != args.target:
-        raise RuntimeError(f"collected {accepted}/{args.target} accepted trajectories")
+    if not args.consume_all_seeds:
+        if args.pool_action_target is not None and accepted_expert_actions < args.pool_action_target:
+            raise RuntimeError(
+                f"collected {accepted_expert_actions}/{args.pool_action_target} expert actions"
+            )
+        if args.pool_action_target is None and accepted != args.target:
+            raise RuntimeError(f"collected {accepted}/{args.target} accepted trajectories")
     _write_json(args.output_dir / "summary.json", {
         "method": args.method, "accepted_total": accepted,
+        "accepted_expert_actions": accepted_expert_actions,
         "accepted_by_split": accepted_by_split, "raw_by_split": raw_by_split,
         "raw_total": sum(raw_by_split.values()),
-        "admission_endpoint": "ever_grasped" if args.method == FIXED_TIMING_METHOD else "strict_success",
+        "admission_endpoint": args.admission_endpoint,
         "dataset": str(args.repo_id), "raw_archive": str(args.output_dir / "raw_archive"),
     })
 

@@ -2,8 +2,9 @@
 
 **状态：Stage A 已在 StackCube 与 Airplane 完成，严格 extension 后两个 task 的
 exact matched budget 均已恢复；Stage B 2500-step training 正由持久化总控运行，
-training 完成后将自动进入 100-ID/100-OOD evaluation、utility summary 和 Stage-C
-passive gate audit。**
+training 完成后将自动进入 100-ID/100-OOD evaluation、utility summary、Stage-C
+passive gate audit，以及其后的 gate-selected matched-budget data/training/evaluation
+和独立 reconciliation。**
 
 历史成功的 StackCube X-VLA collection 使用
 `/data/zhaozhixuan/envs/xvla_official_5090/bin/python`。固定网格首次 smoke
@@ -40,7 +41,14 @@ summary。Stage-C passive gate controller 已预先启动并等待 Stage-B utili
 它固定使用 validation-ID seeds `{149000--149049,159000--159049}` 生成 q=.95
 calibration，使用 held-out OOD seeds `{151000--151049,161000--161049}` 做 detector
 rollout，再由 `summarize_xvla_gate_to_knee.py` 输出 KD/KHR。该阶段完成标记只表示
-passive gate audit 完成，不能替代后续 gate-selected dataset/training。
+passive gate audit 完成，不能替代后续 gate-selected dataset/training。为使后续阶段
+可在无人值守条件下继续，已预注册 Stage-C gate-training pool：StackCube
+`154000--154399`、Airplane `164000--164399`；对应 utility evaluation 使用
+StackCube ID/OOD `155000/156000`、Airplane ID/OOD `165000/166000` 各 100 episodes。
+每个 gate method 先收集完整 expert suffix pool，再用确定性的 whole-episode exact
+subset 选择 `520` 或 `2820` actions；只有所有 10 个 task--method 分支的预算审计
+通过后，才启动 5 methods × 3 seeds × 2 tasks 的 2500-step training 和 100-ID/
+100-OOD evaluation。
 
 ## 1. 目标
 
@@ -92,6 +100,8 @@ passive gate audit 完成，不能替代后续 gate-selected dataset/training。
 - held-out gate OOD：`151000--151049`。
 - final ID：`153000--153099`。
 - final OOD：`152000--152099`。
+- Stage-C gate-training pool：`154000--154399`；gate utility ID/OOD：
+  `155000--155099` / `156000--156099`。
 
 ### Airplane
 
@@ -100,6 +110,8 @@ passive gate audit 完成，不能替代后续 gate-selected dataset/training。
 - held-out gate OOD：`161000--161049`。
 - final ID：`163000--163099`。
 - final OOD：`162000--162099`。
+- Stage-C gate-training pool：`164000--164399`；gate utility ID/OOD：
+  `165000--165099` / `166000--166099`。
 
 All ranges must pass a server-side collision audit immediately before launch; a collision stops the launch and requires a new manifest revision.
 
@@ -124,7 +136,18 @@ All ranges must pass a server-side collision audit immediately before launch; a 
 - Freeze thresholds using validation-ID FAR `<=5%`; never retune on OOD.
 - Evaluate Input PCA, VLM-action Bridge PCA, Action Block 01 PCA, Diff-DAgger and fixed-step Failure-Recovery on held-out OOD rollouts.
 - Fork expert from each actual gate alarm state and compute KD/KHR against the frozen task knee.
-- Train/evaluate gate-selected datasets at the same resolved task budget only after Stage B artifacts pass.
+- After the passive audit marker, collect `input_pca`, `bridge_pca`, `action_pca`,
+  `diffdagger`, and fixed-step-50 `failure_recovery` suffixes using the frozen
+  validation-ID thresholds and the pre-registered Stage-C training seed pools.
+- Select only complete episodes at the exact resolved budget (`520` StackCube,
+  `2820` Airplane); no expert suffix or temporal tail may be sliced.
+- Train three independent 2500-step policies per task--method from the same base,
+  with the existing source-balanced temporal-mask contract, then evaluate frozen
+  100-ID/100-OOD splits and summarize endpoint SR (Airplane primary endpoint:
+  `ever_grasped`, strict completion retained as an auxiliary row).
+- A durable Stage-C total supervisor launches these sub-stages and finally runs an
+  independent denominator/checkpoint/budget reconciliation before writing
+  `PIPELINE_COMPLETE`.
 
 ### Stage D：Airplane confirmation
 

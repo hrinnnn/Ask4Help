@@ -9,7 +9,7 @@
     "root@39.101.70.188:1012"
   ],
   "current_stage": "stage_b_training_running_with_total_supervisor",
-  "next_stage": "stage_b_evaluation_then_stage_c_gate_audit_auto_after_utility_marker",
+  "next_stage": "stage_b_evaluation_then_stage_c_passive_then_gate_data_training_utility_reconciliation",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/",
   "source_of_truth": "github_local_then_server_pull",
   "model_family": "xvla",
@@ -37,7 +37,10 @@
       "calibration_extension_ood": [150020, 150059],
       "gate_ood": [151000, 151049],
       "final_ood": [152000, 152099],
-      "final_id": [153000, 153099]
+      "final_id": [153000, 153099],
+      "stage_c_gate_training_pool": [154000, 154399],
+      "stage_c_gate_eval_id": [155000, 155099],
+      "stage_c_gate_eval_ood": [156000, 156099]
     },
     "airplane": {
       "status": "stage_d_heldout",
@@ -51,7 +54,10 @@
       "calibration_extension_ood_failure_cohort": [160020, 160059],
       "gate_ood": [161000, 161049],
       "final_ood": [162000, 162099],
-      "final_id": [163000, 163099]
+      "final_id": [163000, 163099],
+      "stage_c_gate_training_pool": [164000, 164399],
+      "stage_c_gate_eval_id": [165000, 165099],
+      "stage_c_gate_eval_ood": [166000, 166099]
     }
   },
   "training": {
@@ -64,11 +70,34 @@
   },
   "gate_methods": [
     "input_pca",
-    "vlm_action_bridge_pca",
-    "action_block_01_pca",
+    "bridge_pca",
+    "action_pca",
     "diffdagger",
-    "failure_recovery_fixed_step_50"
+    "failure_recovery"
   ],
+  "gate_method_layers": {
+    "input_pca": "vlm_input_pool",
+    "bridge_pca": "vlm_action_bridge",
+    "action_pca": "action_block_01",
+    "diffdagger": null,
+    "failure_recovery": null
+  },
+  "stage_c_gate_downstream": {
+    "passive_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_c_gate_v1/",
+    "data_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_c_gate_data_v1/",
+    "total_supervisor_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_c_total_v1/",
+    "collection_seed_count_per_task": 400,
+    "training_seeds": [17001, 17002, 17003],
+    "evaluation_episodes_per_split": 100,
+    "selection": "whole complete expert episodes only; deterministic exact resolved budget; never slice a suffix",
+    "completion_markers": [
+      "STAGE_C_GATE_DATA_COMPLETE",
+      "STAGE_C_GATE_TRAINING_COMPLETE",
+      "STAGE_C_GATE_EVALUATION_COMPLETE",
+      "STAGE_C_GATE_UTILITY_COMPLETE",
+      "PIPELINE_COMPLETE"
+    ]
+  },
   "execution_audit": {
     "required": [
       "manifest_vs_command",
