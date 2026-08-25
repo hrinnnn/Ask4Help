@@ -1,6 +1,7 @@
 # X-VLA Fixed-Grid Task-Policy Knee Validation
 
-**状态：已认领；当前阶段为 StackCube calibration 的运行时诊断与重试。**
+**状态：Stage A 已在 StackCube 与 Airplane 完成；Stage B 暂停于预先冻结的
+`BUDGET_RESOLUTION_FAILED` stop marker，等待 budget fallback 或增加 seed 的决定。**
 
 历史成功的 StackCube X-VLA collection 使用
 `/data/zhaozhixuan/envs/xvla_official_5090/bin/python`。固定网格首次 smoke
@@ -8,6 +9,12 @@
 环境后 step 0 已写出完整 collection evidence，但在 SAPIEN teardown 阶段返回
 `-6`。因此 controller 只在完整 summary/episode denominator 与 dataset 已写出
 时记录并接受该 teardown abort；任何采样中途异常仍然失败并保留 diagnostic root。
+
+Stage A 的独立 audit 显示 StackCube 与 Airplane held-out 的 calibration knee
+均为 step 20；但在不切完整 expert suffix 的 matched-budget 规则下，两个 task
+的最大共同 exact budget 分别只有 requested budget 的 45.0% 和 55.4%，触发
+`BUDGET_RESOLUTION_FAILED`。在没有用户明确选择 fallback 规则前，不启动 Stage-B
+timing training，也不把 calibration knee 表述为 downstream SR 最优。
 
 ## 1. 目标
 
