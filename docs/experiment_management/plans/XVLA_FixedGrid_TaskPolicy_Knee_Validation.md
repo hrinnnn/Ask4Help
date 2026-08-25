@@ -23,6 +23,11 @@ endpoint、recoverability gate、suffix 不切分规则或 budget 公式；exten
 后重新运行独立 audit。若仍低于 80%，才保留 `BUDGET_RESOLUTION_FAILED` 并停止
 Stage-B。
 
+StackCube extension 已完成：合并 cohort 的 valid anchors 为 `{0,10,20,30,45}`，
+共同 recoverable seeds 为 59，exact common budget 已恢复为 `520/520`；step 60
+仍因 `53/60` 低于 gate 而不进入 frontier。Airplane extension 随后执行，完成后
+按相同规则重新判定其 budget gate。
+
 ## 1. 目标
 
 在不修改现有 Ground Truth task 语义的前提下，使用 canonical X-VLA StackCube 与 PickSingleYCB-Airplane，验证固定 takeover time 是否形成可重复的 time--deviation Pareto knee，并验证该 knee 是否落入 matched-budget downstream utility 的 near-optimal window。
