@@ -69,6 +69,7 @@ def build_training_meta(
 def training_command(
     *,
     python: Path,
+    repo: Path,
     start: Path,
     meta: Path,
     output: Path,
@@ -176,6 +177,7 @@ def run(args: argparse.Namespace) -> None:
     )
     command = training_command(
         python=python,
+        repo=repo,
         start=start,
         meta=meta,
         output=args.output / "train",
