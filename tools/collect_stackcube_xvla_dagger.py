@@ -54,6 +54,7 @@ TIMING_CONDITIONS = (
     "post_grasp",
     "post_lift",
     "failure_recovery",
+    "fixed_timing",
 )
 EXECUTE_HORIZON = 5
 TASK_HORIZON = 150
@@ -253,6 +254,7 @@ def _run_attempt(
     flow_steps: int,
     failure_recovery_mode: str,
     controlled_timing: bool = False,
+    fixed_timing_step: int | None = None,
 ) -> tuple[list[Any], list[np.ndarray], list[str], int | None, dict[str, Any]]:
     raw_obs, _ = env.reset(seed=seed)
     records = [_extract_record(raw_obs)]
@@ -275,6 +277,14 @@ def _run_attempt(
         alarm = expert_start is not None
         timing_reason = None
         policy_seed = seed * 1000 + len(timeline)
+        if (
+            fixed_timing_step is not None
+            and expert_start is None
+            and step >= fixed_timing_step
+        ):
+            expert_start, alarm = step, True
+            timing_reason = f"fixed_step_{fixed_timing_step}"
+            failure_recovery_event = timing_reason
         if controlled_timing and expert_start is None and method in {
             "post_grasp", "post_lift", "failure_recovery"
         }:
@@ -397,6 +407,7 @@ def _run_attempt(
         "expert_action_steps": 0 if expert_start is None else len(actions) - expert_start,
         "failure_recovery_mode": failure_recovery_mode,
         "failure_recovery_event": failure_recovery_event,
+        "fixed_timing_step": fixed_timing_step,
         "timeline": timeline,
         "task_state_dim": int(task_states[0].shape[0]),
         "task_states": np.stack(task_states),
@@ -418,6 +429,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pool-action-target", type=int)
     parser.add_argument("--seed-manifest", type=Path)
     parser.add_argument("--controlled-timing", action="store_true")
+    parser.add_argument(
+        "--timing-step",
+        type=int,
+        help="Fixed action-step takeover for the fixed_timing condition.",
+    )
     parser.add_argument("--consume-all-seeds", action="store_true")
     parser.add_argument("--offline-per-split", type=int, default=50)
     parser.add_argument(
@@ -441,6 +457,11 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.method == "fixed_timing":
+        if args.timing_step is None or args.timing_step < 0 or args.timing_step >= TASK_HORIZON:
+            raise ValueError("fixed_timing requires 0 <= --timing-step < task horizon")
+    elif args.timing_step is not None:
+        raise ValueError("--timing-step is only valid with --method fixed_timing")
     if args.expert_action_budget is not None and args.expert_action_budget <= 0:
         raise ValueError("expert-action-budget must be positive")
     if args.output_dir.exists() or args.repo_id.exists():
@@ -503,6 +524,7 @@ def main() -> None:
             "pool_action_target": args.pool_action_target,
             "seed_manifest": str(args.seed_manifest.resolve()) if args.seed_manifest else None,
             "controlled_timing": args.controlled_timing,
+            "timing_step": args.timing_step,
             "task_horizon": TASK_HORIZON,
             "failure_recovery_step": FAILURE_RECOVERY_STEP,
             "failure_recovery_mode": args.failure_recovery_mode,
@@ -577,6 +599,7 @@ def main() -> None:
                 flow_steps=args.flow_steps,
                 failure_recovery_mode=args.failure_recovery_mode,
                 controlled_timing=args.controlled_timing,
+                fixed_timing_step=args.timing_step if args.method == "fixed_timing" else None,
             )
             row["attempt_index"] = attempt_index
             task_states = row.pop("task_states")
