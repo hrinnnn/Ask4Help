@@ -288,7 +288,7 @@ def main() -> None:
         return command, RUN / "logs" / f"matched_{method}_smoke.log", gpu, training_env(gpu, method, budget_root / method, output, 2)
 
     write_state(current_stage="matched_training_smoke", next_stage="matched_training")
-    run_method_waves(METHODS, smoke_builder)
+    run_method_waves(METHODS, smoke_builder, max_parallel=1)
     for method in METHODS:
         if checkpoint_for(training / f"{method}_smoke_2step", 2) is None:
             raise RuntimeError(f"missing diagnostic 2-step checkpoint: {method}")
@@ -307,7 +307,7 @@ def main() -> None:
         ]
         return command, RUN / "logs" / f"reload_{method}.log", gpu
 
-    run_method_waves(METHODS, reload_builder, allowed_returncodes={0, -6, 120})
+    run_method_waves(METHODS, reload_builder, allowed_returncodes={0, -6, 120}, max_parallel=1)
     if not all(eval_evidence(reload_root / method, 1) for method in METHODS):
         raise RuntimeError("diagnostic reload evidence is incomplete")
     (training / "MATCHED_SMOKE_RELOAD_PASSED").write_text("complete\n", encoding="utf-8")
