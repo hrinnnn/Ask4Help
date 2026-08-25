@@ -33,7 +33,12 @@ from tools.run_pick_single_ycb_object_variation_downstream_controller import (
 
 
 BASE = Path("/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1")
-RUN = BASE / "diagnostic_low_threshold_005_v1"
+RUN = Path(
+    os.environ.get(
+        "OBJECT_VARIATION_DIAGNOSTIC_RUN_ROOT",
+        str(BASE / "diagnostic_low_threshold_005_v1"),
+    )
+)
 CHECKPOINT = BASE / (
     "id_training_v1/formal_10000_retry8/id_sft_10000_retry8/"
     "id_sft_10000_retry7_weights_only/checkpoints/global_step_4500"
@@ -181,6 +186,7 @@ def training_env(gpu: int, method: str, expert: Path, output: Path, steps: int) 
     }
     env.update(
         {
+            "RLINF_RAY_ADDRESS": "local",
             "RAY_TMPDIR": ray_roots[method],
             "TMPDIR": ray_roots[method],
             "EMBODIED_PATH": str(ROOT / "RLinf/examples/sft"),
@@ -195,6 +201,7 @@ def training_env(gpu: int, method: str, expert: Path, output: Path, steps: int) 
             "OBJECT_VARIATION_TRAIN_SEED": "9206",
         }
     )
+    env.pop("RAY_ADDRESS", None)
     return env
 
 
