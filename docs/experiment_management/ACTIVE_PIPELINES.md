@@ -16,7 +16,7 @@
 - `runtime_5090`: X-VLA `/data/zhaozhixuan/X-VLA`; Python `/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python`; independent worktree `/data/zhaozhixuan/xvla_fixedgrid_knee_work`
 - `manifest`: `configs/pipelines/xvla_fixedgrid_taskpolicy_knee_v1.json`
 - `plan`: `docs/experiment_management/plans/XVLA_FixedGrid_TaskPolicy_Knee_Validation.md`
-- `source_commit`: `e3a813f`; local branch `codex/xvla-fixed-grid-knee`; GitHub branch pushed
+- `source_commit`: `7ba1cde`; local branch `codex/xvla-fixed-grid-knee`; GitHub branch pushed
 - `implementation`: fixed-step collector, task-state knee summarizer, restart-tolerant calibration controller, contract/knee/controller tests; local and remote 5090 worktree smoke passed (`5 passed`)
 - `resource_preflight_2026-08-25`: 5090 GPUs are occupied/protected by existing owners (GPU0/1/2/4/6/7; GPU5 is OpenDrawer owner; GPU3 is another owner); H20 GPU0/1 are registered to existing online-awbc owner and root overlay is full. No formal process launched, no existing PID touched.
 - `forbidden`: do not use old Stage-2 timing as formal input; do not launch on any protected GPU; do not tune thresholds/anchors on OOD; do not claim completion from smoke or partial calibration
