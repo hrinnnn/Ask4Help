@@ -10,13 +10,13 @@
 - `authorized`: `true`; 用户已要求记录并执行 StackCube/Grab Plane fixed-grid task-policy knee validation
 - `owner_thread`: `current-thread`; `owner_label`: `codex-root-xvla-knee-validation`
 - `server_preference`: `zhaozhixuan@111.198.58.150:12001`; H20 `root@39.101.70.188:1012` 为回退
-- `current_stage`: `remote_worktree_smoke_passed_resource_preflight_blocked`
-- `next_stage`: `runtime_asset_seed_collision_preflight_then_stackcube_smoke`
+- `current_stage`: `both_task_calibration_complete_budget_resolution_failed`
+- `next_stage`: `user_decision_more_seeds_or_budget_fallback_before_stage_b`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/`
 - `runtime_5090`: X-VLA `/data/zhaozhixuan/X-VLA`; Python `/data/zhaozhixuan/envs/xvla_official_5090/bin/python` (historical successful StackCube collection environment; RLinf `.venv` planner-init segfault retained as diagnostic); independent worktree `/data/zhaozhixuan/xvla_fixedgrid_knee_work`
 - `manifest`: `configs/pipelines/xvla_fixedgrid_taskpolicy_knee_v1.json`
 - `plan`: `docs/experiment_management/plans/XVLA_FixedGrid_TaskPolicy_Knee_Validation.md`
-- `source_commit`: `7ba1cde`; local branch `codex/xvla-fixed-grid-knee`; GitHub branch pushed
+- `source_commit`: `b9ef07b`; local branch `codex/xvla-fixed-grid-knee`; GitHub branch pushed
 - `implementation`: fixed-step collector, task-state knee summarizer, restart-tolerant calibration controller, contract/knee/controller tests; local and remote 5090 worktree smoke passed (`5 passed`)
 - `resource_preflight_2026-08-25`: 5090 GPUs are occupied/protected by existing owners (GPU0/1/2/4/6/7; GPU5 is OpenDrawer owner; GPU3 is another owner); H20 GPU0/1 are registered to existing online-awbc owner and root overlay is full. No formal process launched, no existing PID touched.
 - `forbidden`: do not use old Stage-2 timing as formal input; do not launch on any protected GPU; do not tune thresholds/anchors on OOD; do not claim completion from smoke or partial calibration
