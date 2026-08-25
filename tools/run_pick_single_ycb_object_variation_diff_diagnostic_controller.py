@@ -172,8 +172,16 @@ def wait_for_diff() -> tuple[Path, Path, float]:
 
 def training_env(gpu: int, method: str, expert: Path, output: Path, steps: int) -> dict[str, str]:
     env = env_for(gpu)
+    ray_roots = {
+        "bridge_pca": "/tmp/ovbp",
+        "failure_recovery": "/tmp/ovfr",
+        "offline_oracle": "/tmp/ovbc",
+        "diffdagger": "/tmp/ovdiff",
+    }
     env.update(
         {
+            "RAY_TMPDIR": ray_roots[method],
+            "TMPDIR": ray_roots[method],
             "EMBODIED_PATH": str(ROOT / "RLinf/examples/sft"),
             "OBJECT_VARIATION_ID_DATASET": str(ID_DATASET),
             "OBJECT_VARIATION_EXPERT_DATASET": str(expert),
