@@ -213,19 +213,24 @@ def _run_attempt(
         records.extend(expert_records)
         actions.extend(expert_actions)
         sources.extend(["expert"] * len(expert_actions))
+        expert_ever_grasped = bool(oracle_result.pop("ever_grasped", False))
         expert_states = oracle_result.pop(
             "state_timeline", np.empty((0, 0), dtype=np.float32)
         )
         if np.asarray(expert_states).size:
             task_states.extend(np.asarray(expert_states, dtype=np.float32))
         strict_success = bool(oracle_result["accepted"])
+    else:
+        expert_ever_grasped = False
 
     return records, actions, expert_start, {
         "seed": seed,
         "split": split,
         "method": method,
         "strict_success": strict_success,
-        "ever_grasped": bool(np.max(np.asarray(task_states)[:, -2]) > 0.5),
+        "ever_grasped": bool(
+            expert_ever_grasped or np.max(np.asarray(task_states)[:, -2]) > 0.5
+        ),
         "steps": len(actions),
         "expert_start_step": expert_start,
         "expert_action_steps": 0 if expert_start is None else len(actions) - expert_start,

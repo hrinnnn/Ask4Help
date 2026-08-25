@@ -257,6 +257,10 @@ def _plan_and_execute_expert(
                 "state_timeline": np.stack(candidate_states)
                 if candidate_states
                 else np.empty((0, 0), dtype=np.float32),
+                "ever_grasped": any(
+                    bool(attempt.get("grasped_after_close", False))
+                    for attempt in attempts
+                ),
             }
     policy_env.unwrapped.set_state_dict(state)
     return [], [], {
@@ -264,6 +268,9 @@ def _plan_and_execute_expert(
         "attempts": attempts,
         "execution_mode": "same_env_absolute_target_to_delta",
         "state_timeline": np.empty((0, 0), dtype=np.float32),
+        "ever_grasped": any(
+            bool(attempt.get("grasped_after_close", False)) for attempt in attempts
+        ),
     }
 
 
