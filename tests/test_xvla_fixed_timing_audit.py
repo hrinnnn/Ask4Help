@@ -38,6 +38,7 @@ def test_audit_records_unrecoverable_anchor(tmp_path: Path) -> None:
             "attempt_index": index,
             "success": index == 0,
             "steps": 2,
+            "expert_action_steps": 2 if index == 0 else 0,
             "task_states": str(state),
             "video": str(video),
         })

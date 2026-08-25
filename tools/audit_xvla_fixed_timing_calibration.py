@@ -72,7 +72,7 @@ def audit(
             value = row.get(endpoint)
             if value is None and endpoint == "success":
                 value = row.get("strict_success", row.get("success", False))
-            if bool(value):
+            if bool(value) and int(row.get("expert_action_steps", 0)) > 0:
                 recoverable.add(seed)
         recoverable_sets.append(recoverable)
         rate = len(recoverable) / max(1, len(seeds))
