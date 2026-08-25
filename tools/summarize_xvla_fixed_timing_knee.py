@@ -47,16 +47,21 @@ def aligned_distance(expert: np.ndarray, nominal: np.ndarray, scale: np.ndarray)
     return _dtw_average(expert_z, nominal_z[start:])
 
 
-def _load_anchor(root: Path, step: int) -> dict[int, dict[str, Any]]:
+def _load_anchor(root: Path, step: int, *, endpoint: str) -> dict[int, dict[str, Any]]:
     anchor = root / f"step_{step}"
     rows = _read_jsonl(anchor / "episodes.jsonl")
     output: dict[int, dict[str, Any]] = {}
     for row in rows:
         seed = int(row["seed"])
         state_path = Path(row["task_states"])
+        if not state_path.is_absolute():
+            state_path = anchor / state_path
         if not state_path.is_file():
             continue
-        if not bool(row.get("success")) or int(row.get("expert_action_steps", 0)) <= 0:
+        success = row.get(endpoint)
+        if success is None and endpoint == "success":
+            success = row.get("strict_success", False)
+        if not bool(success) or int(row.get("expert_action_steps", 0)) <= 0:
             continue
         output[seed] = {
             "seed": seed,
@@ -86,8 +91,15 @@ def _knee_index(c: np.ndarray, d: np.ndarray) -> int:
     return int(np.argmax(distance))
 
 
-def summarize(root: Path, anchors: list[int], *, bootstrap: int = 1000, seed: int = 0) -> dict[str, Any]:
-    pools = {step: _load_anchor(root, step) for step in anchors}
+def summarize(
+    root: Path,
+    anchors: list[int],
+    *,
+    endpoint: str = "success",
+    bootstrap: int = 1000,
+    seed: int = 0,
+) -> dict[str, Any]:
+    pools = {step: _load_anchor(root, step, endpoint=endpoint) for step in anchors}
     common = sorted(set.intersection(*(set(pool) for pool in pools.values())))
     if not common:
         raise RuntimeError("no common successful seeds across fixed timing anchors")
@@ -145,6 +157,7 @@ def summarize(root: Path, anchors: list[int], *, bootstrap: int = 1000, seed: in
         "common_successful_seed_count": len(common),
         "common_seeds": common,
         "nominal_anchor": anchors[0],
+        "endpoint": endpoint,
         "nominal_state_scale": scale.tolist(),
         "anchor_summary": [
             {
@@ -168,12 +181,19 @@ def main() -> None:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--anchors", type=int, nargs="+", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--endpoint", choices=("success", "strict_success", "ever_grasped"), default="success")
     parser.add_argument("--bootstrap", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
     if args.output.exists():
         raise FileExistsError(args.output)
-    payload = summarize(args.root, args.anchors, bootstrap=args.bootstrap, seed=args.seed)
+    payload = summarize(
+        args.root,
+        args.anchors,
+        endpoint=args.endpoint,
+        bootstrap=args.bootstrap,
+        seed=args.seed,
+    )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
