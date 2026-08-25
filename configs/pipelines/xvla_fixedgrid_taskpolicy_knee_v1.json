@@ -13,6 +13,11 @@
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/",
   "source_of_truth": "github_local_then_server_pull",
   "model_family": "xvla",
+  "runtime": {
+    "xvla_root_5090": "/data/zhaozhixuan/X-VLA",
+    "rlinf_root_5090": "/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf",
+    "python_5090": "/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python"
+  },
   "timing_anchors_env_steps": [0, 10, 20, 30, 45, 60, 80, 100],
   "budget_rule": {
     "nominal_equivalent_count": 20,
