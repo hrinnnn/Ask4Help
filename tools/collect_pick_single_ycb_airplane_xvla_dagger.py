@@ -258,6 +258,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--repo-id", type=Path, required=True)
     parser.add_argument("--target", type=int, default=100)
+    parser.add_argument("--seed-manifest", type=Path)
+    parser.add_argument("--consume-all-seeds", action="store_true")
+    parser.add_argument("--only-split", choices=("id", "ood"))
     parser.add_argument("--id-seed", type=int, default=70000)
     parser.add_argument("--ood-seed", type=int, default=80000)
     parser.add_argument("--offline-per-split", type=int, default=50)
@@ -290,6 +293,9 @@ def main() -> None:
         "pca_asset": str(args.pca_asset.resolve()),
         "calibration": str(args.calibration.resolve()),
         "split_schedule": "offline_exact_50_50" if args.method == "offline_oracle" else "strict_raw_id_ood_alternation",
+        "only_split": args.only_split,
+        "seed_manifest": str(args.seed_manifest.resolve()) if args.seed_manifest else None,
+        "consume_all_seeds": args.consume_all_seeds,
         "policy_episode_horizon": POLICY_EPISODE_HORIZON,
         "fixed_timing_step": args.timing_step,
         "failure_recovery_step": FAILURE_RECOVERY_STEP,
@@ -319,17 +325,28 @@ def main() -> None:
     accepted_by_split = {"id": 0, "ood": 0}
     raw_by_split = {"id": 0, "ood": 0}
     next_seed = {"id": args.id_seed, "ood": args.ood_seed}
+    frozen_seeds = None
+    if args.seed_manifest is not None:
+        payload = json.loads(args.seed_manifest.read_text(encoding="utf-8"))
+        frozen_seeds = [int(seed) for seed in payload["seeds"]]
+        if not frozen_seeds:
+            raise ValueError("seed manifest contains no seeds")
     try:
         for attempt_index in range(args.max_attempts):
-            if accepted >= args.target:
+            if not args.consume_all_seeds and accepted >= args.target:
                 break
-            split = alternating_split(attempt_index)
+            if frozen_seeds is not None and attempt_index >= len(frozen_seeds):
+                break
+            split = args.only_split or alternating_split(attempt_index)
             if args.method == "offline_oracle" and accepted_by_split[split] >= args.offline_per_split:
                 split = "ood" if split == "id" else "id"
             if args.method == "offline_oracle" and accepted_by_split[split] >= args.offline_per_split:
                 break
-            seed = next_seed[split]
-            next_seed[split] += 1
+            if frozen_seeds is not None:
+                seed = frozen_seeds[attempt_index]
+            else:
+                seed = next_seed[split]
+                next_seed[split] += 1
             raw_by_split[split] += 1
             lower, upper = bounds[split]
             records, actions, expert_start, row = _run_attempt(
@@ -404,11 +421,12 @@ def main() -> None:
             dataset.image_writer.wait_until_done()
         for env in (*policy_envs.values(), *solver_envs.values()):
             env.close()
-    if accepted != args.target:
+    if not args.consume_all_seeds and accepted != args.target:
         raise RuntimeError(f"collected {accepted}/{args.target} accepted trajectories")
     _write_json(args.output_dir / "summary.json", {
         "method": args.method, "accepted_total": accepted,
         "accepted_by_split": accepted_by_split, "raw_by_split": raw_by_split,
+        "raw_total": sum(raw_by_split.values()),
         "admission_endpoint": "ever_grasped" if args.method == FIXED_TIMING_METHOD else "strict_success",
         "dataset": str(args.repo_id), "raw_archive": str(args.output_dir / "raw_archive"),
     })

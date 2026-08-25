@@ -41,6 +41,8 @@
     "airplane": {
       "status": "stage_d_heldout",
       "base_checkpoint": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_airplane_v1/id_sft_10000_official_2gpu/ckpt-2500",
+      "timing_calibration": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_airplane_v1/ood_dagger_v1/calibration/id_success20_q95.json",
+      "timing_pca_asset": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_airplane_v1/ood_dagger_v1/assets/vlm_input_pool_pca.pt",
       "ood_split": "canonical_existing_ood",
       "endpoint": "ever_grasped",
       "threshold_validation_id": [159000, 159049],
