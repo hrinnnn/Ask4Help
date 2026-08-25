@@ -38,6 +38,11 @@ def pid_alive(pid: int) -> bool:
 
 
 def launch_data(args: argparse.Namespace, log: Path) -> int:
+    airplane_internal_assets = (
+        args.passive_root / "assets_airplane_input_pool" / "multilayer_detector_assets.pt"
+    )
+    if not airplane_internal_assets.is_file():
+        airplane_internal_assets = args.airplane_internal_assets
     command = [
         args.python,
         str(args.repo / "tools/run_xvla_fixedgrid_stage_c_gate_data_controller.py"),
@@ -53,7 +58,7 @@ def launch_data(args: argparse.Namespace, log: Path) -> int:
         "--stackcube-checkpoint", str(args.stackcube_checkpoint),
         "--stackcube-internal-assets", str(args.stackcube_internal_assets),
         "--airplane-checkpoint", str(args.airplane_checkpoint),
-        "--airplane-internal-assets", str(args.airplane_internal_assets),
+        "--airplane-internal-assets", str(airplane_internal_assets),
         "--airplane-pca-asset", str(args.airplane_pca_asset),
     ]
     log.parent.mkdir(parents=True, exist_ok=True)

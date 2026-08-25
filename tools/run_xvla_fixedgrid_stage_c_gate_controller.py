@@ -55,6 +55,28 @@ def summary_complete(path: Path) -> bool:
         return False
 
 
+def asset_has_layer(path: Path, layer: str, python: str) -> bool:
+    if not path.is_file():
+        return False
+    probe = subprocess.run(
+        [
+            python,
+            "-c",
+            (
+                "import sys, torch; "
+                "p=torch.load(sys.argv[1], map_location='cpu', weights_only=False); "
+                "raise SystemExit(0 if sys.argv[2] in p.get('layers', {}) else 1)"
+            ),
+            str(path),
+            layer,
+        ],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return probe.returncode == 0
+
+
 def gpu_idle(gpu: int) -> bool:
     try:
         rows = subprocess.check_output(
@@ -75,6 +97,59 @@ def gpu_idle(gpu: int) -> bool:
         return not any(line.startswith(uuid) for line in apps.splitlines() if line.strip())
     except (OSError, subprocess.CalledProcessError, ValueError):
         return False
+
+
+def ensure_airplane_assets(
+    *,
+    args: argparse.Namespace,
+    state: dict[str, Any],
+    state_path: Path,
+) -> Path:
+    """Build a fresh ID-only asset when the legacy asset lacks input pooling."""
+
+    if asset_has_layer(args.airplane_internal_assets, "vlm_input_pool", args.python):
+        return args.airplane_internal_assets
+    output_dir = args.run_root / "assets_airplane_input_pool"
+    output_asset = output_dir / "multilayer_detector_assets.pt"
+    marker = output_dir / "ASSETS_COMPLETE"
+    if marker.is_file() and asset_has_layer(output_asset, "vlm_input_pool", args.python):
+        return output_asset
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise FileExistsError(f"partial Airplane asset build exists: {output_dir}")
+    if not args.airplane_metadata.is_file():
+        raise FileNotFoundError(args.airplane_metadata)
+    if not gpu_idle(args.gpu):
+        state.update({"stage": "stage_c_waiting_for_gpu", "waiting_step": "airplane_multilayer_asset_build", "updated_at": now()})
+        write_json(state_path, state)
+        time.sleep(900)
+        raise WaitForResource("airplane_multilayer_asset_build")
+    command = [
+        args.python,
+        str(args.repo / "tools/build_xvla_airplane_multilayer_assets.py"),
+        "--checkpoint", str(args.airplane_checkpoint),
+        "--xvla-root", str(args.xvla_root),
+        "--metadata", str(args.airplane_metadata),
+        "--output-dir", str(output_dir),
+        "--batch-size", "8",
+        "--probe-seed", "0",
+        "--probe-steps", "5",
+        "--device", "cuda",
+    ]
+    log = args.run_root / "logs" / "build_airplane_multilayer_assets.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    state.update({"stage": "stage_c_building_airplane_multilayer_assets", "command": command, "updated_at": now()})
+    write_json(state_path, state)
+    env = {**os.environ, "CUDA_VISIBLE_DEVICES": str(args.gpu), "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "TOKENIZERS_PARALLELISM": "false", "OMP_NUM_THREADS": "20", "MKL_NUM_THREADS": "20"}
+    with log.open("w", encoding="utf-8") as handle:
+        result = subprocess.run(["taskset", "-c", args.cpu_set, *command], cwd=args.repo, env=env, stdout=handle, stderr=subprocess.STDOUT, check=False)
+    if result.returncode != 0 or not asset_has_layer(output_asset, "vlm_input_pool", args.python):
+        state.update({"stage": "stage_c_failed", "failed_step": "airplane_multilayer_asset_build", "returncode": result.returncode, "updated_at": now()})
+        write_json(state_path, state)
+        raise RuntimeError(f"Airplane multilayer asset build failed; see {log}")
+    marker.write_text("ID-only multilayer detector asset includes vlm_input_pool\n", encoding="utf-8")
+    state.update({"stage": "stage_c_running", "airplane_internal_assets": str(output_asset), "updated_at": now()})
+    write_json(state_path, state)
+    return output_asset
 
 
 def run_logged(
@@ -131,11 +206,17 @@ def run(args: argparse.Namespace) -> None:
         while not stage_b_marker.is_file():
             time.sleep(args.interval_seconds)
 
+    # The historical Airplane detector asset predates input-pool capture.  Do
+    # not substitute another layer: build the missing ID-only asset before
+    # validation/OOD detector rollouts begin.
+    airplane_internal_assets = ensure_airplane_assets(
+        args=args, state=state, state_path=state_path
+    )
     stack_checkpoint = args.stackcube_checkpoint
     airplane_checkpoint = args.airplane_checkpoint
     stack_internal = args.stackcube_internal_assets
     stack_external = args.stackcube_external_assets
-    airplane_internal = args.airplane_internal_assets
+    airplane_internal = airplane_internal_assets
     airplane_external = args.airplane_external_assets
     jobs = [
         {
@@ -274,6 +355,7 @@ def main() -> None:
     parser.add_argument("--stackcube-external-assets", type=Path, required=True)
     parser.add_argument("--airplane-internal-assets", type=Path, required=True)
     parser.add_argument("--airplane-external-assets", type=Path, required=True)
+    parser.add_argument("--airplane-metadata", type=Path, required=True)
     args = parser.parse_args()
     while True:
         try:
