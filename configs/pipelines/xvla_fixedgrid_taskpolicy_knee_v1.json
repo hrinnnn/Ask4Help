@@ -86,6 +86,7 @@
     "passive_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_c_gate_v1/",
     "data_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_c_gate_data_v1/",
     "total_supervisor_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_c_total_v1/",
+    "airplane_input_asset": "if the historical asset lacks vlm_input_pool, build an ID-only multilayer asset from the frozen Airplane checkpoint and panda_airplane_id metadata before passive validation/OOD rollout",
     "collection_seed_count_per_task": 400,
     "training_seeds": [17001, 17002, 17003],
     "evaluation_episodes_per_split": 100,

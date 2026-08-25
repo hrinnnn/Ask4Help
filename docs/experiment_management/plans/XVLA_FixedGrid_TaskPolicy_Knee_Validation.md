@@ -48,7 +48,10 @@ StackCube ID/OOD `155000/156000`、Airplane ID/OOD `165000/166000` 各 100 episo
 每个 gate method 先收集完整 expert suffix pool，再用确定性的 whole-episode exact
 subset 选择 `520` 或 `2820` actions；只有所有 10 个 task--method 分支的预算审计
 通过后，才启动 5 methods × 3 seeds × 2 tasks 的 2500-step training 和 100-ID/
-100-OOD evaluation。
+100-OOD evaluation。若历史 Airplane detector asset 不含 `vlm_input_pool`，控制器
+会在 Stage-B utility marker 之后、任何 validation/OOD rollout 之前，用同一
+checkpoint 和 ID metadata 构建新的 ID-only multilayer asset；不得用其他层冒充
+input，也不得从 OOD rows 拟合该 asset。
 
 ## 1. 目标
 
