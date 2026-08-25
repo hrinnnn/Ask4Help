@@ -30,3 +30,15 @@ def test_calibration_command_contains_fixed_timing_step() -> None:
     assert "fixed_timing" in command
     assert "--timing-step" in command
     assert command[command.index("--timing-step") + 1] == "45"
+
+
+def test_completed_collection_evidence_requires_full_denominator(tmp_path: Path) -> None:
+    module = _load_module()
+    output = tmp_path / "collection"
+    output.mkdir()
+    (output / "episodes.jsonl").write_text('{"seed": 1}\n{"seed": 2}\n', encoding="utf-8")
+    (output / "summary.json").write_text(
+        '{"raw_total": 2, "accepted_total": 2}\n', encoding="utf-8"
+    )
+    assert module.completed_collection_evidence(output, expected_episodes=2)
+    assert not module.completed_collection_evidence(output, expected_episodes=3)

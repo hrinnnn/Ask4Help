@@ -111,6 +111,30 @@ def calibration_command(
     ]
 
 
+def completed_collection_evidence(output: Path, *, expected_episodes: int) -> bool:
+    """Accept only a completed collection followed by the known teardown abort.
+
+    ManiSkill/SAPIEN can abort during interpreter teardown after all collection
+    artifacts have already been flushed.  The abort is acceptable only when an
+    independent evidence check finds a complete summary and episode ledger with
+    the expected denominator; planner or mid-rollout crashes remain failures.
+    """
+    summary_path = output / "summary.json"
+    episodes_path = output / "episodes.jsonl"
+    if not summary_path.is_file() or not episodes_path.is_file():
+        return False
+    try:
+        summary = read_json(summary_path)
+        rows = [line for line in episodes_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        len(rows) == expected_episodes
+        and int(summary.get("raw_total", -1)) == expected_episodes
+        and int(summary.get("accepted_total", -1)) == expected_episodes
+    )
+
+
 def run_stackcube_calibration(args: argparse.Namespace) -> None:
     manifest = read_json(args.manifest)
     task = manifest["tasks"]["stackcube"]
@@ -171,12 +195,17 @@ def run_stackcube_calibration(args: argparse.Namespace) -> None:
         env.update({"CUDA_VISIBLE_DEVICES": str(args.gpu), "HF_HUB_OFFLINE": "1", "TRANSFORMERS_OFFLINE": "1", "TOKENIZERS_PARALLELISM": "false", "OMP_NUM_THREADS": "20", "MKL_NUM_THREADS": "20"})
         with log.open("w", encoding="utf-8") as handle:
             result = subprocess.run(command, cwd=worktree, env=env, stdout=handle, stderr=subprocess.STDOUT, check=False)
-        if result.returncode != 0:
+        teardown_abort = result.returncode == -6 and completed_collection_evidence(
+            output, expected_episodes=seed_count
+        )
+        if result.returncode != 0 and not teardown_abort:
             state.update({"stage": f"calibration_step_{step}_failed", "returncode": result.returncode, "updated_at": _now()})
             write_json(state_path, state)
             raise RuntimeError(f"calibration step {step} failed; see {log}")
         if not (output / "summary.json").is_file() or not (output / "episodes.jsonl").is_file():
             raise RuntimeError(f"calibration step {step} missing summary/episodes evidence")
+        if teardown_abort:
+            state.setdefault("accepted_teardown_aborts", []).append({"step": step, "returncode": -6})
         state["completed_steps"].append(step)
         state.update({"stage": "calibration", "updated_at": _now()})
         write_json(state_path, state)

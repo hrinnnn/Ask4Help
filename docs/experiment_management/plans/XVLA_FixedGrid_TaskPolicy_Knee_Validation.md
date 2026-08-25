@@ -1,6 +1,13 @@
 # X-VLA Fixed-Grid Task-Policy Knee Validation
 
-**状态：已认领；当前阶段为本地 plan/asset 预检，服务器 formal run 等待安全空闲 GPU。**
+**状态：已认领；当前阶段为 StackCube calibration 的运行时诊断与重试。**
+
+历史成功的 StackCube X-VLA collection 使用
+`/data/zhaozhixuan/envs/xvla_official_5090/bin/python`。固定网格首次 smoke
+在 RLinf 自带 `.venv` 中于 `mplib` planner 初始化时发生段错误；切换到历史
+环境后 step 0 已写出完整 collection evidence，但在 SAPIEN teardown 阶段返回
+`-6`。因此 controller 只在完整 summary/episode denominator 与 dataset 已写出
+时记录并接受该 teardown abort；任何采样中途异常仍然失败并保留 diagnostic root。
 
 ## 1. 目标
 

@@ -16,7 +16,8 @@
   "runtime": {
     "xvla_root_5090": "/data/zhaozhixuan/X-VLA",
     "rlinf_root_5090": "/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf",
-    "python_5090": "/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python"
+    "python_5090": "/data/zhaozhixuan/envs/xvla_official_5090/bin/python",
+    "runtime_selection_reason": "historical canonical X-VLA StackCube collections used this environment and completed artifact writes; the RLinf .venv diagnostic segfaulted in mplib planner initialization"
   },
   "timing_anchors_env_steps": [0, 10, 20, 30, 45, 60, 80, 100],
   "budget_rule": {
