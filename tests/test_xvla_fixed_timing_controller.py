@@ -42,3 +42,7 @@ def test_completed_collection_evidence_requires_full_denominator(tmp_path: Path)
     )
     assert module.completed_collection_evidence(output, expected_episodes=2)
     assert not module.completed_collection_evidence(output, expected_episodes=3)
+    (output / "summary.json").write_text(
+        '{"raw_total": 2, "accepted_total": 1}\n', encoding="utf-8"
+    )
+    assert module.completed_collection_evidence(output, expected_episodes=2)

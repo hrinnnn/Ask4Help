@@ -116,8 +116,10 @@ def completed_collection_evidence(output: Path, *, expected_episodes: int) -> bo
 
     ManiSkill/SAPIEN can abort during interpreter teardown after all collection
     artifacts have already been flushed.  The abort is acceptable only when an
-    independent evidence check finds a complete summary and episode ledger with
-    the expected denominator; planner or mid-rollout crashes remain failures.
+    independent evidence check finds a complete summary and raw episode ledger
+    with the expected denominator.  ``accepted_total`` may be lower because
+    recoverability is a scientific calibration outcome, not an artifact-write
+    failure; planner or mid-rollout crashes remain failures.
     """
     summary_path = output / "summary.json"
     episodes_path = output / "episodes.jsonl"
@@ -128,10 +130,11 @@ def completed_collection_evidence(output: Path, *, expected_episodes: int) -> bo
         rows = [line for line in episodes_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     except (OSError, json.JSONDecodeError):
         return False
+    accepted = int(summary.get("accepted_total", -1))
     return (
         len(rows) == expected_episodes
         and int(summary.get("raw_total", -1)) == expected_episodes
-        and int(summary.get("accepted_total", -1)) == expected_episodes
+        and 0 <= accepted <= expected_episodes
     )
 
 
