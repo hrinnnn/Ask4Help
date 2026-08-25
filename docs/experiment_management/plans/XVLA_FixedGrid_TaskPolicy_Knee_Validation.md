@@ -2,7 +2,8 @@
 
 **状态：Stage A 已在 StackCube 与 Airplane 完成，严格 extension 后两个 task 的
 exact matched budget 均已恢复；Stage B 2500-step training 正由持久化总控运行，
-training 完成后将自动进入 100-ID/100-OOD evaluation 与 utility summary。**
+training 完成后将自动进入 100-ID/100-OOD evaluation、utility summary 和 Stage-C
+passive gate audit。**
 
 历史成功的 StackCube X-VLA collection 使用
 `/data/zhaozhixuan/envs/xvla_official_5090/bin/python`。固定网格首次 smoke
@@ -35,7 +36,11 @@ Airplane extension 完成后，合并 cohort 的 valid anchors 为 `{0,10,20,30}
 meta 同时加载、`action_valid_mask` 实际参与 loss；正式 2500-step training 已进入
 controller 阶段。持久化 Stage-B total supervisor 以 900 秒间隔等待 training marker，
 随后自动启动 evaluation controller，并在 54 个评测作业完成后生成两 task utility
-summary。
+summary。Stage-C passive gate controller 已预先启动并等待 Stage-B utility marker；
+它固定使用 validation-ID seeds `{149000--149049,159000--159049}` 生成 q=.95
+calibration，使用 held-out OOD seeds `{151000--151049,161000--161049}` 做 detector
+rollout，再由 `summarize_xvla_gate_to_knee.py` 输出 KD/KHR。该阶段完成标记只表示
+passive gate audit 完成，不能替代后续 gate-selected dataset/training。
 
 ## 1. 目标
 

@@ -9,7 +9,7 @@
     "root@39.101.70.188:1012"
   ],
   "current_stage": "stage_b_training_running_with_total_supervisor",
-  "next_stage": "stage_b_evaluation_then_utility_auto_after_training_marker",
+  "next_stage": "stage_b_evaluation_then_stage_c_gate_audit_auto_after_utility_marker",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/",
   "source_of_truth": "github_local_then_server_pull",
   "model_family": "xvla",

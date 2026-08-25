@@ -11,15 +11,16 @@
 - `owner_thread`: `current-thread`; `owner_label`: `codex-root-xvla-knee-validation`
 - `server_preference`: `zhaozhixuan@111.198.58.150:12001`; H20 `root@39.101.70.188:1012` 为回退
 - `current_stage`: `stage_b_training_running_with_total_supervisor`
-- `next_stage`: `stage_b_evaluation_then_utility_auto_after_training_marker`
+- `next_stage`: `stage_b_evaluation_then_stage_c_gate_audit_auto_after_utility_marker`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/`
 - `runtime_5090`: X-VLA `/data/zhaozhixuan/X-VLA`; Python `/data/zhaozhixuan/envs/xvla_official_5090/bin/python` (historical successful StackCube collection environment; RLinf `.venv` planner-init segfault retained as diagnostic); independent worktree `/data/zhaozhixuan/xvla_fixedgrid_knee_work`
 - `manifest`: `configs/pipelines/xvla_fixedgrid_taskpolicy_knee_v1.json`
 - `plan`: `docs/experiment_management/plans/XVLA_FixedGrid_TaskPolicy_Knee_Validation.md`
-- `source_commit`: `462c252`; local branch `codex/xvla-fixed-grid-knee`; GitHub branch pushed and remote worktree detached at the same commit
-- `implementation`: fixed-step collector, task-state knee summarizer, restart-tolerant calibration controller, matched-budget Stage-B trainer/evaluator, temporal-mask training shim, durable Stage-B total supervisor, and contract/knee/controller tests
+- `source_commit`: `3e3f515`; local branch `codex/xvla-fixed-grid-knee`; GitHub branch pushed and remote worktree detached at the same commit
+- `implementation`: fixed-step collector, task-state knee summarizer, restart-tolerant calibration controller, matched-budget Stage-B trainer/evaluator, temporal-mask training shim, durable Stage-B total supervisor, frozen gate-to-knee audit, durable Stage-C passive gate controller, and contract/knee/controller tests
 - `resource_preflight_2026-08-25`: calibration and smoke evidence passed; formal Stage-B is now running on the explicitly selected 5090 GPU5/CPU `0-19`. Other protected GPUs and the H20 owner are untouched. Training controller PID `4087857`; total supervisor PID `585165`; supervisor interval `900s`.
 - `stage_b_roots`: training=`/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_b_training_v1/`; evaluation=`/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_b_evaluation_v1/`; supervisor=`/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_b_total_supervisor_v1/`
+- `stage_c_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_c_gate_v1/`; controller PID `768810`; it waits for `STAGE_B_UTILITY_COMPLETE`, then runs validation-ID calibration and held-out OOD gate audit with a 900-second resource wait.
 - `forbidden`: do not use old Stage-2 timing as formal input; do not launch on any protected GPU; do not tune thresholds/anchors on OOD; do not claim completion from smoke or partial calibration
 
 ## OpenDrawer pi0.5 Continuation From global_step_10000
