@@ -243,6 +243,8 @@ def main() -> None:
     )
 
     budget_root = RUN / "matched_expert_budget"
+    if budget_root.exists() and not (budget_root / "BUDGET_SELECTION_COMPLETE").is_file():
+        budget_root = RUN / "matched_expert_budget_retry1"
     write_state(current_stage="matched_budget", next_stage="matched_training_smoke")
     run(
         [

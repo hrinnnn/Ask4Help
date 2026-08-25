@@ -52,14 +52,19 @@ def exact_reachable(lengths: list[int], cap: int) -> dict[int, tuple[int, ...]]:
 def rewrite_episode_stats(stats: dict, *, new_index: int, frame_start: int) -> dict:
     out = copy.deepcopy(stats)
     if "episode_index" in out:
-        count = out["episode_index"].get("count", [1])
-        out["episode_index"] = {
-            "min": [new_index],
-            "max": [new_index],
-            "mean": [float(new_index)],
-            "std": [0.0],
-            "count": count,
-        }
+        source = out["episode_index"]
+        if isinstance(source, dict):
+            count = source.get("count", [1])
+            out["episode_index"] = {
+                "min": [new_index],
+                "max": [new_index],
+                "mean": [float(new_index)],
+                "std": [0.0],
+                "count": count,
+            }
+        else:
+            # Current LeRobot exports store this field as a scalar episode id.
+            out["episode_index"] = new_index
     if "index" in out:
         source = out["index"]
         count = source.get("count", [1])
