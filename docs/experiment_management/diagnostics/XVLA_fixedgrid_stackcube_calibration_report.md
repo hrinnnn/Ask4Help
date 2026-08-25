@@ -43,3 +43,11 @@ task-state DTW deviation、expert-action cost 和 5,000 次 bootstrap 计算离�
 `80--100` 已不可恢复；`20` 是当前 time--deviation trade-off 的 calibration knee。
 下一步若要声称“对学习最优”，仍需 matched-budget timing utility 或至少一次
 独立 downstream update 验证。
+
+## Matched-budget stop marker
+
+按冻结规则 `20 * median(nominal expert actions)`，StackCube requested budget 为
+520 actions；在所有有效 anchors 的共同 recoverable seed intersection 上，
+不切任何完整 expert suffix 时的最大共同 exact budget 只有 234（45.0%），
+低于 80% resolution gate。因此 Stage-B matched-budget training 同样被标记为
+`BUDGET_RESOLUTION_FAILED`，当前 calibration 不能直接推出 downstream SR 提升。
