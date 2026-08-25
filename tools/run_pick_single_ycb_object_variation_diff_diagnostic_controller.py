@@ -28,6 +28,7 @@ from tools.run_pick_single_ycb_object_variation_downstream_controller import (
     run,
     run_parallel,
     select_idle_gpus,
+    wait_for_idle_gpus,
 )
 
 
@@ -246,21 +247,22 @@ def main() -> None:
     if budget_root.exists() and not (budget_root / "BUDGET_SELECTION_COMPLETE").is_file():
         budget_root = RUN / "matched_expert_budget_retry1"
     write_state(current_stage="matched_budget", next_stage="matched_training_smoke")
-    run(
-        [
-            str(PY), str(ROOT / "tools/prepare_pick_single_ycb_object_variation_matched_budget.py"),
-            "--output-root", str(budget_root), "--expert-action-cap", "12000",
-            "--bridge-pca", paths["bridge_pca"]["dataset_dir"],
-            "--diffdagger", paths["diffdagger"]["dataset_dir"],
-            "--failure-recovery", paths["failure_recovery"]["dataset_dir"],
-            "--offline-oracle", paths["offline_oracle"]["dataset_dir"],
-        ],
-        log=RUN / "matched_budget.log",
-    )
+    if not (budget_root / "BUDGET_SELECTION_COMPLETE").is_file():
+        run(
+            [
+                str(PY), str(ROOT / "tools/prepare_pick_single_ycb_object_variation_matched_budget.py"),
+                "--output-root", str(budget_root), "--expert-action-cap", "12000",
+                "--bridge-pca", paths["bridge_pca"]["dataset_dir"],
+                "--diffdagger", paths["diffdagger"]["dataset_dir"],
+                "--failure-recovery", paths["failure_recovery"]["dataset_dir"],
+                "--offline-oracle", paths["offline_oracle"]["dataset_dir"],
+            ],
+            log=RUN / "matched_budget.log",
+        )
     budget_manifest = json.loads((budget_root / "budget_manifest.json").read_text(encoding="utf-8"))
 
     training = RUN / "matched_training"
-    gpus = select_idle_gpus(4)
+    gpus = wait_for_idle_gpus(4)
     gpu_map = dict(zip(METHODS, gpus))
     smoke_commands = []
     for method in METHODS:
