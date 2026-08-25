@@ -28,6 +28,12 @@ StackCube extension 已完成：合并 cohort 的 valid anchors 为 `{0,10,20,30
 仍因 `53/60` 低于 gate 而不进入 frontier。Airplane extension 随后执行，完成后
 按相同规则重新判定其 budget gate。
 
+Airplane extension 完成后，合并 cohort 的 valid anchors 为 `{0,10,20,30}`，
+共同 recoverable seeds 为 55，exact common budget 为 `2820/2820`。两个 task
+的 Stage-B 2-step/reload smoke 均通过，且日志确认 ID replay 与 selected expert
+meta 同时加载、`action_valid_mask` 实际参与 loss；正式 2500-step training 现已
+进入 controller 阶段。
+
 ## 1. 目标
 
 在不修改现有 Ground Truth task 语义的前提下，使用 canonical X-VLA StackCube 与 PickSingleYCB-Airplane，验证固定 takeover time 是否形成可重复的 time--deviation Pareto knee，并验证该 knee 是否落入 matched-budget downstream utility 的 near-optimal window。
