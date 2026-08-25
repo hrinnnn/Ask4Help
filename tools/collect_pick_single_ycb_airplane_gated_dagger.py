@@ -8,7 +8,7 @@ import hashlib
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import torch
@@ -189,6 +189,7 @@ def _plan_and_execute_expert(
     raw_obs: dict[str, Any],
     lower: np.ndarray,
     upper: np.ndarray,
+    state_callback: Callable[[Any], np.ndarray] | None = None,
 ) -> tuple[list[Any], list[np.ndarray], dict[str, Any]]:
     """Execute planner targets through delta control in the exact policy env."""
     state = policy_env.unwrapped.get_state_dict()
@@ -197,6 +198,7 @@ def _plan_and_execute_expert(
         policy_env.unwrapped.set_state_dict(state)
         candidate_records: list[Any] = []
         candidate_actions: list[np.ndarray] = []
+        candidate_states: list[np.ndarray] = []
         original_step = policy_env.step
 
         servo_substeps = 0
@@ -217,6 +219,10 @@ def _plan_and_execute_expert(
                 result = original_step(action, *step_args, **step_kwargs)
                 candidate_actions.append(action)
                 candidate_records.append(_extract_record(result[0]))
+                if state_callback is not None:
+                    candidate_states.append(
+                        np.asarray(state_callback(policy_env), dtype=np.float32).copy()
+                    )
                 servo_substeps += 1
             assert result is not None
             return result
@@ -248,9 +254,17 @@ def _plan_and_execute_expert(
                 "planned_actions": len(candidate_actions),
                 "executed_actions": len(candidate_actions),
                 "execution_mode": "same_env_absolute_target_to_delta",
+                "state_timeline": np.stack(candidate_states)
+                if candidate_states
+                else np.empty((0, 0), dtype=np.float32),
             }
     policy_env.unwrapped.set_state_dict(state)
-    return [], [], {"accepted": False, "attempts": attempts, "execution_mode": "same_env_absolute_target_to_delta"}
+    return [], [], {
+        "accepted": False,
+        "attempts": attempts,
+        "execution_mode": "same_env_absolute_target_to_delta",
+        "state_timeline": np.empty((0, 0), dtype=np.float32),
+    }
 
 
 def _save_raw_attempt(

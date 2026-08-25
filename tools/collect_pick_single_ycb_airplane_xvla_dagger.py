@@ -45,6 +45,7 @@ EXECUTE_HORIZON = 5
 POLICY_EPISODE_HORIZON = 150
 FAILURE_RECOVERY_STEP = 50
 TASK_HORIZON = 250
+FIXED_TIMING_METHOD = "fixed_timing"
 
 
 def consecutive_gate(score: float, threshold: float, count: int, patience: int) -> tuple[int, bool]:
@@ -67,6 +68,28 @@ def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(payload) + "\n")
+
+
+def task_state(env: Any) -> np.ndarray:
+    """Compact geometry/proprioception state used for timing deviation."""
+    base = env.unwrapped
+    object_p = base.obj.pose.p.reshape(-1, 3)[0].detach().cpu().numpy()
+    goal_p = base.goal_site.pose.p.reshape(-1, 3)[0].detach().cpu().numpy()
+    tcp_p = base.agent.tcp.pose.p.reshape(-1, 3)[0].detach().cpu().numpy()
+    qpos = base.agent.robot.get_qpos().reshape(-1).detach().cpu().numpy()
+    grasped = _bool(base.agent.is_grasping(base.obj))
+    strict_success = _bool(base.evaluate().get("success", False))
+    return np.concatenate(
+        [
+            object_p,
+            goal_p,
+            tcp_p,
+            tcp_p - object_p,
+            goal_p - object_p,
+            qpos[:9],
+            np.asarray([grasped, strict_success], dtype=np.float32),
+        ]
+    ).astype(np.float32)
 
 
 def alternating_split(attempt_index: int) -> str:
@@ -99,17 +122,35 @@ def _run_attempt(
     diff_patience: int,
     diff_timesteps: int,
     flow_steps: int,
+    timing_step: int | None = None,
 ) -> tuple[list[Any], list[np.ndarray], int | None, dict[str, Any]]:
     raw_obs, _ = policy_env.reset(seed=seed)
     records = [_extract_record(raw_obs)]
     actions: list[np.ndarray] = []
     sources: list[str] = []
     timeline: list[dict[str, Any]] = []
+    task_states = [task_state(policy_env)]
     expert_start = 0 if method == "offline_oracle" else None
     gate_count = 0
 
     while len(actions) < POLICY_EPISODE_HORIZON and expert_start is None:
         step = len(actions)
+        if method == FIXED_TIMING_METHOD:
+            if timing_step is None or timing_step < 0:
+                raise ValueError("fixed_timing requires a non-negative --timing-step")
+            if step >= timing_step:
+                expert_start = step
+                timeline.append(
+                    {
+                        "env_step": step,
+                        "controller": "expert",
+                        "score": None,
+                        "threshold": None,
+                        "alarm": True,
+                        "timing_reason": f"fixed_step_{timing_step}",
+                    }
+                )
+                break
         if method == "failure_recovery" and step >= FAILURE_RECOVERY_STEP:
             expert_start = step
             timeline.append({"env_step": step, "controller": "expert", "alarm": True})
@@ -151,6 +192,7 @@ def _run_attempt(
             actions.append(np.asarray(action, dtype=np.float32))
             sources.append("policy")
             records.append(_extract_record(raw_obs))
+            task_states.append(task_state(policy_env))
             if _bool(terminated) or _bool(truncated):
                 break
         if _bool(terminated) or _bool(truncated):
@@ -160,11 +202,22 @@ def _run_attempt(
     strict_success = False
     if expert_start is not None:
         expert_records, expert_actions, oracle_result = _plan_and_execute_expert(
-            policy_env, solver_env, seed=seed, raw_obs=raw_obs, lower=lower, upper=upper
+            policy_env,
+            solver_env,
+            seed=seed,
+            raw_obs=raw_obs,
+            lower=lower,
+            upper=upper,
+            state_callback=task_state,
         )
         records.extend(expert_records)
         actions.extend(expert_actions)
         sources.extend(["expert"] * len(expert_actions))
+        expert_states = oracle_result.pop(
+            "state_timeline", np.empty((0, 0), dtype=np.float32)
+        )
+        if np.asarray(expert_states).size:
+            task_states.extend(np.asarray(expert_states, dtype=np.float32))
         strict_success = bool(oracle_result["accepted"])
 
     return records, actions, expert_start, {
@@ -172,10 +225,14 @@ def _run_attempt(
         "split": split,
         "method": method,
         "strict_success": strict_success,
+        "ever_grasped": bool(np.max(np.asarray(task_states)[:, -2]) > 0.5),
         "steps": len(actions),
         "expert_start_step": expert_start,
         "expert_action_steps": 0 if expert_start is None else len(actions) - expert_start,
         "timeline": timeline,
+        "fixed_timing_step": timing_step,
+        "task_state_dim": int(task_states[0].shape[0]),
+        "task_states": np.stack(task_states),
         "oracle": oracle_result,
         "sources": sources,
         **reset_metadata(policy_env, split=split),
@@ -184,7 +241,11 @@ def _run_attempt(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--method", choices=("vlm_pool_pca", "offline_oracle", "failure_recovery", "diffdagger"), required=True)
+    parser.add_argument(
+        "--method",
+        choices=("vlm_pool_pca", "offline_oracle", "failure_recovery", "diffdagger", FIXED_TIMING_METHOD),
+        required=True,
+    )
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--xvla-root", type=Path, required=True)
     parser.add_argument("--calibration", type=Path, required=True)
@@ -202,11 +263,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--flow-steps", type=int, default=10)
     parser.add_argument("--diff-timesteps", type=int, default=16)
     parser.add_argument("--diff-patience", type=int, default=2)
+    parser.add_argument("--timing-step", type=int)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    if args.method == FIXED_TIMING_METHOD and args.timing_step is None:
+        raise ValueError("fixed_timing requires --timing-step")
     if args.output_dir.exists() or args.repo_id.exists():
         raise FileExistsError("output and dataset paths must be new")
     args.output_dir.mkdir(parents=True)
@@ -222,13 +286,16 @@ def main() -> None:
         "calibration": str(args.calibration.resolve()),
         "split_schedule": "offline_exact_50_50" if args.method == "offline_oracle" else "strict_raw_id_ood_alternation",
         "policy_episode_horizon": POLICY_EPISODE_HORIZON,
+        "fixed_timing_step": args.timing_step,
         "failure_recovery_step": FAILURE_RECOVERY_STEP,
         "oracle_close": {
             "strategy": "stop_after_stable_grasp",
             "max_steps": ORACLE_CLOSE_MAX_STEPS,
             "stable_steps": ORACLE_STABLE_GRASP_STEPS,
         },
-        "admission": "strict_oracle_success_and_nonempty_full_expert_suffix",
+        "admission": "ever_grasped_and_nonempty_full_expert_suffix"
+        if args.method == FIXED_TIMING_METHOD
+        else "strict_oracle_success_and_nonempty_full_expert_suffix",
         "tail_handling": "all_real_actions_saved_temporal_mask_at_training",
     })
 
@@ -268,16 +335,33 @@ def main() -> None:
                 pca_threshold=float(calibration["pca_threshold"]),
                 diff_threshold=float(calibration["diff_threshold"]),
                 diff_patience=args.diff_patience, diff_timesteps=args.diff_timesteps,
-                flow_steps=args.flow_steps,
+                flow_steps=args.flow_steps, timing_step=args.timing_step,
             )
             sources = row.pop("sources")
+            task_states = row.pop("task_states")
             row["attempt_index"] = attempt_index
+            state_path = (
+                args.output_dir
+                / "raw_archive"
+                / "task_states"
+                / f"episode_{attempt_index:06d}_seed_{seed:06d}.npy"
+            )
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(state_path, np.asarray(task_states, dtype=np.float32))
+            row["task_states"] = str(state_path)
             row["video"] = _save_raw_attempt(
                 output_dir=args.output_dir, episode_index=attempt_index, seed=seed,
                 records=records, actions=actions, sources=sources, control_freq=args.control_freq,
             )
+            admission_success = (
+                row["ever_grasped"]
+                if args.method == FIXED_TIMING_METHOD
+                else row["strict_success"]
+            )
             admitted = admitted_expert_suffix(
-                success=row["strict_success"], expert_start=expert_start, action_count=len(actions)
+                success=admission_success,
+                expert_start=expert_start,
+                action_count=len(actions),
             )
             row["accepted"] = admitted is not None
             _append_jsonl(args.output_dir / "episodes.jsonl", row)
@@ -320,6 +404,7 @@ def main() -> None:
     _write_json(args.output_dir / "summary.json", {
         "method": args.method, "accepted_total": accepted,
         "accepted_by_split": accepted_by_split, "raw_by_split": raw_by_split,
+        "admission_endpoint": "ever_grasped" if args.method == FIXED_TIMING_METHOD else "strict_success",
         "dataset": str(args.repo_id), "raw_archive": str(args.output_dir / "raw_archive"),
     })
 
