@@ -16,6 +16,13 @@ Stage A 的独立 audit 显示 StackCube 与 Airplane held-out 的 calibration k
 `BUDGET_RESOLUTION_FAILED`。在没有用户明确选择 fallback 规则前，不启动 Stage-B
 timing training，也不把 calibration knee 表述为 downstream SR 最优。
 
+为严格执行原 exact-budget 规则，新增一轮 calibration extension：StackCube
+使用 OOD seeds `150020--150059`，Airplane 使用 OOD seeds `160020--160059`。
+这只扩大共同 recoverable seed pool，不改变八个 timing anchors、checkpoint、
+endpoint、recoverability gate、suffix 不切分规则或 budget 公式；extension 完成
+后重新运行独立 audit。若仍低于 80%，才保留 `BUDGET_RESOLUTION_FAILED` 并停止
+Stage-B。
+
 ## 1. 目标
 
 在不修改现有 Ground Truth task 语义的前提下，使用 canonical X-VLA StackCube 与 PickSingleYCB-Airplane，验证固定 takeover time 是否形成可重复的 time--deviation Pareto knee，并验证该 knee 是否落入 matched-budget downstream utility 的 near-optimal window。

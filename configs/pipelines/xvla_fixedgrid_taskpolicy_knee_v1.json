@@ -8,8 +8,8 @@
     "zhaozhixuan@111.198.58.150:12001",
     "root@39.101.70.188:1012"
   ],
-  "current_stage": "both_task_calibration_complete_budget_resolution_failed",
-  "next_stage": "user_decision_more_seeds_or_budget_fallback_before_stage_b",
+  "current_stage": "calibration_extension_stackcube_seed_collection",
+  "next_stage": "extension_budget_audit_then_airplane_extension",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/",
   "source_of_truth": "github_local_then_server_pull",
   "model_family": "xvla",
@@ -34,6 +34,7 @@
       "endpoint": "strict_task_success",
       "threshold_validation_id": [149000, 149049],
       "calibration_ood": [150000, 150019],
+      "calibration_extension_ood": [150020, 150059],
       "gate_ood": [151000, 151049],
       "final_ood": [152000, 152099],
       "final_id": [153000, 153099]
@@ -47,6 +48,7 @@
       "endpoint": "ever_grasped",
       "threshold_validation_id": [159000, 159049],
       "calibration_ood_failure_cohort": [160000, 160019],
+      "calibration_extension_ood_failure_cohort": [160020, 160059],
       "gate_ood": [161000, 161049],
       "final_ood": [162000, 162099],
       "final_id": [163000, 163099]
