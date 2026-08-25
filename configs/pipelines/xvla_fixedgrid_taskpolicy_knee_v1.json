@@ -8,7 +8,7 @@
     "zhaozhixuan@111.198.58.150:12001",
     "root@39.101.70.188:1012"
   ],
-  "current_stage": "local_plan_recorded_resource_preflight_blocked",
+  "current_stage": "remote_worktree_smoke_passed_resource_preflight_blocked",
   "next_stage": "runtime_asset_seed_collision_preflight_then_smoke",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/",
   "source_of_truth": "github_local_then_server_pull",
