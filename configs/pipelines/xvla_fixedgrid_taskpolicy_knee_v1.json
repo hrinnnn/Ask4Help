@@ -8,8 +8,8 @@
     "zhaozhixuan@111.198.58.150:12001",
     "root@39.101.70.188:1012"
   ],
-  "current_stage": "stage_b_stackcube_formal_training_running",
-  "next_stage": "stage_b_airplane_after_stackcube_completion",
+  "current_stage": "stage_b_training_running_with_total_supervisor",
+  "next_stage": "stage_b_evaluation_then_utility_auto_after_training_marker",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/",
   "source_of_truth": "github_local_then_server_pull",
   "model_family": "xvla",

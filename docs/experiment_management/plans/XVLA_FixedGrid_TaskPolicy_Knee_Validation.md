@@ -1,7 +1,8 @@
 # X-VLA Fixed-Grid Task-Policy Knee Validation
 
-**状态：Stage A 已在 StackCube 与 Airplane 完成；Stage B 暂停于预先冻结的
-`BUDGET_RESOLUTION_FAILED` stop marker，等待 budget fallback 或增加 seed 的决定。**
+**状态：Stage A 已在 StackCube 与 Airplane 完成，严格 extension 后两个 task 的
+exact matched budget 均已恢复；Stage B 2500-step training 正由持久化总控运行，
+training 完成后将自动进入 100-ID/100-OOD evaluation 与 utility summary。**
 
 历史成功的 StackCube X-VLA collection 使用
 `/data/zhaozhixuan/envs/xvla_official_5090/bin/python`。固定网格首次 smoke
@@ -11,10 +12,10 @@
 时记录并接受该 teardown abort；任何采样中途异常仍然失败并保留 diagnostic root。
 
 Stage A 的独立 audit 显示 StackCube 与 Airplane held-out 的 calibration knee
-均为 step 20；但在不切完整 expert suffix 的 matched-budget 规则下，两个 task
-的最大共同 exact budget 分别只有 requested budget 的 45.0% 和 55.4%，触发
-`BUDGET_RESOLUTION_FAILED`。在没有用户明确选择 fallback 规则前，不启动 Stage-B
-timing training，也不把 calibration knee 表述为 downstream SR 最优。
+均为 step 20。首轮 cohort 曾触发 `BUDGET_RESOLUTION_FAILED`；在不改变 anchors、
+recoverability gate、whole-suffix 规则或 budget 公式的前提下增加预注册 extension
+seeds 后，两个 task 均通过 exact-budget gate，因此解锁 Stage B。calibration knee
+仍不被预先表述为 downstream SR 最优，需由 Stage B utility evaluation 独立验证。
 
 为严格执行原 exact-budget 规则，新增一轮 calibration extension：StackCube
 使用 OOD seeds `150020--150059`，Airplane 使用 OOD seeds `160020--160059`。
@@ -31,8 +32,10 @@ StackCube extension 已完成：合并 cohort 的 valid anchors 为 `{0,10,20,30
 Airplane extension 完成后，合并 cohort 的 valid anchors 为 `{0,10,20,30}`，
 共同 recoverable seeds 为 55，exact common budget 为 `2820/2820`。两个 task
 的 Stage-B 2-step/reload smoke 均通过，且日志确认 ID replay 与 selected expert
-meta 同时加载、`action_valid_mask` 实际参与 loss；正式 2500-step training 现已
-进入 controller 阶段。
+meta 同时加载、`action_valid_mask` 实际参与 loss；正式 2500-step training 已进入
+controller 阶段。持久化 Stage-B total supervisor 以 900 秒间隔等待 training marker，
+随后自动启动 evaluation controller，并在 54 个评测作业完成后生成两 task utility
+summary。
 
 ## 1. 目标
 
