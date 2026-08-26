@@ -193,6 +193,30 @@
     "interpretation": "StackCube Bridge/Action PCA alarms are closest to its knee set; no Airplane method hits the frozen t=20 knee within 5 steps",
     "not_downstream_utility": true
   },
+  "stage_c_data_decision": {
+    "status": "needs_user_decision",
+    "failed_branch": "stackcube/diffdagger",
+    "reason": "400/400 pre-registered OOD pool episodes were consumed, but only 2 complete expert episodes (52 actions) were admitted; the frozen whole-episode exact budget is 520 actions",
+    "evidence": {
+      "raw_total": 400,
+      "accepted_total": 2,
+      "accepted_actions": 52,
+      "required_actions": 520,
+      "selection_error": "no whole-episode subset reaches exact budget=520"
+    },
+    "forbidden_automatic_repairs": [
+      "lowering_validation_id_threshold",
+      "slicing_or_padding_partial_episodes",
+      "changing_success_predicate",
+      "substituting_another_gate_method"
+    ],
+    "decision_options": [
+      "keep frozen protocol and register Diff-DAgger as ineligible/no downstream utility",
+      "approve a new manifest revision with a larger pre-registered pool and rerun only this branch",
+      "approve a new threshold/admission protocol and rerun calibration plus this branch"
+    ],
+    "marker": "NEEDS_USER_DECISION_DIFFDAGGER_EXACT_BUDGET"
+  },
   "execution_audit": {
     "required": [
       "manifest_vs_command",
