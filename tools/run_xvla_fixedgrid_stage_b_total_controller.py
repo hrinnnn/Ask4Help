@@ -163,6 +163,26 @@ def run(args: argparse.Namespace) -> None:
             continue
 
         if not evaluation_complete(evaluation_root):
+            partial_marker = (
+                Path(args.partial_evaluation_marker)
+                if args.partial_evaluation_marker
+                else args.training_root.parent
+                / "diagnostic_partial_evaluation_v1"
+                / "PARTIAL_EVAL_COMPLETE"
+            )
+            if not partial_marker.is_file():
+                state.update(
+                    {
+                        "stage": "stage_b_waiting_for_partial_evaluation",
+                        "partial_evaluation_marker": str(partial_marker),
+                        "updated_at": now(),
+                    }
+                )
+                write_json(state_path, state)
+                with log_path.open("a", encoding="utf-8") as handle:
+                    handle.write(f"{now()} waiting for diagnostic partial evaluation: {partial_marker}\n")
+                time.sleep(args.interval_seconds)
+                continue
             eval_state_path = evaluation_root / "pipeline_state.json"
             eval_state = read_json(eval_state_path) if eval_state_path.exists() else {}
             if eval_state.get("stage") == "stage_b_evaluation_failed":
@@ -204,6 +224,7 @@ def main() -> None:
     parser.add_argument("--gpu", type=int, required=True)
     parser.add_argument("--cpu-set", default="0-19")
     parser.add_argument("--interval-seconds", type=int, default=900)
+    parser.add_argument("--partial-evaluation-marker", type=Path, default=None)
     args = parser.parse_args()
     run(args)
 
