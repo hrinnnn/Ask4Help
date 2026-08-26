@@ -47,8 +47,14 @@ def main() -> None:
 
     sys.path.insert(0, str(args.xvla_root.resolve()))
     from datasets.dataset import InfiniteDataReader
+    from tools.xvla_panda_airplane_domain_handler import install_panda_airplane_handler
     from models.modeling_xvla import XVLA
     from models.processing_xvla import XVLAProcessor
+
+    # The metadata explicitly names ``panda_airplane``.  Register the same
+    # handler used by the training shim before InfiniteDataReader iterates;
+    # otherwise the first batch fails before any feature asset is written.
+    install_panda_airplane_handler()
 
     device = torch.device(args.device)
     model = XVLA.from_pretrained(args.checkpoint, torch_dtype=torch.bfloat16).to(device).eval()
