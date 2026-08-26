@@ -103,8 +103,8 @@
     "authorized": true,
     "formal": false,
     "purpose": "Validate evaluator/checkpoint reload and obtain a preliminary nonzero-rate sanity check before formal Stage-B utility evaluation",
-    "status": "queued_after_stage_b_training",
-    "resource_rule": "run only on GPU5 after STAGE_B_TRAINING_COMPLETE; do not use protected GPUs1/2/3 or interrupt training",
+    "status": "running_on_gpu4_before_stage_b_training_complete",
+    "resource_rule": "run only on independently idle GPU4 with CPU20-39; do not use protected GPUs1/2/3, GPU5, or interrupt training",
     "episodes_per_task_split": 20,
     "diagnostic_seed_ranges": {
       "stackcube_id": [190000, 190019],
@@ -117,6 +117,7 @@
       "airplane": "stage_b_training_v1/airplane/step_20/seed_17001/train/ckpt-2500"
     },
     "output_root": "diagnostic_partial_evaluation_v1",
+    "start_condition": "required knee checkpoints present and GPU4 independently idle",
     "completion_marker": "PARTIAL_EVAL_COMPLETE",
     "failure_marker": "PARTIAL_EVAL_FAILED",
     "not_used_for_formal_denominators": true

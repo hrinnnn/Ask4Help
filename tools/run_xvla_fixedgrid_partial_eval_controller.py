@@ -263,15 +263,25 @@ def run(args: argparse.Namespace) -> None:
     state.setdefault("completed_jobs", [])
     write_json(state_path, state)
     training_marker = args.training_root / "STAGE_B_TRAINING_COMPLETE"
-    while not training_marker.is_file():
+    if not args.start_now:
+        while not training_marker.is_file():
+            state.update(
+                {
+                    "stage": "partial_eval_waiting_for_stage_b_training",
+                    "updated_at": now(),
+                }
+            )
+            write_json(state_path, state)
+            time.sleep(args.interval_seconds)
+    else:
         state.update(
             {
-                "stage": "partial_eval_waiting_for_stage_b_training",
+                "stage": "partial_eval_waiting_for_gpu",
+                "start_condition": "required knee checkpoints present and selected GPU idle",
                 "updated_at": now(),
             }
         )
         write_json(state_path, state)
-        time.sleep(args.interval_seconds)
 
     summaries: dict[str, Any] = {}
     for job in JOBS:
@@ -309,6 +319,11 @@ def main() -> None:
     parser.add_argument("--gpu", type=int, required=True)
     parser.add_argument("--cpu-set", default="0-19")
     parser.add_argument("--interval-seconds", type=int, default=900)
+    parser.add_argument(
+        "--start-now",
+        action="store_true",
+        help="run as soon as the selected checkpoints and GPU are available, without waiting for Stage-B training completion",
+    )
     args = parser.parse_args()
     run(args)
 
