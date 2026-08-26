@@ -156,6 +156,43 @@
       }
     }
   },
+  "stage_c_passive_result": {
+    "status": "complete_data_pending",
+    "asset_observations": 12632,
+    "asset_layers": 37,
+    "validation_id_episodes_per_task": 50,
+    "heldout_ood_episodes_per_task": 50,
+    "threshold_rule": "q=.95 calibrated on validation ID and frozen before held-out OOD",
+    "tasks": {
+      "stackcube": {
+        "validation_id_successes": 43,
+        "heldout_ood_successes": 0,
+        "knee_set": [10, 20],
+        "methods": {
+          "input_pca": {"alarms_observed": 50, "miss_rate": 0.0, "kd_mean": 27.5, "khr_all": 0.20},
+          "bridge_pca": {"alarms_observed": 50, "miss_rate": 0.0, "kd_mean": 5.2, "khr_all": 0.76},
+          "action_pca": {"alarms_observed": 50, "miss_rate": 0.0, "kd_mean": 9.5, "khr_all": 0.82},
+          "diffdagger": {"alarms_observed": 18, "miss_rate": 0.64, "kd_mean": 73.61111111111111, "khr_all": 0.0},
+          "failure_recovery": {"alarms_observed": 50, "miss_rate": 0.0, "kd_mean": 30.0, "khr_all": 0.0}
+        }
+      },
+      "airplane": {
+        "validation_id_ever_grasped": 47,
+        "heldout_ood_ever_grasped": 24,
+        "heldout_ood_strict_successes": 0,
+        "knee_set": [20],
+        "methods": {
+          "input_pca": {"alarms_observed": 50, "miss_rate": 0.0, "kd_mean": 21.7, "khr_all": 0.0},
+          "bridge_pca": {"alarms_observed": 35, "miss_rate": 0.30, "kd_mean": 66.57142857142857, "khr_all": 0.0},
+          "action_pca": {"alarms_observed": 46, "miss_rate": 0.08, "kd_mean": 75.8695652173913, "khr_all": 0.0},
+          "diffdagger": {"alarms_observed": 44, "miss_rate": 0.12, "kd_mean": 68.86363636363636, "khr_all": 0.0},
+          "failure_recovery": {"alarms_observed": 50, "miss_rate": 0.0, "kd_mean": 30.0, "khr_all": 0.0}
+        }
+      }
+    },
+    "interpretation": "StackCube Bridge/Action PCA alarms are closest to its knee set; no Airplane method hits the frozen t=20 knee within 5 steps",
+    "not_downstream_utility": true
+  },
   "execution_audit": {
     "required": [
       "manifest_vs_command",
