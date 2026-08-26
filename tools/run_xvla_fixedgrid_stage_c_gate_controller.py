@@ -114,8 +114,18 @@ def ensure_airplane_assets(
     marker = output_dir / "ASSETS_COMPLETE"
     if marker.is_file() and asset_has_layer(output_asset, "vlm_input_pool", args.python):
         return output_asset
-    if output_dir.exists() and any(output_dir.iterdir()):
-        raise FileExistsError(f"partial Airplane asset build exists: {output_dir}")
+    if output_dir.exists():
+        # A failed builder creates the directory and an empty feature_cache
+        # before iterating the dataset.  That empty scaffold is not a
+        # recoverable artifact; allow the same retry root to reuse it while
+        # still failing closed on any real feature/asset file.
+        substantive = []
+        for entry in output_dir.iterdir():
+            if entry.name == "feature_cache" and entry.is_dir() and not any(entry.iterdir()):
+                continue
+            substantive.append(entry)
+        if substantive:
+            raise FileExistsError(f"partial Airplane asset build exists: {output_dir}")
     if not args.airplane_metadata.is_file():
         raise FileNotFoundError(args.airplane_metadata)
     if not gpu_idle(args.gpu):
