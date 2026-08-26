@@ -103,7 +103,7 @@
     "authorized": true,
     "formal": false,
     "purpose": "Validate evaluator/checkpoint reload and obtain a preliminary nonzero-rate sanity check before formal Stage-B utility evaluation",
-    "status": "running_on_gpu4_before_stage_b_training_complete",
+    "status": "complete_excluded_from_formal",
     "resource_rule": "run only on independently idle GPU4 with CPU20-39; do not use protected GPUs1/2/3, GPU5, or interrupt training",
     "episodes_per_task_split": 20,
     "diagnostic_seed_ranges": {
@@ -120,7 +120,17 @@
     "start_condition": "required knee checkpoints present and GPU4 independently idle",
     "completion_marker": "PARTIAL_EVAL_COMPLETE",
     "failure_marker": "PARTIAL_EVAL_FAILED",
-    "not_used_for_formal_denominators": true
+    "not_used_for_formal_denominators": true,
+    "result_path": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/diagnostic_partial_evaluation_v1/partial_report.json",
+    "evidence": {
+      "episodes_per_task_split": 20,
+      "stackcube_id_success_rate": 0.65,
+      "stackcube_ood_success_rate": 0.35,
+      "airplane_id_ever_grasped_rate": 0.75,
+      "airplane_ood_ever_grasped_rate": 0.30,
+      "all_video_and_action_rows_present": true,
+      "cleanup_exit_diagnostic_only": "free(): invalid pointer"
+    }
   },
   "execution_audit": {
     "required": [
