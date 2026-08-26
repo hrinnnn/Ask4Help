@@ -132,6 +132,30 @@
       "cleanup_exit_diagnostic_only": "free(): invalid pointer"
     }
   },
+  "stage_b_utility_result": {
+    "status": "complete",
+    "completed_evaluations": 54,
+    "summary_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_fixedgrid_taskpolicy_knee_v1/stage_b_evaluation_v1/utility_summaries",
+    "interpretation": "under the frozen matched-budget protocol, the calibration knee is not the OOD-utility-best anchor for either task",
+    "tasks": {
+      "stackcube": {
+        "metric": "success_rate",
+        "best_anchor_set": [0],
+        "best_ood_mean": 0.7233333333333333,
+        "calibration_knee_set": [10, 20],
+        "knee_utility_overlap": [],
+        "utility_consistent_with_calibration": false
+      },
+      "airplane": {
+        "metric": "ever_grasped_rate",
+        "best_anchor_set": [0],
+        "best_ood_mean": 0.7966666666666667,
+        "calibration_knee_set": [20],
+        "knee_utility_overlap": [],
+        "utility_consistent_with_calibration": false
+      }
+    }
+  },
   "execution_audit": {
     "required": [
       "manifest_vs_command",
