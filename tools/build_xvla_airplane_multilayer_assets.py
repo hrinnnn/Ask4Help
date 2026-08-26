@@ -45,7 +45,9 @@ def main() -> None:
     feature_dir = args.output_dir / "feature_cache"
     feature_dir.mkdir()
 
-    sys.path.insert(0, str(args.xvla_root.resolve()))
+    # Keep the Ask4Help root first so ``tools.xvla_panda_airplane_domain_handler``
+    # resolves to this repository rather than an unrelated X-VLA tools package.
+    sys.path.insert(1, str(args.xvla_root.resolve()))
     from datasets.dataset import InfiniteDataReader
     from tools.xvla_panda_airplane_domain_handler import install_panda_airplane_handler
     from models.modeling_xvla import XVLA
@@ -55,6 +57,9 @@ def main() -> None:
     # handler used by the training shim before InfiniteDataReader iterates;
     # otherwise the first batch fails before any feature asset is written.
     install_panda_airplane_handler()
+    from datasets.domain_handler import registry
+    if "panda_airplane" not in registry._REGISTRY:
+        raise RuntimeError("panda_airplane handler registration failed before asset build")
 
     device = torch.device(args.device)
     model = XVLA.from_pretrained(args.checkpoint, torch_dtype=torch.bfloat16).to(device).eval()
