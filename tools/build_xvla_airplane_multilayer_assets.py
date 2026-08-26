@@ -40,10 +40,20 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     if args.output_dir.exists():
-        raise FileExistsError(f"refusing to overwrite {args.output_dir}")
-    args.output_dir.mkdir(parents=True)
+        # A previous failed attempt may have left only the empty feature
+        # cache scaffold.  Reuse that scaffold, but never overwrite a real
+        # feature or detector artifact.
+        substantive = []
+        for entry in args.output_dir.iterdir():
+            if entry.name == "feature_cache" and entry.is_dir() and not any(entry.iterdir()):
+                continue
+            substantive.append(entry)
+        if substantive:
+            raise FileExistsError(f"refusing to overwrite non-empty {args.output_dir}")
+    else:
+        args.output_dir.mkdir(parents=True)
     feature_dir = args.output_dir / "feature_cache"
-    feature_dir.mkdir()
+    feature_dir.mkdir(exist_ok=True)
 
     # Keep the Ask4Help root first so ``tools.xvla_panda_airplane_domain_handler``
     # resolves to this repository rather than an unrelated X-VLA tools package.
