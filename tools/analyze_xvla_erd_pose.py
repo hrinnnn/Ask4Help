@@ -177,13 +177,18 @@ def _causal_align(
     scale: np.ndarray,
     *,
     max_forward_jump: int = 5,
+    max_time_lead: int = 0,
 ) -> np.ndarray:
     indices: list[int] = []
     previous = 0
     query_length = len(query["position"])
     reference_length = len(reference["position"])
     for query_index in range(query_length):
-        upper = min(reference_length - 1, previous + max_forward_jump)
+        upper = min(
+            reference_length - 1,
+            previous + max_forward_jump,
+            query_index + max_time_lead,
+        )
         candidates = range(previous, upper + 1)
         current = min(
             candidates,
