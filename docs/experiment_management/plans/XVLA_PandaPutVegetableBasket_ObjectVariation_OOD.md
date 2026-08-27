@@ -17,7 +17,7 @@ shared by both splits.
 
 - Robot: `PandaBridgeDatasetFlatTable` with its Panda EE delta-pose controller.
 - ID object: `eggplant`.
-- OOD object: `bridge_carrot_generated_modified`.
+- OOD object: `eggplant` with fixed model scale `1.25` (object-size variation).
 - Instruction: `put the vegetable into the yellow basket`.
 - Scene: sink and yellow basket target from the BridgeData real-to-sim assets.
 - Main camera: one fixed Panda experiment camera contract, frozen after smoke.

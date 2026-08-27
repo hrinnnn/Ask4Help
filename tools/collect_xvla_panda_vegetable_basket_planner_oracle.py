@@ -253,6 +253,8 @@ def run_episode(env: Any, split: str, seed: int, episode_index: int, output: Pat
         "robot": type(base.agent).__name__,
         "source_object": base.source_obj_name,
         "target_object": base.target_obj_name,
+        "source_model_scale": float(base.episode_model_scales[base.source_obj_name]),
+        "target_model_scale": float(base.episode_model_scales[base.target_obj_name]),
         "instruction": TASK,
         "configured_source_pose": _array(base.xyz_configs[0, 0]).tolist(),
         "configured_target_pose": _array(base.xyz_configs[0, 1]).tolist(),
@@ -292,7 +294,7 @@ def main() -> None:
         render_mode="rgb_array",
         sim_backend="physx_cpu",
         control_mode="pd_joint_pos",
-        max_episode_steps=200,
+        max_episode_steps=120,
     )
     rows = []
     try:

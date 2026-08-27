@@ -8,8 +8,8 @@
     "zhaozhixuan@111.198.58.150:12001",
     "root@39.101.70.188:1012"
   ],
-  "current_stage": "contract_registered",
-  "next_stage": "server_asset_preflight",
+  "current_stage": "candidate_oracle_profile_selected",
+  "next_stage": "oracle_gate_id_ood",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_panda_put_vegetable_basket_object_ood_v1/",
   "plan": "docs/experiment_management/plans/XVLA_PandaPutVegetableBasket_ObjectVariation_OOD.md",
   "source": {
@@ -23,8 +23,10 @@
     "id_env": "XVLAPandaPutVegetableInBasketID-v1",
     "ood_env": "XVLAPandaPutVegetableInBasketOOD-v1",
     "id_object": "eggplant",
-    "ood_object": "bridge_carrot_generated_modified",
-    "ood_family": "object_variation",
+    "ood_object": "eggplant_scale_1.25",
+    "ood_asset": "eggplant",
+    "ood_scale": 1.25,
+    "ood_family": "object_size_variation",
     "robot": "panda_bridgedataset_flat_table",
     "instruction": "put the vegetable into the yellow basket",
     "object_variation_only": true,
@@ -121,7 +123,7 @@
     "formal_ood": [99000, 99099]
   },
   "placement_preflight": {
-    "status": "pending",
+    "status": "selected_5090_2026-08-27",
     "required_assets": [
       "native X-VLA runtime",
       "X-VLA-Pt foundation",
@@ -140,10 +142,24 @@
         "reason": "ManiSkill/H20 fallback; requires native X-VLA runtime and asset audit"
       }
     ],
-    "selected_server": null,
-    "selected_reason": null,
-    "rejected_alternatives": [],
-    "resource_snapshot": {},
+    "selected_server": "zhaozhixuan@111.198.58.150:12001",
+    "selected_reason": "5090 has the native X-VLA runtime, foundation, BridgeData assets and persistent /data; GPUs 5-7 were idle during audit, while H20 GPUs belong to an existing Ray owner and its root filesystem is full",
+    "rejected_alternatives": [
+      "root@39.101.70.188:1012: both H20 cards registered to PID 276925; root filesystem 100% full; no new allocation"
+    ],
+    "resource_snapshot": {
+      "5090_idle_gpus": [5, 6, 7],
+      "5090_protected_or_occupied_gpus": [0, 1, 2, 3, 4],
+      "5090_data_free": "4.7T",
+      "5090_sdd_free": "177G",
+      "5090_root_free": "79G",
+      "5090_runtime": "/data/zhaozhixuan/envs/xvla_official_5090",
+      "5090_xvla_source": "/data/zhaozhixuan/X-VLA",
+      "5090_foundation": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_airplane_v1/model_cache/X-VLA-Pt-local",
+      "5090_bridge_assets": "/home/zhaozhixuan/.maniskill/data/tasks/bridge_v2_real2sim_dataset",
+      "h20_gpu_owner_pid": 276925,
+      "h20_root_use": "100%"
+    },
     "persistent_output_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_panda_put_vegetable_basket_object_ood_v1/"
   },
   "execution_audit": {

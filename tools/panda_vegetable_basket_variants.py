@@ -99,6 +99,7 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
 
     scene_setting = "sink"
     source_asset = "eggplant"
+    object_scale = None
     task_instruction = "put the vegetable into the yellow basket"
     objects_excluded_from_greenscreening = ["eggplant"]
 
@@ -118,7 +119,7 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
         self.model_db = io_utils.load_json(
             BRIDGE_DATASET_ASSET_PATH / "custom/info_bridge_custom_v0.json"
         )
-        scale_override = os.environ.get("PANDA_BASKET_OOD_SCALE")
+        scale_override = self.object_scale or os.environ.get("PANDA_BASKET_OOD_SCALE")
         if scale_override and self.source_asset == "eggplant":
             self.model_db["eggplant"]["scales"] = [float(scale_override)]
         self.consecutive_grasp = None
@@ -275,9 +276,8 @@ class PandaPutVegetableInBasketID(_PandaPutVegetableInBasket):
     asset_download_ids=["bridge_v2_real2sim"],
 )
 class PandaPutVegetableInBasketOOD(_PandaPutVegetableInBasket):
-    """Panda object-OOD split using the modified carrot asset."""
+    """Panda object-OOD split using a fixed larger eggplant."""
 
-    source_asset = os.environ.get(
-        "PANDA_BASKET_OOD_ASSET", "bridge_carrot_generated_modified"
-    )
+    source_asset = os.environ.get("PANDA_BASKET_OOD_ASSET", "eggplant")
+    object_scale = 1.25
     objects_excluded_from_greenscreening = [source_asset]
