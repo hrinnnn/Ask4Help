@@ -17,6 +17,12 @@ from mani_skill.envs.tasks.digital_twins.bridge_dataset_eval.base_env import (
     BaseBridgeEnv,
 )
 from mani_skill.envs.tasks.digital_twins.base_env import BaseDigitalTwinEnv
+from mani_skill.agents.controllers.pd_joint_pos import (
+    PDJointPosControllerConfig,
+    PDJointPosMimicControllerConfig,
+)
+from mani_skill.agents.registration import register_agent
+from mani_skill.agents.robots.panda.panda import Panda
 from mani_skill.sensors.camera import CameraConfig
 from mani_skill.utils import io_utils
 from mani_skill.utils.registration import register_env
@@ -30,6 +36,41 @@ except ModuleNotFoundError as exc:  # pragma: no cover - exercised on runtime ho
     raise ModuleNotFoundError(
         "PandaBridgeDatasetFlatTable must be importable from the RLinf checkout"
     ) from exc
+
+
+@register_agent()
+class PandaVegetableBridgeAgent(PandaBridgeDatasetFlatTable):
+    """Panda Bridge agent with a standard joint-position planner mode."""
+
+    uid = "panda_vegetable_bridge"
+
+    @property
+    def _controller_configs(self):
+        configs = super()._controller_configs
+        arm = PDJointPosControllerConfig(
+            self.arm_joint_names,
+            lower=None,
+            upper=None,
+            stiffness=self.arm_stiffness,
+            damping=self.arm_damping,
+            force_limit=self.arm_force_limit,
+            normalize_action=False,
+        )
+        gripper = PDJointPosMimicControllerConfig(
+            self.gripper_joint_names,
+            lower=-0.01,
+            upper=0.04,
+            stiffness=self.gripper_stiffness,
+            damping=self.gripper_damping,
+            force_limit=self.gripper_force_limit,
+            normalize_action=False,
+            mimic={"panda_finger_joint2": {"joint": "panda_finger_joint1"}},
+        )
+        configs["pd_joint_pos"] = {"arm": arm, "gripper": gripper}
+        # Keep a named standard EE pose mode available for policy evaluation.
+        standard = Panda._controller_configs.fget(self)
+        configs["pd_ee_target_delta_pose"] = standard["pd_ee_target_delta_pose"]
+        return configs
 
 
 def _reset_configs() -> tuple[torch.Tensor, torch.Tensor]:
@@ -79,7 +120,7 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
         self.episode_stats = None
         BaseDigitalTwinEnv.__init__(
             self,
-            robot_uids=PandaBridgeDatasetFlatTable,
+            robot_uids=PandaVegetableBridgeAgent,
             **kwargs,
         )
 
