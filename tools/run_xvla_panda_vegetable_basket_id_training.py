@@ -190,9 +190,6 @@ def main() -> None:
     parser.add_argument("--smoke-only", action="store_true")
     parser.add_argument("--domain-id", type=int, default=20)
     args = parser.parse_args()
-    if args.output.exists():
-        raise FileExistsError(args.output)
-    args.output.mkdir(parents=True)
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -200,6 +197,12 @@ def main() -> None:
         mixed_precision="bf16",
         gradient_accumulation_steps=args.gradient_accumulation_steps,
     )
+    # Accelerate starts every rank from the same entrypoint.  Rank 0 may
+    # create the output directory before rank 1 reaches this point, so the
+    # existence check must not be used as a distributed collision detector.
+    if accelerator.is_main_process:
+        args.output.mkdir(parents=True, exist_ok=True)
+    accelerator.wait_for_everyone()
     model, processor = load_model(args.base_model, args.xvla_root)
     dataset = PandaVegetableDataset(args.dataset, training=True)
     loader = DataLoader(dataset, batch_size=args.batch_size, num_workers=0, collate_fn=build_collate(processor, args.domain_id))

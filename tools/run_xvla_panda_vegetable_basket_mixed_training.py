@@ -132,9 +132,6 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-    if args.output.exists():
-        raise FileExistsError(args.output)
-    args.output.mkdir(parents=True)
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
@@ -142,6 +139,9 @@ def main() -> None:
         mixed_precision="bf16",
         gradient_accumulation_steps=args.gradient_accumulation_steps,
     )
+    if accelerator.is_main_process:
+        args.output.mkdir(parents=True, exist_ok=True)
+    accelerator.wait_for_everyone()
     model, processor = load_model(args.base_model, args.xvla_root)
     dataset = MixedPandaDataset(args.id_dataset, args.expert_dataset, seed=args.seed)
     loader = DataLoader(
