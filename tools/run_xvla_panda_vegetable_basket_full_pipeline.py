@@ -83,12 +83,15 @@ def base_env(visible_devices: str = "") -> dict[str, str]:
             "TOKENIZERS_PARALLELISM": "false",
             "HF_HUB_OFFLINE": "1",
             "TRANSFORMERS_OFFLINE": "1",
-            "CUDA_VISIBLE_DEVICES": visible_devices,
             "OMP_NUM_THREADS": "20",
             "MKL_NUM_THREADS": "20",
             "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True",
         }
     )
+    if visible_devices:
+        env["CUDA_VISIBLE_DEVICES"] = visible_devices
+    else:
+        env.pop("CUDA_VISIBLE_DEVICES", None)
     return env
 
 
@@ -220,7 +223,7 @@ def materialize_id_dataset() -> tuple[Path, Path, Path]:
     raw = RESULT_ROOT / "id_demo_raw_v2"
     if not (raw / "summary.json").is_file():
         raw = fresh_path(raw)
-        run_logged("id_demo_raw_v2", planner_command("id", 160, 96300, raw), visible_devices="6", log_path=LOG_ROOT / "id_demo_raw_v2.log")
+        run_logged("id_demo_raw_v2", planner_command("id", 160, 96300, raw), visible_devices="5", log_path=LOG_ROOT / "id_demo_raw_v2.log")
     summary = read_json(raw / "summary.json")
     if int(summary.get("successes", 0)) < 128:
         raise RuntimeError(f"ID Oracle demonstrations insufficient: {summary.get('successes')}/160")
@@ -258,7 +261,7 @@ def train_command(base_model: Path, dataset: Path, output: Path, steps: int, *, 
     command = [
         "taskset", "-c", "120-159", str(PYTHON), "-m", "accelerate.commands.launch",
         "--num_processes", "2", "--multi_gpu", "--main_process_port", str(port),
-        "--mixed_precision", "bf16", "--gpu_ids", "0,1",
+        "--mixed_precision", "bf16", "--gpu_ids", "5,7",
         str(WORK_ROOT / "tools/run_xvla_panda_vegetable_basket_id_training.py"),
         "--xvla-root", str(XVLA_ROOT), "--base-model", str(base_model),
         "--dataset", str(dataset), "--output", str(output), "--steps", str(steps),
@@ -275,11 +278,11 @@ def train_id_policy(dataset: Path) -> Path:
     smoke = RESULT_ROOT / "training/id_smoke_v2"
     if not (smoke / "RELOAD_SMOKE_COMPLETE").is_file():
         smoke = fresh_path(smoke)
-        run_logged("id_train_smoke_v2", train_command(BASE_MODEL, dataset, smoke, 2, port=29561, smoke=True), visible_devices="5,6", log_path=LOG_ROOT / "id_train_smoke_v2.log")
+        run_logged("id_train_smoke_v2", train_command(BASE_MODEL, dataset, smoke, 2, port=29561, smoke=True), visible_devices="", log_path=LOG_ROOT / "id_train_smoke_v2.log")
     training = RESULT_ROOT / "training/id_sft_10000_v2"
     if not (training / "TRAINING_COMPLETE").is_file():
         training = fresh_path(training)
-        run_logged("id_sft_10000_v2", train_command(BASE_MODEL, dataset, training, 10000, port=29562), visible_devices="5,6", log_path=LOG_ROOT / "id_sft_10000_v2.log")
+        run_logged("id_sft_10000_v2", train_command(BASE_MODEL, dataset, training, 10000, port=29562), visible_devices="", log_path=LOG_ROOT / "id_sft_10000_v2.log")
     missing = [str(training / f"ckpt-{step}" / "model.safetensors") for step in range(500, 10001, 500) if not (training / f"ckpt-{step}" / "model.safetensors").is_file()]
     if missing:
         raise RuntimeError(f"ID training marker/checkpoint mismatch: {missing[:3]}")
@@ -328,7 +331,7 @@ def select_and_gate(training: Path) -> tuple[Path, Path]:
         run_logged(
             f"id_probe_{step}",
             evaluator_command(checkpoint, "id", 20, 97000 + step, output),
-            visible_devices="6",
+            visible_devices="7",
             log_path=LOG_ROOT / f"id_probe_{step}.log",
         )
         if not complete_eval(output, 20):
@@ -348,7 +351,7 @@ def select_and_gate(training: Path) -> tuple[Path, Path]:
     run_logged(
         "id_formal_gate_100_v2",
         evaluator_command(selected, "id", 100, 98000, formal),
-        visible_devices="6",
+        visible_devices="7",
         log_path=LOG_ROOT / "id_formal_gate_100_v2.log",
     )
     if not complete_eval(formal, 100):
@@ -379,7 +382,7 @@ def build_passive_assets(checkpoint: Path, dataset: Path) -> tuple[Path, Path]:
                 "--output-dir", str(internal), "--domain-id", str(DOMAIN_ID), "--batch-size", "8",
                 "--probe-seed", "0", "--probe-steps", "5", "--pca-dim", "512", "--ridge", "1e-6",
             ],
-            visible_devices="6",
+            visible_devices="7",
             log_path=LOG_ROOT / "passive_internal_assets.log",
         )
     external = RESULT_ROOT / "passive/detector_assets_external_v1"
@@ -413,7 +416,7 @@ def run_passive(checkpoint: Path, dataset: Path) -> tuple[Path, Path, Path]:
     calibration = RESULT_ROOT / "passive/calibration_id_25_v1"
     if not (calibration / "EVALUATION_COMPLETE").is_file():
         calibration = fresh_path(calibration)
-        run_logged("passive_calibration_id_25", passive_eval_command(checkpoint, internal, external, "id", 25, 100000, calibration), visible_devices="6", log_path=LOG_ROOT / "passive_calibration_id_25.log")
+        run_logged("passive_calibration_id_25", passive_eval_command(checkpoint, internal, external, "id", 25, 100000, calibration), visible_devices="5", log_path=LOG_ROOT / "passive_calibration_id_25.log")
     thresholds = RESULT_ROOT / "passive/calibration_thresholds_v1"
     if not (thresholds / "CALIBRATION_COMPLETE").is_file():
         thresholds = fresh_path(thresholds)
@@ -426,11 +429,11 @@ def run_passive(checkpoint: Path, dataset: Path) -> tuple[Path, Path, Path]:
     test_id = RESULT_ROOT / "passive/eval_id_100_v1"
     if not complete_eval(test_id, 100):
         test_id = fresh_path(test_id)
-        run_logged("passive_eval_id_100", passive_eval_command(checkpoint, internal, external, "id", 100, 50000, test_id), visible_devices="6", log_path=LOG_ROOT / "passive_eval_id_100.log")
+        run_logged("passive_eval_id_100", passive_eval_command(checkpoint, internal, external, "id", 100, 50000, test_id), visible_devices="5", log_path=LOG_ROOT / "passive_eval_id_100.log")
     test_ood = RESULT_ROOT / "passive/eval_ood_100_v1"
     if not complete_eval(test_ood, 100):
         test_ood = fresh_path(test_ood)
-        run_logged("passive_eval_ood_100", passive_eval_command(checkpoint, internal, external, "ood", 100, 60000, test_ood), visible_devices="6", log_path=LOG_ROOT / "passive_eval_ood_100.log")
+        run_logged("passive_eval_ood_100", passive_eval_command(checkpoint, internal, external, "ood", 100, 60000, test_ood), visible_devices="5", log_path=LOG_ROOT / "passive_eval_ood_100.log")
     metrics = RESULT_ROOT / "passive/metrics_v1"
     if not (metrics / "METRICS_COMPLETE").is_file():
         metrics = fresh_path(metrics)
@@ -485,7 +488,7 @@ def run_collections(checkpoint: Path, internal: Path, thresholds: Path) -> dict[
             run_logged(
                 f"collection_{method}",
                 collection_command(method, None if method == "offline_bc" else checkpoint, internal if method == "internal_pca" else None, threshold, output),
-                visible_devices=str(5 + (index % 3)) if method != "offline_bc" else "",
+                visible_devices=str((5, 7)[index % 2]) if method != "offline_bc" else "",
                 log_path=LOG_ROOT / f"collection_{method}.log",
             )
         summary = read_json(output / "summary.json")
@@ -504,7 +507,7 @@ def run_collections(checkpoint: Path, internal: Path, thresholds: Path) -> dict[
 def mixed_train_command(checkpoint: Path, dataset: Path, expert: Path, output: Path, steps: int, port: int, smoke: bool) -> list[str]:
     return [
         "taskset", "-c", "120-159", str(PYTHON), "-m", "accelerate.commands.launch", "--num_processes", "2", "--multi_gpu",
-        "--main_process_port", str(port), "--mixed_precision", "bf16", "--gpu_ids", "0,1",
+        "--main_process_port", str(port), "--mixed_precision", "bf16", "--gpu_ids", "5,7",
         str(WORK_ROOT / "tools/run_xvla_panda_vegetable_basket_mixed_training.py"),
         "--xvla-root", str(XVLA_ROOT), "--base-model", str(checkpoint), "--id-dataset", str(dataset),
         "--expert-dataset", str(expert), "--output", str(output), "--steps", str(steps), "--save-interval", "500",
@@ -520,11 +523,11 @@ def train_branches(checkpoint: Path, dataset: Path, collections: dict[str, Path]
         smoke = RESULT_ROOT / f"training/branch_{method}_smoke_v1"
         if not (smoke / "RELOAD_SMOKE_COMPLETE").is_file():
             smoke = fresh_path(smoke)
-            run_logged(f"train_{method}_smoke", mixed_train_command(checkpoint, dataset, expert, smoke, 2, 29600 + index, True), visible_devices="5,6", log_path=LOG_ROOT / f"train_{method}_smoke.log")
+            run_logged(f"train_{method}_smoke", mixed_train_command(checkpoint, dataset, expert, smoke, 2, 29600 + index, True), visible_devices="", log_path=LOG_ROOT / f"train_{method}_smoke.log")
         output = RESULT_ROOT / f"training/branch_{method}_5000_v1"
         if not (output / "TRAINING_COMPLETE").is_file():
             output = fresh_path(output)
-            run_logged(f"train_{method}_5000", mixed_train_command(checkpoint, dataset, expert, output, 5000, 29610 + index, False), visible_devices="5,6", log_path=LOG_ROOT / f"train_{method}_5000.log")
+            run_logged(f"train_{method}_5000", mixed_train_command(checkpoint, dataset, expert, output, 5000, 29610 + index, False), visible_devices="", log_path=LOG_ROOT / f"train_{method}_5000.log")
         missing = [str(output / f"ckpt-{step}" / "model.safetensors") for step in range(500, 5001, 500) if not (output / f"ckpt-{step}" / "model.safetensors").is_file()]
         if missing:
             raise RuntimeError(f"missing branch checkpoints for {method}: {missing[:2]}")
@@ -541,11 +544,11 @@ def final_evaluation(branches: dict[str, Path]) -> None:
         id_output = method_root / "id"
         if not complete_eval(id_output, 100):
             id_output = fresh_path(id_output)
-            run_logged(f"final_{method}_id", evaluator_command(checkpoint, "id", 100, 110000, id_output), visible_devices=str(5 + (index % 3)), log_path=LOG_ROOT / f"final_{method}_id.log")
+            run_logged(f"final_{method}_id", evaluator_command(checkpoint, "id", 100, 110000, id_output), visible_devices=str((5, 7)[index % 2]), log_path=LOG_ROOT / f"final_{method}_id.log")
         ood_output = method_root / "ood"
         if not complete_eval(ood_output, 100):
             ood_output = fresh_path(ood_output)
-            run_logged(f"final_{method}_ood", evaluator_command(checkpoint, "ood", 100, 120000, ood_output), visible_devices=str(5 + (index % 3)), log_path=LOG_ROOT / f"final_{method}_ood.log")
+            run_logged(f"final_{method}_ood", evaluator_command(checkpoint, "ood", 100, 120000, ood_output), visible_devices=str((5, 7)[index % 2]), log_path=LOG_ROOT / f"final_{method}_ood.log")
         id_summary = read_json(id_output / "summary.json")
         ood_summary = read_json(ood_output / "summary.json")
         rows.append({
