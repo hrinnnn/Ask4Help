@@ -245,12 +245,31 @@ def run_episode(
             )
             stages["lifted"] = lifted
             if lifted:
+                planner.close_gripper(t=4)
+                object_in_tcp = base.agent.tcp_pose.sp.inv() * source.pose.sp
                 release_object = sapien.Pose(
                     target_sp.p + np.array([0.0, 0.0, 0.08]), source.pose.sp.q
                 )
                 recorder.current_phase = "transport"
-                stages["transport_command_completed"] = _move(
-                    planner, release_object * object_in_tcp.inv()
+                current_object = source.pose.sp
+                midpoint = sapien.Pose(
+                    [
+                        (current_object.p[0] + release_object.p[0]) / 2.0,
+                        (current_object.p[1] + release_object.p[1]) / 2.0,
+                        max(current_object.p[2], release_object.p[2]) + 0.08,
+                    ],
+                    current_object.q,
+                )
+                midpoint_ok = _move(planner, midpoint * object_in_tcp.inv())
+                midpoint_grasped = _bool(base.agent.is_grasping(source))
+                stages["transport_midpoint_completed"] = midpoint_ok
+                stages["transport_midpoint_grasped"] = midpoint_grasped
+                if midpoint_ok and midpoint_grasped:
+                    object_in_tcp = base.agent.tcp_pose.sp.inv() * source.pose.sp
+                stages["transport_command_completed"] = bool(
+                    midpoint_ok
+                    and midpoint_grasped
+                    and _move(planner, release_object * object_in_tcp.inv())
                 )
                 recorder.current_phase = "release"
                 for _ in range(release_max_steps):
