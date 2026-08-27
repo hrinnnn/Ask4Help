@@ -264,7 +264,7 @@ def train_command(base_model: Path, dataset: Path, output: Path, steps: int, *, 
         "--dataset", str(dataset), "--output", str(output), "--steps", str(steps),
         "--save-interval", "500", "--batch-size", "8", "--gradient-accumulation-steps", "8",
         "--learning-rate", "1e-4", "--learning-coef", "0.1", "--freeze-steps", "1000",
-        "--warmup-steps", "2000", "--domain-id", str(DOMAIN_ID), "--seed", "96300",
+        "--warmup-steps", "2000", "--domain-id", str(DOMAIN_ID), "--distributed-backend", "gloo", "--seed", "96300",
     ]
     if smoke:
         command.append("--smoke-only")
@@ -509,7 +509,7 @@ def mixed_train_command(checkpoint: Path, dataset: Path, expert: Path, output: P
         "--xvla-root", str(XVLA_ROOT), "--base-model", str(checkpoint), "--id-dataset", str(dataset),
         "--expert-dataset", str(expert), "--output", str(output), "--steps", str(steps), "--save-interval", "500",
         "--batch-size", "8", "--gradient-accumulation-steps", "8", "--learning-rate", "1e-4", "--learning-coef", "0.1",
-        "--freeze-steps", "1000", "--warmup-steps", "2000", "--domain-id", str(DOMAIN_ID), "--seed", "96500",
+        "--freeze-steps", "1000", "--warmup-steps", "2000", "--domain-id", str(DOMAIN_ID), "--distributed-backend", "gloo", "--seed", "96500",
     ] + (["--smoke-only"] if smoke else [])
 
 

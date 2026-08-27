@@ -17,6 +17,7 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader, IterableDataset
 from accelerate import Accelerator
+from accelerate.utils import InitProcessGroupKwargs
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -127,6 +128,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--domain-id", type=int, default=20)
     parser.add_argument("--seed", type=int, default=96500)
     parser.add_argument("--smoke-only", action="store_true")
+    parser.add_argument("--distributed-backend", choices=("nccl", "gloo"), default="nccl")
     return parser.parse_args()
 
 
@@ -138,6 +140,7 @@ def main() -> None:
     accelerator = Accelerator(
         mixed_precision="bf16",
         gradient_accumulation_steps=args.gradient_accumulation_steps,
+        kwargs_handlers=[InitProcessGroupKwargs(backend=args.distributed_backend)],
     )
     if accelerator.is_main_process:
         args.output.mkdir(parents=True, exist_ok=True)

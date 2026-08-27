@@ -16,6 +16,7 @@ import h5py
 import numpy as np
 import torch
 from accelerate import Accelerator
+from accelerate.utils import InitProcessGroupKwargs
 from PIL import Image
 from torch.optim import AdamW
 from torch.utils.data import DataLoader, IterableDataset
@@ -189,6 +190,7 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=96300)
     parser.add_argument("--smoke-only", action="store_true")
     parser.add_argument("--domain-id", type=int, default=20)
+    parser.add_argument("--distributed-backend", choices=("nccl", "gloo"), default="nccl")
     args = parser.parse_args()
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -196,6 +198,7 @@ def main() -> None:
     accelerator = Accelerator(
         mixed_precision="bf16",
         gradient_accumulation_steps=args.gradient_accumulation_steps,
+        kwargs_handlers=[InitProcessGroupKwargs(backend=args.distributed_backend)],
     )
     # Accelerate starts every rank from the same entrypoint.  Rank 0 may
     # create the output directory before rank 1 reaches this point, so the
