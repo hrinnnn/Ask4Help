@@ -95,6 +95,28 @@ deviation 还大，从而让全局 covariance 过宽、阈值失去敏感性。
 不是用 raw image novelty 填补。阈值应在 context-stratified validation 上冻结，
 并报告 macro-average 与 worst-context false-alarm/miss。
 
+### 2.5 Real-robot first version：gripper-pose ERD
+
+如果当前 OOD 分布固定、任务初始条件可重复，第一版可以只使用 gripper pose，
+不依赖 raw image 或 simulator-only state：
+
+\[
+z_t=[p_t^{ee}-p_0^{ee},\;\log(R_0^{ee\top}R_t^{ee}),\;g_t].
+\]
+
+位置使用 reset-relative frame，姿态使用 `SO(3)` geodesic/log map，`g_t` 为
+gripper width；这些量可以由真机 encoder/FK 直接获得。如果物体 pose 以后能
+稳定跟踪，再将坐标改成 object-relative frame。
+
+一条 OOD expert demonstration 可以作为 prototype，但不能单独估计自然噪声
+阈值。推荐把 expert demo 作为 reference，把同一 OOD 分布中的少量成功 learner
+rollouts 用于冻结阈值；如果确实只有一条 demo，则阈值必须来自预先声明的
+tracking/control tolerance，并将结果标记为 single-prototype diagnostic。
+
+当前 Stage-A `task_states` 已保存 TCP position，但没有完整 TCP orientation，
+所以现有数据可以先验证 position-only ERD；正式 pose ERD 需要在 replay 或新的
+diagnostic rollout 中补存 TCP rotation。
+
 ## 3. 用现有 Stage-A 数据做的 preliminary check
 
 现有 Stage-A 已经有：
