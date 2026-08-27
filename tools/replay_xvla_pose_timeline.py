@@ -228,10 +228,16 @@ def replay(args: argparse.Namespace) -> dict[str, Any]:
             metadata_error = _metadata_max_error(expected_metadata, actual_metadata)
             replay_first = _replay_frame(raw_obs)
             source_first = _source_first_frame(video_path)
+            source_shape = tuple(int(value) for value in source_first.shape)
+            replay_shape = tuple(int(value) for value in replay_first.shape)
             if replay_first.shape != source_first.shape:
-                raise RuntimeError(
-                    f"RGB shape mismatch for seed {row['seed']}: "
-                    f"replay={replay_first.shape}, source={source_first.shape}"
+                from PIL import Image
+
+                source_first = np.asarray(
+                    Image.fromarray(source_first).resize(
+                        (replay_first.shape[1], replay_first.shape[0]),
+                        Image.Resampling.BILINEAR,
+                    )
                 )
             frame_delta = np.abs(
                 replay_first.astype(np.int16) - source_first.astype(np.int16)
@@ -287,6 +293,9 @@ def replay(args: argparse.Namespace) -> dict[str, Any]:
                     "initial_rgb_mae": float(frame_delta.mean()),
                     "initial_rgb_max_abs_error": int(frame_delta.max()),
                     "initial_rgb_match": bool(frame_delta.mean() <= args.rgb_mae_tolerance),
+                    "source_rgb_shape": list(source_shape),
+                    "replay_rgb_shape": list(replay_shape),
+                    "source_resized_for_comparison": bool(source_shape != replay_shape),
                     "terminated": bool(terminated),
                     "truncated": bool(truncated),
                     "pose_file": str(
