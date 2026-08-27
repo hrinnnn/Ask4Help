@@ -7,6 +7,8 @@ so the same BridgeData assets are paired with the existing Panda agent.
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import sapien
 import torch
@@ -272,5 +274,7 @@ class PandaPutVegetableInBasketID(_PandaPutVegetableInBasket):
 class PandaPutVegetableInBasketOOD(_PandaPutVegetableInBasket):
     """Panda object-OOD split using the modified carrot asset."""
 
-    source_asset = "bridge_carrot_generated_modified"
-    objects_excluded_from_greenscreening = ["bridge_carrot_generated_modified"]
+    source_asset = os.environ.get(
+        "PANDA_BASKET_OOD_ASSET", "bridge_carrot_generated_modified"
+    )
+    objects_excluded_from_greenscreening = [source_asset]
