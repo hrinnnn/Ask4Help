@@ -389,6 +389,10 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
         expert, expert_contexts, context_scale, args.fps
     )
     feature_scale = _robust_scales(expert_residuals)
+    expert_peer_context_distances = np.asarray(
+        [row["context_distance"] for row in pair_rows], dtype=np.float64
+    )
+    context_support_threshold = float(np.quantile(expert_peer_context_distances, 0.95))
     threshold, threshold_values = _threshold_from_expert(
         expert,
         context_scale,
@@ -408,6 +412,8 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
             _context_distance(context, _context(ref), context_scale) for ref in expert
         ]
         nearest_index = int(np.argmin(distances))
+        nearest_context_distance = float(distances[nearest_index])
+        context_supported = nearest_context_distance <= context_support_threshold
         reference = _pose_series(expert[nearest_index]["arrays"], args.fps)
         match_indices = _causal_align(
             features,
@@ -454,6 +460,8 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
             "episode_index": item["episode_index"],
             "seed": item["seed"],
             "context_distance_to_nearest_expert": distances[nearest_index],
+            "context_supported": context_supported,
+            "reference_status": "supported" if context_supported else "reference_unsupported",
             "nearest_expert_seed": expert[nearest_index]["seed"],
             "erd_alarm_step": alarm,
             "erd_alarm_observed": alarm is not None,
@@ -491,6 +499,7 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
             "feature_definition": "position, orientation-log, gripper-width, linear-velocity, angular-velocity",
             "feature_scale": feature_scale.tolist(),
             "context_scale": context_scale.tolist(),
+            "expert_peer_context_distance_q95": context_support_threshold,
             "pair_rows": pair_rows,
         },
         "threshold": {
@@ -507,10 +516,19 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
             "fps": args.fps,
             "nearest_context_distance_mean": float(np.mean(learner_context_distances)),
             "nearest_context_distance_median": float(np.median(learner_context_distances)),
+            "unsupported_contexts": sum(not row["context_supported"] for row in rows),
+            "unsupported_context_rate": float(
+                np.mean([not row["context_supported"] for row in rows])
+            ),
         },
         "erd_summary": {
             "observed": len(detected),
             "miss_or_censored": len(rows) - len(detected),
+            "observed_supported_context": sum(
+                row["erd_alarm_step"] is not None and row["context_supported"]
+                for row in rows
+            ),
+            "unsupported_contexts": sum(not row["context_supported"] for row in rows),
             "mean_step_detected_only": None if not detected else float(np.mean(detected)),
             "median_step_detected_only": None if not detected else float(np.median(detected)),
             "p25_step_detected_only": None if not detected else float(np.quantile(detected, 0.25)),
