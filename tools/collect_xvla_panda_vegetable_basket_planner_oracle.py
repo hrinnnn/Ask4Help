@@ -266,9 +266,25 @@ def run_episode(
                 stages["transport_midpoint_grasped"] = midpoint_grasped
                 if midpoint_ok and midpoint_grasped:
                     object_in_tcp = base.agent.tcp_pose.sp.inv() * source.pose.sp
-                stages["transport_command_completed"] = bool(
+                high_target = sapien.Pose(
+                    [release_object.p[0], release_object.p[1], midpoint.p[2]],
+                    source.pose.sp.q,
+                )
+                high_target_ok = bool(
                     midpoint_ok
                     and midpoint_grasped
+                    and _move(planner, high_target * object_in_tcp.inv())
+                )
+                high_target_grasped = bool(
+                    high_target_ok and _bool(base.agent.is_grasping(source))
+                )
+                stages["transport_high_target_completed"] = high_target_ok
+                stages["transport_high_target_grasped"] = high_target_grasped
+                if high_target_grasped:
+                    object_in_tcp = base.agent.tcp_pose.sp.inv() * source.pose.sp
+                stages["transport_command_completed"] = bool(
+                    high_target_ok
+                    and high_target_grasped
                     and _move(planner, release_object * object_in_tcp.inv())
                 )
                 recorder.current_phase = "release"
