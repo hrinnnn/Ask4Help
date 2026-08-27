@@ -8,6 +8,7 @@ so the same BridgeData assets are paired with the existing Panda agent.
 from __future__ import annotations
 
 import numpy as np
+import sapien
 import torch
 from transforms3d.euler import euler2quat
 
@@ -16,6 +17,7 @@ from mani_skill.envs.tasks.digital_twins.bridge_dataset_eval.base_env import (
     BaseBridgeEnv,
 )
 from mani_skill.envs.tasks.digital_twins.base_env import BaseDigitalTwinEnv
+from mani_skill.sensors.camera import CameraConfig
 from mani_skill.utils import io_utils
 from mani_skill.utils.registration import register_env
 
@@ -97,6 +99,22 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
             shadow=False,
             shadow_scale=5,
             shadow_map_size=2048,
+        )
+
+    @property
+    def _default_human_render_camera_configs(self):
+        """Use a Panda-compatible debug camera instead of the WidowX mount."""
+
+        return CameraConfig(
+            "render_camera",
+            pose=sapien.Pose(
+                [0.00, -0.16, 0.336],
+                [0.909182, -0.0819809, 0.347277, 0.214629],
+            ),
+            width=512,
+            height=512,
+            near=0.01,
+            far=100,
         )
 
 
