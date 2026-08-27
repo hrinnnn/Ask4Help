@@ -135,13 +135,14 @@ def update_lrs(optimizer, step: int, args):
 
 
 def masked_ee6d_loss(model, batch):
-    enc = model.forward_vlm(batch["input_ids"], batch["image_input"], batch["image_mask"])
+    core = model.module if hasattr(model, "module") else model
+    enc = core.forward_vlm(batch["input_ids"], batch["image_input"], batch["image_mask"])
     target = batch["action"]
     batch_size = target.shape[0]
     t = (torch.rand(1, device=target.device) + torch.arange(batch_size, device=target.device) / batch_size) % (1 - 1e-5)
     noisy = torch.randn_like(target) * t.view(-1, 1, 1) + target * (1 - t).view(-1, 1, 1)
-    proprio, noisy = model.action_space.preprocess(batch["proprio"], noisy)
-    pred = model.transformer(
+    proprio, noisy = core.action_space.preprocess(batch["proprio"], noisy)
+    pred = core.transformer(
         domain_id=batch["domain_id"],
         action_with_noise=noisy,
         t=t,
