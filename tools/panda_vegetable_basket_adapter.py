@@ -106,10 +106,6 @@ def model_target_to_panda_action(
     if action.size < ACTIVE_ACTION_DIM:
         raise ValueError(f"model action must have at least 10 values, got {action.size}")
     current_world = tcp_pose_world(env)
-    root = env.unwrapped.agent.robot.pose
-    root_p = _array(root.p).reshape(-1, 3)[0]
-    root_q = _array(root.q).reshape(-1, 4)[0]
-    root_rot = Rotation.from_quat(root_q[[1, 2, 3, 0]])
     current_base = controller_target_pose_base(env)
     if current_base is None:
         current_base = world_pose_to_base(env, current_world)
@@ -133,17 +129,45 @@ def target_world_to_panda_action(
     """Build a Panda command for a world-frame waypoint."""
 
     current = tcp_pose_world(env)
-    root = env.unwrapped.agent.robot.pose
-    root_p = _array(root.p).reshape(-1, 3)[0]
-    root_q = _array(root.q).reshape(-1, 4)[0]
-    root_rot = Rotation.from_quat(root_q[[1, 2, 3, 0]])
+    return target_world_pose_to_panda_action(
+        env,
+        target_world_xyz,
+        current[3:],
+        gripper_env,
+        position_limit=position_limit,
+    )
+
+
+def target_world_pose_to_panda_action(
+    env: Any,
+    target_world_xyz: np.ndarray,
+    target_world_quaternion_wxyz: np.ndarray,
+    gripper_env: float,
+    *,
+    position_limit: float = 0.05,
+    rotation_limit: float = 0.1,
+) -> np.ndarray | dict[str, np.ndarray]:
+    """Build a Panda command for a world-frame pose waypoint."""
+
+    current = tcp_pose_world(env)
     previous_target = controller_target_pose_base(env)
     if previous_target is None:
         previous_target = world_pose_to_base(env, current)
-    desired_base_xyz = root_rot.inv().apply(_array(target_world_xyz).reshape(3) - root_p)
+    target_world = np.concatenate(
+        [
+            _array(target_world_xyz).reshape(3),
+            _array(target_world_quaternion_wxyz).reshape(4),
+        ]
+    )
+    desired_base = world_pose_to_base(env, target_world)
+    desired_base_xyz = desired_base[:3]
     delta = desired_base_xyz - previous_target[:3]
     delta = np.clip(delta, -position_limit, position_limit)
-    arm = np.concatenate([delta, np.zeros(3, dtype=np.float32)]).astype(np.float32)
+    previous_rot = Rotation.from_quat(previous_target[3:][[1, 2, 3, 0]])
+    desired_rot = Rotation.from_quat(desired_base[3:][[1, 2, 3, 0]])
+    delta_rot = (previous_rot.inv() * desired_rot).as_rotvec()
+    delta_rot = np.clip(delta_rot, -rotation_limit, rotation_limit)
+    arm = np.concatenate([delta, delta_rot]).astype(np.float32)
     if isinstance(env.action_space, gym.spaces.Dict):
         return {"arm": arm, "gripper": np.asarray([gripper_env], dtype=np.float32)}
     return np.concatenate([arm, [gripper_env]]).astype(np.float32)

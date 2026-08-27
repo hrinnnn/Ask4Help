@@ -13,11 +13,12 @@ import cv2
 import gymnasium as gym
 import h5py
 import numpy as np
+from scipy.spatial.transform import Rotation
 
 from panda_vegetable_basket_adapter import (
     action_space_gripper_bounds,
     encode_base_ee6d,
-    target_world_to_panda_action,
+    target_world_pose_to_panda_action,
     tcp_pose_world,
     world_pose_to_base,
 )
@@ -57,9 +58,21 @@ def _is_true(value) -> bool:
     return bool(_array(value).reshape(-1)[0])
 
 
-def _record_action(env, desired_xyz, grip, frames, proprio, actions, source_states, target_states):
+def _record_action(
+    env,
+    desired_xyz,
+    desired_quaternion,
+    grip,
+    frames,
+    proprio,
+    actions,
+    source_states,
+    target_states,
+):
     current = tcp_pose_world(env)
-    target_world = np.concatenate([np.asarray(desired_xyz, dtype=np.float32), current[3:]])
+    target_world = np.concatenate(
+        [np.asarray(desired_xyz, dtype=np.float32), np.asarray(desired_quaternion, dtype=np.float32)]
+    )
     current_base = world_pose_to_base(env, current)
     target_base = world_pose_to_base(env, target_world)
     frames.append(_rgb(env._last_obs))
@@ -68,7 +81,7 @@ def _record_action(env, desired_xyz, grip, frames, proprio, actions, source_stat
     base = env.unwrapped
     source_states.append(_pose(base.objs[base.source_obj_name]))
     target_states.append(_pose(base.objs[base.target_obj_name]))
-    return target_world_to_panda_action(env, desired_xyz, grip)
+    return target_world_pose_to_panda_action(env, desired_xyz, desired_quaternion, grip)
 
 
 def _save_attempt(output, episode_index, frames, proprio, actions, source_states, target_states, metadata):
@@ -130,7 +143,7 @@ def _save_attempt(output, episode_index, frames, proprio, actions, source_states
     return h5_path, video_path, meta_path
 
 
-def run_episode(env, split, seed, episode_index, output):
+def run_episode(env, split, seed, episode_index, output, close_offset, orientation_yaw_deg):
     obs, _ = env.reset(seed=int(seed))
     env._last_obs = obs
     base = env.unwrapped
@@ -138,6 +151,12 @@ def run_episode(env, split, seed, episode_index, output):
     target = base.target_obj_name
     start_source = _pose(base.objs[source])
     start_target = _pose(base.objs[target])
+    initial_tcp = tcp_pose_world(env)
+    initial_rotation = Rotation.from_quat(initial_tcp[3:][[1, 2, 3, 0]])
+    grasp_rotation = initial_rotation * Rotation.from_euler(
+        "z", orientation_yaw_deg, degrees=True
+    )
+    grasp_quaternion = grasp_rotation.as_quat()[[3, 0, 1, 2]].astype(np.float32)
     opened, closed = action_space_gripper_bounds(env)[1], action_space_gripper_bounds(env)[0]
     frames, proprio, actions, source_states, target_states = [], [], [], [], []
     timeline = []
@@ -145,8 +164,8 @@ def run_episode(env, split, seed, episode_index, output):
     max_source_z = float(start_source[2])
     phases = [
         ("hover", start_source[:3] + np.array([0, 0, 0.16], dtype=np.float32), opened, 12),
-        ("descend", start_source[:3] + np.array([0, 0, 0.025], dtype=np.float32), opened, 8),
-        ("close", start_source[:3] + np.array([0, 0, 0.025], dtype=np.float32), closed, 6),
+        ("descend", start_source[:3] + np.array([0, 0, close_offset], dtype=np.float32), opened, 8),
+        ("close", start_source[:3] + np.array([0, 0, close_offset], dtype=np.float32), closed, 8),
         ("lift", start_source[:3] + np.array([0, 0, 0.18], dtype=np.float32), closed, 12),
         ("transport", start_target[:3] + np.array([0, 0, 0.18], dtype=np.float32), closed, 14),
         ("lower", start_target[:3] + np.array([0, 0, 0.095], dtype=np.float32), closed, 6),
@@ -157,7 +176,15 @@ def run_episode(env, split, seed, episode_index, output):
         phase_start = step_index
         for _ in range(count):
             command = _record_action(
-                env, desired, grip, frames, proprio, actions, source_states, target_states
+                env,
+                desired,
+                grasp_quaternion,
+                grip,
+                frames,
+                proprio,
+                actions,
+                source_states,
+                target_states,
             )
             env._last_obs, _, terminated, truncated, info = env.step(command)
             step_index += 1
@@ -198,6 +225,8 @@ def run_episode(env, split, seed, episode_index, output):
         },
         "max_source_z": max_source_z,
         "grasp_steps": grasp_steps,
+        "close_offset": float(close_offset),
+        "orientation_yaw_deg": float(orientation_yaw_deg),
         "timeline": timeline,
         "expert_control_start": 0,
         "expert_control_end": len(actions),
@@ -214,6 +243,8 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, required=True)
     parser.add_argument("--seed-start", type=int, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--close-offset", type=float, default=0.025)
+    parser.add_argument("--orientation-yaw-deg", type=float, default=0.0)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     sys.path.insert(0, str(args.rlinf_root))
@@ -228,7 +259,13 @@ def main() -> None:
     try:
         for episode_index in range(args.episodes):
             _, metadata = run_episode(
-                env, args.split, args.seed_start + episode_index, episode_index, args.output
+                env,
+                args.split,
+                args.seed_start + episode_index,
+                episode_index,
+                args.output,
+                args.close_offset,
+                args.orientation_yaw_deg,
             )
             rows.append(metadata)
             print(json.dumps(metadata), flush=True)
@@ -254,4 +291,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
