@@ -23,10 +23,12 @@ def _array(value: Any) -> np.ndarray:
 def tcp_pose_world(env: Any) -> np.ndarray:
     """Return Panda TCP pose as ``xyz + quaternion(wxyz)`` in world frame."""
 
-    link = next(
-        link for link in env.unwrapped.agent.robot.get_links()
-        if link.name == "ee_gripper_link"
-    )
+    link = getattr(env.unwrapped.agent, "tcp", None)
+    if link is None:
+        link = next(
+            link for link in env.unwrapped.agent.robot.get_links()
+            if link.name in {"panda_hand_tcp", "ee_gripper_link"}
+        )
     return _array(link.pose.raw_pose).reshape(-1, 7)[0]
 
 
@@ -139,4 +141,3 @@ def action_space_gripper_bounds(env: Any) -> tuple[float, float]:
     else:
         low, high = space.low[-1], space.high[-1]
     return float(low), float(high)
-
