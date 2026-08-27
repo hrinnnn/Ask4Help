@@ -20,6 +20,8 @@ from mani_skill.envs.tasks.digital_twins.base_env import BaseDigitalTwinEnv
 from mani_skill.sensors.camera import CameraConfig
 from mani_skill.utils import io_utils
 from mani_skill.utils.registration import register_env
+from mani_skill.utils.geometry import rotation_conversions
+from mani_skill.utils.structs.pose import Pose
 
 
 try:
@@ -100,6 +102,84 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
             shadow_scale=5,
             shadow_map_size=2048,
         )
+
+    def _initialize_episode(self, env_idx: torch.Tensor, options: dict):
+        """Reset Bridge objects and the Panda using its 9-DoF initial state."""
+
+        with torch.device(self.device):
+            batch_size = len(env_idx)
+            if "episode_id" in options:
+                episode_id = options["episode_id"]
+                if isinstance(episode_id, int):
+                    episode_id = torch.tensor([episode_id])
+                position_ids = (episode_id % (len(self.xyz_configs) * len(self.quat_configs))) // len(self.quat_configs)
+                quaternion_ids = episode_id % len(self.quat_configs)
+            else:
+                position_ids = torch.randint(0, len(self.xyz_configs), size=(batch_size,))
+                quaternion_ids = torch.randint(0, len(self.quat_configs), size=(batch_size,))
+
+            for index, actor in enumerate(self.objs.values()):
+                actor.set_pose(
+                    Pose.create_from_pq(
+                        p=self.xyz_configs[position_ids, index],
+                        q=self.quat_configs[quaternion_ids, index],
+                    )
+                )
+            if self.scene.gpu_sim_enabled:
+                self.scene._gpu_apply_all()
+            self._settle(0.5)
+            if self.scene.gpu_sim_enabled:
+                self.scene._gpu_fetch_all()
+
+            linear_velocity = 0.0
+            angular_velocity = 0.0
+            for obj in self.objs.values():
+                linear_velocity += torch.linalg.norm(obj.linear_velocity)
+                angular_velocity += torch.linalg.norm(obj.angular_velocity)
+            if linear_velocity > 1e-3 or angular_velocity > 1e-2:
+                if self.scene.gpu_sim_enabled:
+                    self.scene._gpu_apply_all()
+                self._settle(6)
+                if self.scene.gpu_sim_enabled:
+                    self.scene._gpu_fetch_all()
+
+            self.agent.robot.set_pose(
+                sapien.Pose([0.3, 0.028, 0.870], q=[0, 0, 0, 1])
+            )
+            panda_qpos = np.array(
+                [0.0, 0.259, 0.0, -2.289, 0.0, 2.515, np.pi / 4, 0.04, 0.015],
+                dtype=np.float32,
+            )
+            self.agent.reset(init_qpos=panda_qpos)
+
+            self.episode_source_obj_xyz_after_settle = self.objs[self.source_obj_name].pose.p
+            self.episode_target_obj_xyz_after_settle = self.objs[self.target_obj_name].pose.p
+            self.episode_obj_xyzs_after_settle = {
+                name: obj.pose.p for name, obj in self.objs.items()
+            }
+            self.episode_source_obj_bbox_world = self.episode_model_bbox_sizes[self.source_obj_name].float()
+            self.episode_target_obj_bbox_world = self.episode_model_bbox_sizes[self.target_obj_name].float()
+            self.episode_source_obj_bbox_world = (
+                rotation_conversions.quaternion_to_matrix(self.objs[self.source_obj_name].pose.q)
+                @ self.episode_source_obj_bbox_world[..., None]
+            )[0, :, 0]
+            self.episode_target_obj_bbox_world = (
+                rotation_conversions.quaternion_to_matrix(self.objs[self.target_obj_name].pose.q)
+                @ self.episode_target_obj_bbox_world[..., None]
+            )[0, :, 0]
+
+            if self.consecutive_grasp is None:
+                self.consecutive_grasp = torch.zeros(self.num_envs, dtype=torch.int32).to(self.device)
+            if self.episode_stats is None:
+                self.episode_stats = {
+                    "moved_correct_obj": torch.zeros((self.num_envs,), dtype=torch.bool).to(self.device),
+                    "moved_wrong_obj": torch.zeros((self.num_envs,), dtype=torch.bool).to(self.device),
+                    "is_src_obj_grasped": torch.zeros((self.num_envs,), dtype=torch.bool).to(self.device),
+                    "consecutive_grasp": torch.zeros((self.num_envs,), dtype=torch.bool).to(self.device),
+                }
+            self.consecutive_grasp[env_idx] = 0
+            for key in self.episode_stats:
+                self.episode_stats[key][env_idx] = 0
 
     @property
     def _default_human_render_camera_configs(self):
