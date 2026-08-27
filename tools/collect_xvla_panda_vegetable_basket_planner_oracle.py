@@ -353,17 +353,21 @@ def main() -> None:
     args.output.mkdir(parents=True, exist_ok=False)
     sys.path.insert(0, str(args.rlinf_root))
     _load_task_module(args.task_module)
-    env = gym.make(
-        ENV_IDS[args.split],
-        obs_mode="rgb+segmentation",
-        render_mode="rgb_array",
-        sim_backend="physx_cpu",
-        control_mode="pd_joint_pos",
-        max_episode_steps=args.max_episode_steps,
-    )
     rows = []
-    try:
-        for index in range(args.episodes):
+    for index in range(args.episodes):
+        # Planner and controller state is episode-local.  Reusing a single
+        # ManiSkill environment across planner resets can retain internal
+        # targets and turn otherwise successful fixed seeds into false gate
+        # failures, so each recorded episode gets a fresh environment.
+        env = gym.make(
+            ENV_IDS[args.split],
+            obs_mode="rgb+segmentation",
+            render_mode="rgb_array",
+            sim_backend="physx_cpu",
+            control_mode="pd_joint_pos",
+            max_episode_steps=args.max_episode_steps,
+        )
+        try:
             row = run_episode(
                 env,
                 args.split,
@@ -376,8 +380,8 @@ def main() -> None:
             )
             rows.append(row)
             print(json.dumps(row), flush=True)
-    finally:
-        env.close()
+        finally:
+            env.close()
     summary = {
         "format": "xvla_panda_vegetable_basket_planner_oracle_v1",
         "split": args.split,
