@@ -47,6 +47,17 @@ def world_pose_to_base(env: Any, world_pose: np.ndarray) -> np.ndarray:
     return np.concatenate([base_p, base_q]).astype(np.float32)
 
 
+def controller_target_pose_base(env: Any) -> np.ndarray | None:
+    """Return the active Panda arm controller target in root-frame pose."""
+
+    controller = getattr(env.unwrapped.agent, "controller", None)
+    arm = getattr(controller, "controllers", {}).get("arm") if controller else None
+    target = getattr(arm, "_target_pose", None)
+    if target is None:
+        return None
+    return _array(target.raw_pose).reshape(-1, 7)[0]
+
+
 def rotation_to_6d(quaternion_wxyz: np.ndarray) -> np.ndarray:
     """Encode a wxyz quaternion using X-VLA's first-two-column 6D format."""
 
@@ -99,7 +110,9 @@ def model_target_to_panda_action(
     root_p = _array(root.p).reshape(-1, 3)[0]
     root_q = _array(root.q).reshape(-1, 4)[0]
     root_rot = Rotation.from_quat(root_q[[1, 2, 3, 0]])
-    current_base = world_pose_to_base(env, current_world)
+    current_base = controller_target_pose_base(env)
+    if current_base is None:
+        current_base = world_pose_to_base(env, current_world)
     target_base_xyz = action[:3]
     target_base_rot = rotation_from_6d(action[3:9])
     delta_xyz = np.clip(target_base_xyz - current_base[:3], -position_limit, position_limit)
@@ -124,7 +137,11 @@ def target_world_to_panda_action(
     root_p = _array(root.p).reshape(-1, 3)[0]
     root_q = _array(root.q).reshape(-1, 4)[0]
     root_rot = Rotation.from_quat(root_q[[1, 2, 3, 0]])
-    delta = root_rot.inv().apply(_array(target_world_xyz).reshape(3) - current[:3])
+    previous_target = controller_target_pose_base(env)
+    if previous_target is None:
+        previous_target = world_pose_to_base(env, current)
+    desired_base_xyz = root_rot.inv().apply(_array(target_world_xyz).reshape(3) - root_p)
+    delta = desired_base_xyz - previous_target[:3]
     delta = np.clip(delta, -position_limit, position_limit)
     arm = np.concatenate([delta, np.zeros(3, dtype=np.float32)]).astype(np.float32)
     if isinstance(env.action_space, gym.spaces.Dict):
