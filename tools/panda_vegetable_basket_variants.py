@@ -273,7 +273,7 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
 
 @register_env(
     "XVLAPandaPutVegetableInBasketID-v1",
-    max_episode_steps=120,
+    max_episode_steps=150,
     asset_download_ids=["bridge_v2_real2sim"],
 )
 class PandaPutVegetableInBasketID(_PandaPutVegetableInBasket):
@@ -285,7 +285,7 @@ class PandaPutVegetableInBasketID(_PandaPutVegetableInBasket):
 
 @register_env(
     "XVLAPandaPutVegetableInBasketOOD-v1",
-    max_episode_steps=120,
+    max_episode_steps=150,
     asset_download_ids=["bridge_v2_real2sim"],
 )
 class PandaPutVegetableInBasketOOD(_PandaPutVegetableInBasket):

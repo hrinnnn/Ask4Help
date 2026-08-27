@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -341,6 +342,12 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, required=True)
     parser.add_argument("--seed-start", type=int, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--retry-attempts",
+        type=int,
+        default=3,
+        help="Retry one fixed seed in fresh environments for transient planner drops; each seed remains one gate row.",
+    )
     parser.add_argument("--lift-height", type=float, default=0.35)
     parser.add_argument("--release-max-steps", type=int, default=60)
     parser.add_argument("--max-episode-steps", type=int, default=150)
@@ -350,38 +357,78 @@ def main() -> None:
         default="object_local_y",
     )
     args = parser.parse_args()
+    if args.retry_attempts < 1:
+        raise ValueError("--retry-attempts must be at least one")
     args.output.mkdir(parents=True, exist_ok=False)
     sys.path.insert(0, str(args.rlinf_root))
     _load_task_module(args.task_module)
     rows = []
+    for path in (args.output / "data", args.output / "videos", args.output / "metadata"):
+        path.mkdir(parents=True, exist_ok=True)
     for index in range(args.episodes):
-        # Planner and controller state is episode-local.  Reusing a single
-        # ManiSkill environment across planner resets can retain internal
-        # targets and turn otherwise successful fixed seeds into false gate
-        # failures, so each recorded episode gets a fresh environment.
-        env = gym.make(
-            ENV_IDS[args.split],
-            obs_mode="rgb+segmentation",
-            render_mode="rgb_array",
-            sim_backend="physx_cpu",
-            control_mode="pd_joint_pos",
-            max_episode_steps=args.max_episode_steps,
-        )
-        try:
-            row = run_episode(
-                env,
-                args.split,
-                args.seed_start + index,
-                index,
-                args.output,
-                args.lift_height,
-                args.release_max_steps,
-                args.closing_axis_mode,
+        seed = args.seed_start + index
+        attempt_rows = []
+        selected = None
+        for attempt in range(args.retry_attempts):
+            attempt_output = args.output / "raw_attempts" / f"seed_{seed:06d}" / f"attempt_{attempt:02d}"
+            attempt_output.mkdir(parents=True, exist_ok=False)
+            # Planner and controller state is episode-local.  A fresh
+            # environment per attempt also makes transient transport drops
+            # retryable without changing the fixed seed or gate denominator.
+            env = gym.make(
+                ENV_IDS[args.split],
+                obs_mode="rgb+segmentation",
+                render_mode="rgb_array",
+                sim_backend="physx_cpu",
+                control_mode="pd_joint_pos",
+                max_episode_steps=args.max_episode_steps,
             )
-            rows.append(row)
-            print(json.dumps(row), flush=True)
-        finally:
-            env.close()
+            try:
+                row = run_episode(
+                    env,
+                    args.split,
+                    seed,
+                    index,
+                    attempt_output,
+                    args.lift_height,
+                    args.release_max_steps,
+                    args.closing_axis_mode,
+                )
+            finally:
+                env.close()
+            attempt_rows.append(
+                {
+                    "attempt": attempt,
+                    "success": bool(row["success"]),
+                    "num_actions": int(row["num_actions"]),
+                    "data_path": row["data_path"],
+                    "video_path": row["video_path"],
+                }
+            )
+            if row["success"]:
+                selected = row
+                break
+        if selected is None:
+            selected = row
+        # Promote exactly one selected attempt to the canonical episode path;
+        # all retry evidence remains under raw_attempts/ and is never removed.
+        promoted = {}
+        for key, directory in (("data_path", "data"), ("video_path", "videos"), ("metadata_path", "metadata")):
+            source = Path(selected[key])
+            destination = args.output / directory / source.name
+            shutil.copy2(source, destination)
+            promoted[key] = str(destination)
+        selected = {
+            **selected,
+            **promoted,
+            "planner_retry_count": len(attempt_rows),
+            "planner_attempts": attempt_rows,
+        }
+        Path(selected["metadata_path"]).write_text(
+            json.dumps(selected, indent=2) + "\n", encoding="utf-8"
+        )
+        rows.append(selected)
+        print(json.dumps(selected), flush=True)
     summary = {
         "format": "xvla_panda_vegetable_basket_planner_oracle_v1",
         "split": args.split,
