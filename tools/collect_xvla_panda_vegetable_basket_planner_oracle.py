@@ -341,7 +341,7 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, required=True)
     parser.add_argument("--seed-start", type=int, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--lift-height", type=float, default=0.25)
+    parser.add_argument("--lift-height", type=float, default=0.35)
     parser.add_argument("--release-max-steps", type=int, default=30)
     parser.add_argument("--max-episode-steps", type=int, default=120)
     parser.add_argument(

@@ -66,7 +66,7 @@
     "oracle_gate": "20 fixed paired ID/OOD resets; each split requires at least 19 strict successes",
     "oracle_profile": {
       "planner": "ManiSkill PandaArmMotionPlanningSolver",
-      "lift_height": 0.25,
+      "lift_height": 0.35,
       "release_max_steps": 30,
       "max_episode_steps": 120
     },
