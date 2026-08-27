@@ -25,7 +25,7 @@ shared by both splits.
 - Reset: paired seed generation; only the object asset identifier changes.
 - Horizon: 120 environment steps, with all actual control and termination rules
   recorded in the manifest.
-- Oracle profile: Panda planner, 18 cm lift, up to 30 one-step release waits;
+- Oracle profile: Panda planner, 25 cm lift, up to 30 one-step release waits;
   the profile is fixed before the formal gate.
 - Success: after release, the object is inside the basket target region, above
   the target plane, static, and not grasped.
