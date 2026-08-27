@@ -237,7 +237,9 @@ def save_attempt(output: Path, index: int, recorder: RecordingEnv, sources: list
         h5.create_dataset("source_labels", data=np.asarray([value.encode("ascii") for value in sources], dtype="S6"))
         h5.attrs["seed"] = int(metadata["seed"])
         h5.attrs["success"] = bool(metadata["success"])
-        h5.attrs["expert_control_start"] = int(metadata["expert_control_start"])
+        h5.attrs["expert_control_start"] = (
+            -1 if metadata["expert_control_start"] is None else int(metadata["expert_control_start"])
+        )
         h5.attrs["expert_control_end"] = int(metadata["expert_control_end"])
         h5.attrs["split"] = metadata["split"]
     video_path = output / "videos" / f"{stem}.mp4"

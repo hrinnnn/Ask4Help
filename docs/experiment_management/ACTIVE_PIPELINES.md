@@ -93,11 +93,14 @@
 - `base_checkpoint`: v9 full-prompt native5000 at `/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000`; independent ID probe `10/20`, so `base_policy_status=preliminary_id_checkpoint` and not `ID_BASE_VALIDATED`
 - `user_override`: Oracle gate is `20` independent resets per split with strict `>=18/20`; formal failure-detection rows include FIDeL, CRSAIL, ACC and STAC in addition to internal PCA/LLMD/kNN and Diff-DAgger. The user explicitly permits these benchmark and OOD-training rows to be registered as formal results under the preliminary base; policy qualification remains reported separately.
 - `splits`: `handle_ood` handle offset `0.085`, `grasp_ood` yaw `80--100` degrees, `goal_ood` goal center `y=+0.30`; each split remains independent and paired with ID factors.
-- `current_stage`: `ood_serial_retry3_grasp_pca_only`; all four Handle methods reached 100 accepted with independent artifact audits: PCA `3/97`, DiffDAgger `23/77`, Failure-Recovery `48/52`, Offline-Oracle `0/100`. Protocol PID `2561352` runs the sole Grasp/PCA collector on GPU0 (latest live count `139/2`); earlier calibration mismatch parts remain diagnostics, and the filtered 18-detector adapter is recorded under clean retry3 assets.
+- `legacy_q95_diagnostic`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_v9_formal_failure_ood_v1_serial_retry3/` was stopped before completion and is marked `diagnostic_q95_stopped_user_switched_to_q90`; its accepted rows and partial Grasp/PCA parts remain unchanged and are not mixed into the new run.
+- `legacy_q90_diagnostic`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_v9_formal_failure_ood_v1_serial_q90_retry1/` was stopped on Grasp/PCA after `308` raw, `308` videos and `4` accepted (`2 OOD / 2 ID`) because the q=.90 trigger rate was too low; it is marked `Q90_GRASP_PCA_STOPPED_FOR_LOWER_THRESHOLD_DIAGNOSTIC` and is not mixed into q=.80.
+- `q80_retry_diagnostics`: retry1 failed because its calibration omitted the required `detectors` mapping; retry2 failed because the controller launch expanded an undefined `CTRL`. Both roots are preserved with engineering diagnostic markers and are excluded from retry3.
+- `current_stage`: `q80_four_method_cycle_handle_ood_pca_only`; the new controller PID is `183367` on physical GPU0, with the first `Handle/PCA` collector active. It uses the frozen successful-ID calibration at q=`.80`, PCA threshold `0.29928144812583923`, and a strict alternating ID/OOD stream. The per-split method order is `PCA → DiffDAgger → Failure-Recovery → Offline-Oracle`, with a total target of 100 accepted trajectories per method and split; q=.80 retry3 is now the only active root.
 - `disk_risk_update`: the completed task-owned archive `pi05_rlinf_v4_20260824.tar.zst` was byte-checked and migrated from `/sdd/ask4help-open-drawer/runtime_archives/` to `/data/zhaozhixuan/Ask4Help-open-drawer/archive/runtime_archives/pi05_rlinf_v4_20260824/`; the old `/sdd` filename remains a symlink, and active runtime/checkpoints were not touched.
 - `disk_risk_update_v2`: the completed, unreferenced `runtime/pi05_rlinf_v3` (`INSTALL_COMPLETE`, about 13G) was regular-file-byte/file-count/rsync-dry-run verified and migrated to `/data/zhaozhixuan/Ask4Help-open-drawer/archive/runtime/pi05_rlinf_v3_20260824/`; the old runtime path remains a symlink. Active `runtime/pi05_rlinf_v4` and all checkpoints were preserved.
 - `combined_metrics_update`: independently generated `combined_id_ood_v1` contains 72 rows for `id+handle_ood`, `id+grasp_ood`, and `id+goal_ood` (200 episodes each), using the existing trajectory-max score and frozen ID calibration; separate OOD splits were not merged together.
-- `next_stage`: finish clean retry3 `handle_ood/pca_only` collection at 100 accepted, then let the single locked protocol continue `handle_ood` DiffDAgger/Failure-Recovery/Offline-BC, followed by the independent Grasp/Goal split collections, matched-budget training, and final evaluation. Oracle20 and detector assets are already complete; do not copy Airplane/StackCube metric values.
+- `next_stage`: finish q80 retry3 `handle_ood/pca_only`, then let the same persistent controller continue `handle_ood` DiffDAgger/Failure-Recovery/Offline-Oracle, followed by independent Grasp/Goal split collections, matched-budget training, and final evaluation. Oracle20 and detector assets are already complete; do not copy Airplane/StackCube metric values or q95/q90 rows into the q80 run.
 - `manifest`: `configs/pipelines/open_drawer_pi05_v9_formal_failure_ood_v1.json`
 
 ## OpenDrawer X-VLA Foundation Adaptation
@@ -206,6 +209,26 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `short_term_goal`: visible-object smoke passed; formal Oracle ID/OOD=`20/20` each; fresh ID collection=`128/128`; temporal-mask/norm audit and 2-step reload smoke passed; fresh ID SFT reached `10000` with every 500-step checkpoint; independent ID gate completed `20/20` episodes and `20/20` videos but achieved `0/20` success. OOD remains locked.
 - `scientific_stop`: visible-RGB retry has a complete denominator but failed the ID gate; evidence=`/mnt/data/ask4help/results/xvla_put_vegetable_basket_object_ood_v1_rgb_visible_retry1/provenance/id_gate_evidence_visible_retry1.json`; action diagnostic=`/mnt/data/ask4help/results/xvla_put_vegetable_basket_object_ood_v1_rgb_visible_retry1/diagnostics/policy_action_trace_ckpt10000_seed94000.json`.
 - `completion`: only `PIPELINE_COMPLETE`, `NEEDS_USER_DECISION`, `ORACLE_NOT_ACCEPTED`, `ID_BASE_NOT_ACCEPTED`, or unrecoverable `PIPELINE_FAILED`
+
+## X-VLA Panda Put Vegetable in Basket Object Variation OOD
+
+- `pipeline_id`: `xvla_panda_put_vegetable_basket_object_ood_v1`
+- `authorized`: `true` by the user-set active goal; this is a new Panda line, not the existing WidowX line
+- `owner_thread`: `019ffbc4-f3a9-78f3-8684-e0b4cba3552a`; `owner_label`: `codex-xvla-panda-vegetable-basket-object-ood`
+- `server_preference`: 5090 selected after live preflight; H20 rejected because both cards belong to PID `276925` and its root filesystem is full
+- `current_stage`: `id_demo_raw_v2`
+- `next_stage`: `id_dataset_materialize_v2 -> ID-only SFT -> independent ID gate`
+- `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_panda_put_vegetable_basket_object_ood_v1/`
+- `manifest`: `configs/pipelines/xvla_panda_put_vegetable_basket_object_ood_v1.json`
+- `plan`: `docs/experiment_management/plans/XVLA_PandaPutVegetableBasket_ObjectVariation_OOD.md`
+- `task_contract`: Panda BridgeData basket task; ID=`eggplant`, OOD=`eggplant` at fixed scale `1.25`; same sink, basket, prompt, paired reset and success predicate; only object size changes within the main comparison
+- `model_contract`: fresh X-VLA-Pt adaptation with a newly audited Panda domain row; active 10D EE6D block padded to 20D; Panda adapter and temporal mask required; WidowX domain 4 and old WidowX outputs forbidden
+- `execution_contract`: `preflight -> task/oracle smoke -> 128 ID demos -> ID-only SFT and gate -> passive detection -> four data branches -> matched-budget training -> final evaluation -> result registration`
+- `placement_preflight`: passed on 5090; GPU5--7 were idle, `/data` had about 4.7TB free, native X-VLA runtime/foundation/Panda source/BridgeData assets were co-located; controller PID is recorded in remote `pipeline.pid`
+- `oracle_gate`: `oracle_gate_v11` passed ID `20/20` and OOD `20/20` strict; profile is lift `0.35m`, release wait `60`, horizon `150`, object-local-y closing axis, three fresh-environment retries retained under `raw_attempts/`
+- `controller`: `tools/run_xvla_panda_vegetable_basket_full_pipeline.py`; remote log=`full_pipeline.log`; current child is the ID demonstration collector on GPU6
+- `forbidden`: do not modify or reuse `xvla_put_vegetable_basket_object_ood_v1`; do not mix WidowX data/norm/checkpoint/results; do not unlock OOD before the independent ID gate
+- `completion`: only `PIPELINE_COMPLETE`, `ORACLE_NOT_ACCEPTED`, `ID_BASE_NOT_ACCEPTED`, `NEEDS_USER_DECISION`, or unrecoverable `PIPELINE_FAILED` after evidence audit
 
 ## Heartbeat Watchdog Rule
 
