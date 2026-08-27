@@ -39,7 +39,7 @@
       "language instruction, seed manifests and success predicate"
     ],
     "success_predicate": "after release the operated object is inside the basket target region, above the target plane, static, and not grasped",
-    "max_episode_steps": 120
+    "max_episode_steps": 150
   },
   "action_contract": {
     "model_space": "single-arm EE6D active block (xyz, rot6d, gripper) padded to 20 dimensions",
@@ -67,8 +67,8 @@
     "oracle_profile": {
       "planner": "ManiSkill PandaArmMotionPlanningSolver",
       "lift_height": 0.35,
-      "release_max_steps": 30,
-      "max_episode_steps": 120
+      "release_max_steps": 60,
+      "max_episode_steps": 150
     },
     "norm": "computed only from the 128 ID demonstrations and frozen before all training and evaluation",
     "evidence": [
