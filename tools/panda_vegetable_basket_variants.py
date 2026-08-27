@@ -124,6 +124,13 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
             **kwargs,
         )
 
+    def _build_actor_helper(self, model_id, *args, **kwargs):
+        """Keep the goal marker fixed while leaving operated objects dynamic."""
+
+        if model_id == self.target_obj_name:
+            kwargs["kinematic"] = True
+        return super()._build_actor_helper(model_id, *args, **kwargs)
+
     def evaluate(self, *args, **kwargs):
         return self._evaluate(
             success_require_src_completely_on_target=False,
