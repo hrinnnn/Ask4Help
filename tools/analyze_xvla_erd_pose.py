@@ -302,8 +302,8 @@ def _first_persistent_crossing(
 
 def _phase_label(arrays: dict[str, np.ndarray], step: int, task: str) -> str:
     index = min(step, len(arrays["phase_flag_1"]) - 1)
-    if float(arrays["phase_flag_1"][index]) > 0.5:
-        return "post_grasp"
+    if np.any(np.asarray(arrays["phase_flag_1"][: index + 1]) > 0.5):
+        return "post_grasp_or_recovery"
     return "pre_grasp"
 
 
@@ -348,7 +348,7 @@ def _detector_summary(
     output: dict[str, Any] = {}
     for name, method in payload.get("methods", {}).items():
         detected: list[int] = []
-        phase_counts = {"pre_grasp": 0, "post_grasp": 0, "unknown": 0}
+        phase_counts = {"pre_grasp": 0, "post_grasp_or_recovery": 0, "unknown": 0}
         for detail in method.get("episodes_detail", []):
             if not detail.get("alarm_observed"):
                 continue
@@ -435,6 +435,16 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
         )
         irreversibility = _irreversibility(arrays, args.task)
         episode_summary = summary_rows.get(item["episode_index"], {})
+        alarm_current_grasped = (
+            None
+            if alarm is None
+            else bool(float(arrays["phase_flag_1"][min(alarm, len(arrays["phase_flag_1"]) - 1)]) > 0.5)
+        )
+        alarm_ever_grasped = (
+            None
+            if alarm is None
+            else bool(np.any(np.asarray(arrays["phase_flag_1"][: alarm + 1]) > 0.5))
+        )
         row = {
             "episode_index": item["episode_index"],
             "seed": item["seed"],
@@ -443,6 +453,8 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
             "erd_alarm_step": alarm,
             "erd_alarm_observed": alarm is not None,
             "erd_alarm_phase": None if alarm is None else _phase_label(arrays, alarm, args.task),
+            "grasped_at_alarm": alarm_current_grasped,
+            "ever_grasped_before_alarm": alarm_ever_grasped,
             "irreversibility": irreversibility,
             "lead_time": None if alarm is None else int(irreversibility["step"] - alarm),
             "lead_time_censored": bool(irreversibility["censored"]),
@@ -460,7 +472,7 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
         rows.append(row)
         learner_context_distances.append(distances[nearest_index])
     detected = [row["erd_alarm_step"] for row in rows if row["erd_alarm_step"] is not None]
-    phase_counts = {"pre_grasp": 0, "post_grasp": 0}
+    phase_counts = {"pre_grasp": 0, "post_grasp_or_recovery": 0}
     for row in rows:
         if row["erd_alarm_phase"] in phase_counts:
             phase_counts[row["erd_alarm_phase"]] += 1
