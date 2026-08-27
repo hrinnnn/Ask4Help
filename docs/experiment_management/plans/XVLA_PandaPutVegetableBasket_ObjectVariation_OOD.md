@@ -133,6 +133,9 @@ expert source balancing of 1:1, identical optimization settings and the correct
 temporal mask. OOD data is never used to train the ID base.
 The four branches use 5,000 optimizer steps after their smoke and save every
 500 steps.
+The effective global batch remains 128, implemented as micro-batch 8,
+gradient accumulation 8, and two GPUs; this is the largest contract-preserving
+per-rank batch that fits the 32 GiB RTX 5090 runtime.
 
 ### Stage F: final evaluation and registration
 

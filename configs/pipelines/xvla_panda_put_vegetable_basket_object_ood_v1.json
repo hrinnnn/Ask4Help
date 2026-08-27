@@ -90,7 +90,8 @@
     "id_probe_episodes": 20,
     "id_probe_gate": "at least 17 strict successes for checkpoint candidate; independent formal ID gate at least 80/100",
     "global_batch_size": 128,
-    "micro_batch_size": 32,
+    "micro_batch_size": 8,
+    "gradient_accumulation_steps": 8,
     "optimizer": "fresh optimizer from immutable X-VLA-Pt foundation",
     "ood_training_forbidden": true,
     "all_methods_same_steps": true

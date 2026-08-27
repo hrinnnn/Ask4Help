@@ -109,9 +109,10 @@ def run_logged(stage: str, command: list[str], *, visible_devices: str, log_path
             start_new_session=True,
         )
         write_state(stage, "running", pid=process.pid, command=command, log=str(log_path), gpu=visible_devices)
-        while process.poll() is None:
-            time.sleep(300)
-        return_code = process.returncode
+        # Keep the controller passive while the child owns the long stage.
+        # The short sleep avoids a tight polling loop before reaping it.
+        time.sleep(60)
+        return_code = process.wait()
     if return_code != 0:
         write_state(stage, "engineering_failure", pid=process.pid, return_code=return_code, log=str(log_path))
         raise RuntimeError(f"{stage} exited with {return_code}")
@@ -261,7 +262,7 @@ def train_command(base_model: Path, dataset: Path, output: Path, steps: int, *, 
         str(WORK_ROOT / "tools/run_xvla_panda_vegetable_basket_id_training.py"),
         "--xvla-root", str(XVLA_ROOT), "--base-model", str(base_model),
         "--dataset", str(dataset), "--output", str(output), "--steps", str(steps),
-        "--save-interval", "500", "--batch-size", "32", "--gradient-accumulation-steps", "2",
+        "--save-interval", "500", "--batch-size", "8", "--gradient-accumulation-steps", "8",
         "--learning-rate", "1e-4", "--learning-coef", "0.1", "--freeze-steps", "1000",
         "--warmup-steps", "2000", "--domain-id", str(DOMAIN_ID), "--seed", "96300",
     ]
@@ -507,7 +508,7 @@ def mixed_train_command(checkpoint: Path, dataset: Path, expert: Path, output: P
         str(WORK_ROOT / "tools/run_xvla_panda_vegetable_basket_mixed_training.py"),
         "--xvla-root", str(XVLA_ROOT), "--base-model", str(checkpoint), "--id-dataset", str(dataset),
         "--expert-dataset", str(expert), "--output", str(output), "--steps", str(steps), "--save-interval", "500",
-        "--batch-size", "32", "--gradient-accumulation-steps", "2", "--learning-rate", "1e-4", "--learning-coef", "0.1",
+        "--batch-size", "8", "--gradient-accumulation-steps", "8", "--learning-rate", "1e-4", "--learning-coef", "0.1",
         "--freeze-steps", "1000", "--warmup-steps", "2000", "--domain-id", str(DOMAIN_ID), "--seed", "96500",
     ] + (["--smoke-only"] if smoke else [])
 
