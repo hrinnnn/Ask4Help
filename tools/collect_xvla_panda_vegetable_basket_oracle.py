@@ -152,31 +152,36 @@ def run_episode(env, split, seed, episode_index, output, close_offset, orientati
     start_source = _pose(base.objs[source])
     start_target = _pose(base.objs[target])
     initial_tcp = tcp_pose_world(env)
-    initial_rotation = Rotation.from_quat(initial_tcp[3:][[1, 2, 3, 0]])
-    grasp_rotation = initial_rotation * Rotation.from_euler(
-        "z", orientation_yaw_deg, degrees=True
+    object_rotation = Rotation.from_quat(start_source[3:][[1, 2, 3, 0]])
+    closing_axis = object_rotation.apply(np.array([0.0, 1.0, 0.0]))
+    closing_axis[2] = 0.0
+    closing_axis /= max(float(np.linalg.norm(closing_axis)), 1e-8)
+    grasp_pose = base.agent.build_grasp_pose(
+        np.array([0.0, 0.0, -1.0]), closing_axis, start_source[:3]
     )
-    grasp_quaternion = grasp_rotation.as_quat()[[3, 0, 1, 2]].astype(np.float32)
-    finger_center = (
-        _array(base.agent.finger1_link.pose.p).reshape(-1, 3)[0]
-        + _array(base.agent.finger2_link.pose.p).reshape(-1, 3)[0]
-    ) / 2.0
-    finger_offset = finger_center - initial_tcp[:3]
-    source_center = start_source[:3] - finger_offset
-    target_center = start_target[:3] - finger_offset
+    grasp_center = np.asarray(grasp_pose.p, dtype=np.float32)
+    grasp_quaternion = np.asarray(grasp_pose.q, dtype=np.float32)
+    if orientation_yaw_deg:
+        grasp_rotation = Rotation.from_quat(grasp_quaternion[[1, 2, 3, 0]])
+        grasp_rotation = grasp_rotation * Rotation.from_euler(
+            "z", orientation_yaw_deg, degrees=True
+        )
+        grasp_quaternion = grasp_rotation.as_quat()[[3, 0, 1, 2]].astype(np.float32)
+    source_center = grasp_center
+    target_center = start_target[:3]
     opened, closed = action_space_gripper_bounds(env)[1], action_space_gripper_bounds(env)[0]
     frames, proprio, actions, source_states, target_states = [], [], [], [], []
     timeline = []
     grasp_steps = 0
     max_source_z = float(start_source[2])
     phases = [
-        ("hover", source_center + np.array([0, 0, 0.16], dtype=np.float32), opened, 12),
+        ("hover", source_center + np.array([0, 0, 0.16], dtype=np.float32), opened, 18),
         ("descend", source_center + np.array([0, 0, close_offset], dtype=np.float32), opened, 8),
         ("close", source_center + np.array([0, 0, close_offset], dtype=np.float32), closed, 8),
         ("lift", source_center + np.array([0, 0, 0.18], dtype=np.float32), closed, 12),
         ("transport", target_center + np.array([0, 0, 0.18], dtype=np.float32), closed, 14),
-        ("lower", target_center + np.array([0, 0, 0.095], dtype=np.float32), closed, 6),
-        ("release", target_center + np.array([0, 0, 0.09], dtype=np.float32), opened, 8),
+        ("lower", target_center + np.array([0, 0, 0.035], dtype=np.float32), closed, 8),
+        ("release", target_center + np.array([0, 0, 0.035], dtype=np.float32), opened, 8),
     ]
     step_index = 0
     for phase, desired, grip, count in phases:
@@ -234,7 +239,9 @@ def run_episode(env, split, seed, episode_index, output, close_offset, orientati
         "grasp_steps": grasp_steps,
         "close_offset": float(close_offset),
         "orientation_yaw_deg": float(orientation_yaw_deg),
-        "finger_center_offset_from_tcp": finger_offset.tolist(),
+        "grasp_center": grasp_center.tolist(),
+        "grasp_closing_axis": closing_axis.tolist(),
+        "grasp_pose_quaternion": grasp_quaternion.tolist(),
         "timeline": timeline,
         "expert_control_start": 0,
         "expert_control_end": len(actions),
