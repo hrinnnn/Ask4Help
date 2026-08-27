@@ -20,17 +20,17 @@ def _audit_episode(path: Path) -> tuple[int, np.ndarray, dict]:
     with h5py.File(path, "r") as h5:
         actions = np.asarray(h5["abs_action_6d"], dtype=np.float32)
         proprio = np.asarray(h5["proprio"], dtype=np.float32)
-        images = h5["images"]
+        image_count = len(h5["images"])
         attrs = {str(key): h5.attrs[key].item() if hasattr(h5.attrs[key], "item") else h5.attrs[key] for key in h5.attrs}
     if actions.ndim != 2 or actions.shape[1] != ACTIVE_ACTION_DIM:
         raise ValueError(f"{path}: action shape {actions.shape}")
     if proprio.shape != actions.shape:
         raise ValueError(f"{path}: proprio/action shape mismatch {proprio.shape} vs {actions.shape}")
-    if len(images) < len(actions):
+    if image_count < len(actions):
         raise ValueError(f"{path}: fewer images than actions")
     if not np.isfinite(actions).all() or not np.isfinite(proprio).all():
         raise ValueError(f"{path}: non-finite action or proprio")
-    return len(actions), actions, {"attrs": attrs, "image_count": len(images)}
+    return len(actions), actions, {"attrs": attrs, "image_count": image_count}
 
 
 def main() -> None:
@@ -95,4 +95,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
