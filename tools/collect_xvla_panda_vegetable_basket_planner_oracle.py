@@ -228,7 +228,7 @@ def run_episode(env: Any, split: str, seed: int, episode_index: int, output: Pat
             stages["lifted"] = lifted
             if lifted:
                 release_object = sapien.Pose(
-                    target_sp.p + np.array([0.0, 0.0, 0.035]), source.pose.sp.q
+                    target_sp.p + np.array([0.0, 0.0, 0.08]), source.pose.sp.q
                 )
                 recorder.current_phase = "transport"
                 stages["transport_command_completed"] = _move(
@@ -320,4 +320,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
