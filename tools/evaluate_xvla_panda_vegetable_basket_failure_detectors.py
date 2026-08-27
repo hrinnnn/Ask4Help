@@ -440,6 +440,7 @@ def main() -> None:
     }
     (args.output_dir / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     (args.output_dir / "EVALUATION_COMPLETE").write_text("complete\n", encoding="utf-8")
+    (args.output_dir / "EVAL_COMPLETE").write_text("complete\n", encoding="utf-8")
     print(json.dumps({key: value for key, value in summary.items() if key != "rows"}, indent=2), flush=True)
 
 

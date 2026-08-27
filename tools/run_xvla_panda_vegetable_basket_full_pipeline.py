@@ -310,7 +310,7 @@ def complete_eval(output: Path, episodes: int) -> bool:
         summary.get("episodes") == episodes
         and summary.get("videos") == episodes
         and summary.get("actions") == episodes
-        and (output / "EVAL_COMPLETE").is_file()
+        and ((output / "EVAL_COMPLETE").is_file() or (output / "EVALUATION_COMPLETE").is_file())
     )
 
 
