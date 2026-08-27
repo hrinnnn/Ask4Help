@@ -118,6 +118,9 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
         self.model_db = io_utils.load_json(
             BRIDGE_DATASET_ASSET_PATH / "custom/info_bridge_custom_v0.json"
         )
+        scale_override = os.environ.get("PANDA_BASKET_OOD_SCALE")
+        if scale_override and self.source_asset == "eggplant":
+            self.model_db["eggplant"]["scales"] = [float(scale_override)]
         self.consecutive_grasp = None
         self.episode_stats = None
         BaseDigitalTwinEnv.__init__(
