@@ -236,6 +236,7 @@ def run_episode(env: Any, split: str, seed: int, episode_index: int, output: Pat
                 )
                 recorder.current_phase = "release"
                 planner.open_gripper(t=10)
+                planner.open_gripper(t=8)
                 placed = _bool(base.evaluate()["success"])
                 stages["placed"] = placed
                 recorder.current_phase = "retreat"

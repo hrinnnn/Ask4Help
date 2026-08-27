@@ -138,12 +138,25 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
         return super()._build_actor_helper(model_id, *args, **kwargs)
 
     def evaluate(self, *args, **kwargs):
-        return self._evaluate(
+        result = self._evaluate(
             success_require_src_completely_on_target=False,
             z_flag_required_offset=0.06,
             *args,
             **kwargs,
         )
+        source = self.objs[self.source_obj_name]
+        grasped_now = self.agent.is_grasping(source)
+        linear_speed = torch.linalg.norm(source.linear_velocity, dim=-1)
+        angular_speed = torch.linalg.norm(source.angular_velocity, dim=-1)
+        released = ~grasped_now
+        static = (linear_speed <= 0.03) & (angular_speed <= 0.20)
+        result["is_src_obj_grasped_current"] = grasped_now
+        result["released"] = released
+        result["source_static"] = static
+        result["source_linear_speed"] = linear_speed
+        result["source_angular_speed"] = angular_speed
+        result["success"] = result["src_on_target"] & released & static
+        return result
 
     def get_language_instruction(self, **kwargs):
         return [self.task_instruction] * self.num_envs
