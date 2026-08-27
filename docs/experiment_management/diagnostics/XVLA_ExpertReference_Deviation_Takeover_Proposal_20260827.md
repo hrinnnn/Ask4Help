@@ -65,6 +65,36 @@ D_{t+1}^{\mathrm{ERD}}>\tau_D(\phi_{t+1})\}.
 没有 downstream update 验证前直接称为 globally best timing。它表示“再不接管
 就开始进入不可接受偏离”的时间。
 
+### 2.4 Broad-OOD robustness：paired/conditional reference
+
+不能把所有 OOD expert trajectories 直接混成一个全局均值。对象初始位姿、目标
+距离、物体形状和执行速度造成的 between-context variation 可能比真正的 policy
+deviation 还大，从而让全局 covariance 过宽、阈值失去敏感性。
+
+推荐使用三层 reference：
+
+1. **paired reference（首选）**：为每个 OOD scene/object context 保存一条同初始
+   条件的 expert demo；learner prefix 只和它比较；
+2. **conditional prototype**：没有完全配对 demo 时，按可观测 context（初始
+   object/goal 相对位姿、物体类别、初始 TCP 距离）检索最近的 expert prototypes，
+   只在相同 context cluster 内估计 `mu_phi` 和 `Sigma_phi`；
+3. **unsupported-context abstention**：若当前 context 离 reference bank 太远，
+   不把它误判成“没有偏离”，而是输出 `reference_unsupported`，要求补充 expert
+   demo 或单独报告该 OOD 子分布。
+
+在 real robot 上，建议把状态分成两种版本：
+
+- `ERD-Pose`（可部署）：末端位置、末端姿态、速度、gripper width 和可获得的
+  object/goal relative pose；姿态误差使用 SO(3) geodesic distance，不依赖仿真
+  专有变量；
+- `ERD-State`（仿真诊断）：加入完整 simulator task state，只作为 upper-bound
+  ablation，不能冒充 real-robot metric。
+
+若不能稳定获得 object pose，至少使用 robot-centric pose：以初始 TCP frame 或
+可观测的场景 frame 表示末端轨迹，并明确把 object-relative 部分标记为缺失，而
+不是用 raw image novelty 填补。阈值应在 context-stratified validation 上冻结，
+并报告 macro-average 与 worst-context false-alarm/miss。
+
 ## 3. 用现有 Stage-A 数据做的 preliminary check
 
 现有 Stage-A 已经有：
@@ -129,14 +159,14 @@ Bridge PCA 接近 ERD onset，但 Grab Plane 现有 detector 并没有稳定逼�
 
 ## 6. 推荐的下一步实验（不立即改变 formal pipeline）
 
-1. 从 Stage-A `step=0` OOD expert bank 做固定 reference split；
+1. 从 Stage-A `step=0` OOD expert bank 做 paired/context-stratified reference split；
 2. 对 Stage-C 已保存的 50 条 OOD policy-only action trajectories 做 deterministic
    replay，补出 task-state timeline；若 replay 不能通过 state/video alignment，
    再做一次只保存 state 的 50-episode diagnostic rollout；
-3. 用 validation successful prefixes 冻结 phase-conditioned `tau_D`，同时报告
+3. 用 validation successful prefixes 冻结 phase- and context-conditioned `tau_D`，同时报告
    raw crossing 和 two-step debounced crossing；
-4. 比较 ERD `T_D` 与 Input/Bridge/Action/Diff 的 alarm time、miss/censor 和
-   pre-grasp/post-grasp phase；
+4. 比较 ERD `T_D` 与 Input/Bridge/Action/Diff 的 alarm time、miss/censor、
+   pre-grasp/post-grasp phase 和 unsupported-context rate；
 5. 只在 ERD timing 稳定后，选择 `t=0,10,20` 等少量 candidate 做 downstream
    utility check，不先启动完整 Stage-C 的 30 个 gate-selected models。
 
