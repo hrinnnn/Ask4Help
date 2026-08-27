@@ -262,11 +262,14 @@ def main() -> None:
                 if optimizer_steps % (2 if args.smoke_only else args.save_interval) == 0 or optimizer_steps == target_steps:
                     save_checkpoint(model, processor, accelerator, args.output, optimizer_steps)
     accelerator.wait_for_everyone()
+    reload_batch = next(iter(loader)) if args.smoke_only else None
+    if args.smoke_only:
+        accelerator.wait_for_everyone()
     if accelerator.is_main_process:
         if args.smoke_only:
+            assert reload_batch is not None
             reload_model, _ = load_model(args.output / "ckpt-2", args.xvla_root)
             reload_model.to(accelerator.device).eval()
-            reload_batch = next(iter(loader))
             reload_batch = {key: value.to(accelerator.device) if isinstance(value, torch.Tensor) else value for key, value in reload_batch.items()}
             with torch.inference_mode(), accelerator.autocast():
                 reload_loss = masked_ee6d_loss(reload_model, reload_batch)
