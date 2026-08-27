@@ -95,7 +95,7 @@ def _build_env(task: str, split: str, *, image_size: int, max_episode_steps: int
             max_episode_steps=max_episode_steps,
         )
 
-    from rlinf.toolkits.lerobot.collect_maniskill_pick_single_ycb_airplane_lerobot import (
+    from toolkits.lerobot.collect_maniskill_pick_single_ycb_airplane_lerobot import (
         _build_env as build_airplane_env,
     )
 
