@@ -64,6 +64,12 @@
     "id_demonstrations": 128,
     "id_training_only": true,
     "oracle_gate": "20 fixed paired ID/OOD resets; each split requires at least 19 strict successes",
+    "oracle_profile": {
+      "planner": "ManiSkill PandaArmMotionPlanningSolver",
+      "lift_height": 0.18,
+      "release_max_steps": 30,
+      "max_episode_steps": 120
+    },
     "norm": "computed only from the 128 ID demonstrations and frozen before all training and evaluation",
     "evidence": [
       "actions",
