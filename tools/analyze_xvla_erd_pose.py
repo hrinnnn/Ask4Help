@@ -354,6 +354,8 @@ def _detector_summary(
     for name, method in payload.get("methods", {}).items():
         detected: list[int] = []
         phase_counts = {"pre_grasp": 0, "post_grasp_or_recovery": 0, "unknown": 0}
+        lead_times: list[int] = []
+        late_alarms = 0
         for detail in method.get("episodes_detail", []):
             if not detail.get("alarm_observed"):
                 continue
@@ -365,6 +367,11 @@ def _detector_summary(
             else:
                 label = _phase_label(item["arrays"], step, task)
                 phase_counts[label] += 1
+                irreversibility = _irreversibility(item["arrays"], task)
+                if not irreversibility["censored"]:
+                    lead = int(irreversibility["step"] - step)
+                    lead_times.append(lead)
+                    late_alarms += int(lead < 0)
         output[name] = {
             "episodes": int(method.get("episodes", 0)),
             "observed": len(detected),
@@ -374,6 +381,9 @@ def _detector_summary(
             "p25_step": None if not detected else float(np.quantile(detected, 0.25)),
             "p75_step": None if not detected else float(np.quantile(detected, 0.75)),
             "phase_counts": phase_counts,
+            "lead_time_observed_count": len(lead_times),
+            "lead_time_median_observed": None if not lead_times else float(np.median(lead_times)),
+            "late_alarms": late_alarms,
         }
     return output
 
