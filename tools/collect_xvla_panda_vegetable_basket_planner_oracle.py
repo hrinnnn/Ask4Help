@@ -170,7 +170,15 @@ def _save_episode(output: Path, index: int, recorder: RecordingEnv, metadata: di
     return metadata
 
 
-def run_episode(env: Any, split: str, seed: int, episode_index: int, output: Path) -> dict[str, Any]:
+def run_episode(
+    env: Any,
+    split: str,
+    seed: int,
+    episode_index: int,
+    output: Path,
+    lift_height: float,
+    release_max_steps: int,
+) -> dict[str, Any]:
     import sapien
     from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
 
@@ -217,7 +225,9 @@ def run_episode(env: Any, split: str, seed: int, episode_index: int, output: Pat
         stages["stable_grasp"] = stable_grasp
         if stable_grasp:
             object_in_tcp = base.agent.tcp_pose.sp.inv() * source.pose.sp
-            lift_object = sapien.Pose(source.pose.sp.p + np.array([0.0, 0.0, 0.12]), source.pose.sp.q)
+            lift_object = sapien.Pose(
+                source.pose.sp.p + np.array([0.0, 0.0, lift_height]), source.pose.sp.q
+            )
             recorder.current_phase = "lift"
             stages["lift_command_completed"] = _move(planner, lift_object * object_in_tcp.inv())
             lifted = bool(
@@ -235,7 +245,7 @@ def run_episode(env: Any, split: str, seed: int, episode_index: int, output: Pat
                     planner, release_object * object_in_tcp.inv()
                 )
                 recorder.current_phase = "release"
-                for _ in range(24):
+                for _ in range(release_max_steps):
                     planner.open_gripper(t=1)
                     if _bool(base.evaluate()["success"]):
                         break
@@ -272,6 +282,8 @@ def run_episode(env: Any, split: str, seed: int, episode_index: int, output: Pat
         },
         "stages": stages,
         "max_source_z": float(max(record["object_pose"][2] for record in recorder.records)),
+        "lift_height": float(lift_height),
+        "release_max_steps": int(release_max_steps),
         "action_contract": "joint-position planner replay re-encoded as base-frame absolute EE6D targets",
     }
     return _save_episode(output, episode_index, recorder, metadata)
@@ -285,6 +297,9 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, required=True)
     parser.add_argument("--seed-start", type=int, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--lift-height", type=float, default=0.12)
+    parser.add_argument("--release-max-steps", type=int, default=24)
+    parser.add_argument("--max-episode-steps", type=int, default=120)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     sys.path.insert(0, str(args.rlinf_root))
@@ -295,12 +310,20 @@ def main() -> None:
         render_mode="rgb_array",
         sim_backend="physx_cpu",
         control_mode="pd_joint_pos",
-        max_episode_steps=120,
+        max_episode_steps=args.max_episode_steps,
     )
     rows = []
     try:
         for index in range(args.episodes):
-            row = run_episode(env, args.split, args.seed_start + index, index, args.output)
+            row = run_episode(
+                env,
+                args.split,
+                args.seed_start + index,
+                index,
+                args.output,
+                args.lift_height,
+                args.release_max_steps,
+            )
             rows.append(row)
             print(json.dumps(row), flush=True)
     finally:
