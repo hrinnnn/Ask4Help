@@ -113,6 +113,10 @@ class _PandaPutVegetableInBasket(BaseBridgeEnv):
             ),
             width=512,
             height=512,
+            intrinsic=np.array(
+                [[623.588, 0, 319.501], [0, 623.588, 239.545], [0, 0, 1]],
+                dtype=np.float32,
+            ),
             near=0.01,
             far=100,
         )
