@@ -203,13 +203,13 @@ def run_episode(env: Any, split: str, seed: int, episode_index: int, output: Pat
     placed = False
     try:
         recorder.current_phase = "open"
-        planner.open_gripper(t=8)
+        planner.open_gripper(t=4)
         recorder.current_phase = "pregrasp"
         stages["pregrasp_reached"] = _move(planner, grasp_pose * sapien.Pose([0, 0, -0.06]))
         recorder.current_phase = "grasp"
         stages["grasp_reached"] = stages["pregrasp_reached"] and _move(planner, grasp_pose)
         recorder.current_phase = "close"
-        planner.close_gripper(t=12)
+        planner.close_gripper(t=8)
         for _ in range(4):
             if _bool(base.agent.is_grasping(source)):
                 stable_grasp = True
@@ -235,12 +235,12 @@ def run_episode(env: Any, split: str, seed: int, episode_index: int, output: Pat
                     planner, release_object * object_in_tcp.inv()
                 )
                 recorder.current_phase = "release"
-                planner.open_gripper(t=10)
-                planner.open_gripper(t=8)
+                for _ in range(24):
+                    planner.open_gripper(t=1)
+                    if _bool(base.evaluate()["success"]):
+                        break
                 placed = _bool(base.evaluate()["success"])
                 stages["placed"] = placed
-                recorder.current_phase = "retreat"
-                _move(planner, release_object * sapien.Pose([0, 0, 0.10]) * object_in_tcp.inv())
     except Exception as exc:
         stages["oracle_error"] = repr(exc)
     finally:
