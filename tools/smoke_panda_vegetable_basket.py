@@ -67,6 +67,20 @@ def main() -> None:
             frame = _rgb(obs)
             image_path = args.output / f"{split}_reset.png"
             cv2.imwrite(str(image_path), cv2.cvtColor(frame, cv2.COLOR_RGB2BGR))
+            segmentation = _array(obs["sensor_data"]["3rd_view_camera"]["segmentation"])
+            segmentation = segmentation[0, ..., 0] if segmentation.ndim == 4 else segmentation[..., 0]
+            object_id = int(_array(base.objs[source].per_scene_id).reshape(-1)[0])
+            object_pixels = np.argwhere(segmentation == object_id)
+            object_bbox = (
+                [
+                    int(object_pixels[:, 1].min()),
+                    int(object_pixels[:, 0].min()),
+                    int(object_pixels[:, 1].max()),
+                    int(object_pixels[:, 0].max()),
+                ]
+                if len(object_pixels)
+                else None
+            )
             initial_eval = base.evaluate()
             rows.append(
                 {
@@ -77,10 +91,14 @@ def main() -> None:
                     "robot": type(base.agent).__name__,
                     "source_object": source,
                     "target_object": target,
+                    "configured_source_pose": _array(base.xyz_configs[0, 0]).tolist(),
                     "source_pose": _pose(base.objs[source]).tolist(),
                     "target_pose": _pose(base.objs[target]).tolist(),
                     "rgb_shape": list(frame.shape),
                     "rgb_path": str(image_path),
+                    "object_segmentation_id": object_id,
+                    "object_pixel_count": int(len(object_pixels)),
+                    "object_bbox_xyxy": object_bbox,
                     "initial_success": bool(_array(initial_eval["success"]).reshape(-1)[0]),
                 }
             )
@@ -91,13 +109,22 @@ def main() -> None:
         "format": "xvla_panda_vegetable_basket_smoke_v1",
         "seed": args.seed,
         "rows": rows,
-        "same_source_xy": bool(np.allclose(rows[0]["source_pose"][:2], rows[1]["source_pose"][:2])),
+        "same_configured_source_xy": bool(np.allclose(rows[0]["configured_source_pose"][:2], rows[1]["configured_source_pose"][:2])),
+        "settled_source_xy_delta": (
+            np.asarray(rows[1]["source_pose"][:2]) - np.asarray(rows[0]["source_pose"][:2])
+        ).tolist(),
         "same_target_pose": bool(np.allclose(rows[0]["target_pose"], rows[1]["target_pose"])),
         "panda_action_dim_7": all(row["action_shape"] == [7] for row in rows),
         "rgb_visible_frames": all(Path(row["rgb_path"]).stat().st_size > 0 for row in rows),
+        "object_visible_in_segmentation": all(row["object_pixel_count"] >= 100 for row in rows),
     }
     (args.output / "smoke.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    if not (report["panda_action_dim_7"] and report["rgb_visible_frames"]):
+    if not (
+        report["same_configured_source_xy"]
+        and report["panda_action_dim_7"]
+        and report["rgb_visible_frames"]
+        and report["object_visible_in_segmentation"]
+    ):
         raise SystemExit("PANDA_TASK_SMOKE_FAILED")
     (args.output / "SMOKE_COMPLETE").write_text("complete\n", encoding="utf-8")
     print(json.dumps(report, indent=2), flush=True)
@@ -105,4 +132,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
