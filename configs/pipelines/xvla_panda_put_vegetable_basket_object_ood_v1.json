@@ -54,8 +54,8 @@
     "family": "xvla",
     "base_model": "X-VLA-Pt foundation; exact persistent path frozen after preflight",
     "domain_name": "panda-vegetable-basket",
-    "domain_id": null,
-    "domain_id_status": "select a free row after auditing the foundation config; never reuse WidowX domain 4",
+    "domain_id": 20,
+    "domain_id_status": "audited free foundation row; never reuse WidowX domain 4",
     "use_proprio": true,
     "fresh_id_adaptation": true,
     "task_checkpoint_reuse_forbidden": true
@@ -84,6 +84,7 @@
   },
   "training": {
     "id_target_steps": 10000,
+    "dagger_target_steps": 5000,
     "checkpoint_interval": 500,
     "id_probe_interval": 500,
     "id_probe_episodes": 20,
@@ -169,6 +170,7 @@
     "persistent_output_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_panda_put_vegetable_basket_object_ood_v1/"
   },
   "execution_audit": {
+    "controller_entrypoint": "tools/run_xvla_panda_vegetable_basket_full_pipeline.py",
     "required": [
       "manifest_vs_command",
       "runtime_import_gpu",

@@ -33,13 +33,15 @@ shared by both splits.
 - X-VLA output: one active 10D EE6D arm block padded to the 20D model width;
   the Panda adapter maps this to the Panda controller. Directly putting Panda
   joint deltas into the X-VLA padding slots is invalid.
+- X-VLA domain row: `20`, audited free in the 30-row foundation configuration;
+  the old WidowX row `4` is never reused.
 - Action chunk: 30 model actions, matching the foundation checkpoint contract.
 - Training target: every real observation is an anchor. Tail actions repeat the
   final real action only for tensor shape and are excluded by the temporal mask.
 
-The exact free X-VLA domain row, source commit, camera pose, and persistent
-asset paths are not guessed here. They are frozen in the manifest only after
-the preflight audits the foundation configuration and task runtime.
+The source commit, camera pose, and persistent asset paths are frozen in the
+manifest after the preflight audits the foundation configuration and runtime;
+the selected domain row is recorded there as `20`.
 
 ## 3. Stage-localized object OOD check
 
@@ -129,6 +131,8 @@ After collection, select a common matched low-level expert-action budget. Train
 each method independently from the same immutable ID base with original-ID/new-
 expert source balancing of 1:1, identical optimization settings and the correct
 temporal mask. OOD data is never used to train the ID base.
+The four branches use 5,000 optimizer steps after their smoke and save every
+500 steps.
 
 ### Stage F: final evaluation and registration
 
