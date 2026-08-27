@@ -95,6 +95,8 @@ def base_env(visible_devices: str = "") -> dict[str, str]:
 def run_logged(stage: str, command: list[str], *, visible_devices: str, log_path: Path) -> None:
     """Run one stage under the durable controller and retain its command log."""
 
+    if log_path.exists():
+        log_path = fresh_path(log_path)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     write_state(stage, "running", command=command, log=str(log_path), gpu=visible_devices)
     with log_path.open("w", encoding="utf-8") as handle:
