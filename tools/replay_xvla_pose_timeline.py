@@ -60,12 +60,16 @@ def _pose_snapshot(env: Any, *, task: str, info: dict[str, Any] | None = None) -
         "gripper_width": width,
     }
     if task == "stackcube":
+        output["object_position"] = _to_numpy(base.cubeA.pose.p).reshape(-1)[:3].astype(np.float32).tolist()
+        output["target_position"] = _to_numpy(base.cubeB.pose.p).reshape(-1)[:3].astype(np.float32).tolist()
         output["grasped"] = bool(base.agent.is_grasping(base.cubeA))
         output["on_cube"] = bool(
             _bool_scalar((info or {}).get("is_cubeA_on_cubeB", False))
         )
         output["success"] = bool(_bool_scalar((info or {}).get("success", False)))
     else:
+        output["object_position"] = _to_numpy(base.obj.pose.p).reshape(-1)[:3].astype(np.float32).tolist()
+        output["target_position"] = _to_numpy(base.goal_site.pose.p).reshape(-1)[:3].astype(np.float32).tolist()
         output["grasped"] = bool(base.agent.is_grasping(base.obj))
         output["strict_success"] = bool(
             _bool_scalar((info or {}).get("success", False))
@@ -274,6 +278,12 @@ def replay(args: argparse.Namespace) -> dict[str, Any]:
                 ],
                 dtype=np.float32,
             )
+            object_positions = np.asarray(
+                [pose["object_position"] for pose in poses], dtype=np.float32
+            )
+            target_positions = np.asarray(
+                [pose["target_position"] for pose in poses], dtype=np.float32
+            )
             np.savez_compressed(
                 args.output / "pose" / f"episode_{int(row['episode_index']):06d}_seed_{seed:06d}.npz",
                 pose=pose_array,
@@ -282,6 +292,8 @@ def replay(args: argparse.Namespace) -> dict[str, Any]:
                 gripper_width=pose_array[:, 7],
                 phase_flag_1=pose_array[:, 8],
                 phase_flag_2=pose_array[:, 9],
+                object_position=object_positions,
+                target_position=target_positions,
             )
             source_steps = int(row.get("steps", len(actions)))
             replay_steps = len(poses) - 1
