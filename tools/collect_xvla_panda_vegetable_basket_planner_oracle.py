@@ -15,7 +15,7 @@ import gymnasium as gym
 import h5py
 import numpy as np
 
-from panda_vegetable_basket_adapter import tcp_pose_world, world_pose_to_base
+from panda_vegetable_basket_adapter import encode_base_ee6d, tcp_pose_world, world_pose_to_base
 
 
 TASK = "put the vegetable into the yellow basket"
@@ -124,14 +124,14 @@ def _save_episode(output: Path, index: int, recorder: RecordingEnv, metadata: di
     transitions = len(recorder.actions)
     if len(recorder.records) != transitions + 1:
         raise RuntimeError("record boundary mismatch")
-    proprio = np.stack([record["tcp_base"][:10] for record in recorder.records[:-1]])
+    # X-VLA's active Panda block is xyz + continuous 6D rotation + gripper.
+    # The recorder keeps quaternions for geometry audits, so encode both the
+    # observation and post-step target through the single canonical adapter.
+    proprio = np.stack(
+        [encode_base_ee6d(record["tcp_base"], record["gripper_01"])[:10] for record in recorder.records[:-1]]
+    )
     actions = np.stack(
-        [
-            np.concatenate(
-                [record["tcp_base"][:9], [record["gripper_01"]]]
-            ).astype(np.float32)
-            for record in recorder.records[1:]
-        ]
+        [encode_base_ee6d(record["tcp_base"], record["gripper_01"])[:10] for record in recorder.records[1:]]
     )
     source_states = np.stack([record["object_pose"] for record in recorder.records[:-1]])
     target_states = np.stack([record["target_pose"] for record in recorder.records[:-1]])
@@ -342,8 +342,8 @@ def main() -> None:
     parser.add_argument("--seed-start", type=int, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--lift-height", type=float, default=0.35)
-    parser.add_argument("--release-max-steps", type=int, default=30)
-    parser.add_argument("--max-episode-steps", type=int, default=120)
+    parser.add_argument("--release-max-steps", type=int, default=60)
+    parser.add_argument("--max-episode-steps", type=int, default=150)
     parser.add_argument(
         "--closing-axis-mode",
         choices=("object_local_y", "object_local_x", "world_y"),
