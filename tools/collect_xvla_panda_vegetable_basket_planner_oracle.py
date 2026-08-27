@@ -178,6 +178,7 @@ def run_episode(
     output: Path,
     lift_height: float,
     release_max_steps: int,
+    closing_axis_mode: str,
 ) -> dict[str, Any]:
     import sapien
     from mani_skill.examples.motionplanning.panda.motionplanner import PandaArmMotionPlanningSolver
@@ -192,7 +193,14 @@ def run_episode(
     source_sp = source.pose.sp
     target_sp = target.pose.sp
     object_matrix = np.asarray(source_sp.to_transformation_matrix(), dtype=np.float64)
-    closing = object_matrix[:3, 1]
+    local_axis = np.array(
+        [1.0, 0.0, 0.0] if closing_axis_mode == "object_local_x" else [0.0, 1.0, 0.0]
+    )
+    closing = (
+        object_matrix[:3, :3] @ local_axis
+        if closing_axis_mode.startswith("object_local")
+        else np.array([0.0, 1.0, 0.0])
+    )
     closing[2] = 0.0
     closing /= max(float(np.linalg.norm(closing)), 1e-8)
     approaching = np.array([0.0, 0.0, -1.0], dtype=np.float64)
@@ -284,6 +292,7 @@ def run_episode(
         "max_source_z": float(max(record["object_pose"][2] for record in recorder.records)),
         "lift_height": float(lift_height),
         "release_max_steps": int(release_max_steps),
+        "closing_axis_mode": closing_axis_mode,
         "action_contract": "joint-position planner replay re-encoded as base-frame absolute EE6D targets",
     }
     return _save_episode(output, episode_index, recorder, metadata)
@@ -300,6 +309,11 @@ def main() -> None:
     parser.add_argument("--lift-height", type=float, default=0.18)
     parser.add_argument("--release-max-steps", type=int, default=30)
     parser.add_argument("--max-episode-steps", type=int, default=120)
+    parser.add_argument(
+        "--closing-axis-mode",
+        choices=("object_local_y", "object_local_x", "world_y"),
+        default="object_local_y",
+    )
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
     sys.path.insert(0, str(args.rlinf_root))
@@ -323,6 +337,7 @@ def main() -> None:
                 args.output,
                 args.lift_height,
                 args.release_max_steps,
+                args.closing_axis_mode,
             )
             rows.append(row)
             print(json.dumps(row), flush=True)
