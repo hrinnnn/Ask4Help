@@ -157,19 +157,26 @@ def run_episode(env, split, seed, episode_index, output, close_offset, orientati
         "z", orientation_yaw_deg, degrees=True
     )
     grasp_quaternion = grasp_rotation.as_quat()[[3, 0, 1, 2]].astype(np.float32)
+    finger_center = (
+        _array(base.agent.finger1_link.pose.p).reshape(-1, 3)[0]
+        + _array(base.agent.finger2_link.pose.p).reshape(-1, 3)[0]
+    ) / 2.0
+    finger_offset = finger_center - initial_tcp[:3]
+    source_center = start_source[:3] - finger_offset
+    target_center = start_target[:3] - finger_offset
     opened, closed = action_space_gripper_bounds(env)[1], action_space_gripper_bounds(env)[0]
     frames, proprio, actions, source_states, target_states = [], [], [], [], []
     timeline = []
     grasp_steps = 0
     max_source_z = float(start_source[2])
     phases = [
-        ("hover", start_source[:3] + np.array([0, 0, 0.16], dtype=np.float32), opened, 12),
-        ("descend", start_source[:3] + np.array([0, 0, close_offset], dtype=np.float32), opened, 8),
-        ("close", start_source[:3] + np.array([0, 0, close_offset], dtype=np.float32), closed, 8),
-        ("lift", start_source[:3] + np.array([0, 0, 0.18], dtype=np.float32), closed, 12),
-        ("transport", start_target[:3] + np.array([0, 0, 0.18], dtype=np.float32), closed, 14),
-        ("lower", start_target[:3] + np.array([0, 0, 0.095], dtype=np.float32), closed, 6),
-        ("release", start_target[:3] + np.array([0, 0, 0.09], dtype=np.float32), opened, 8),
+        ("hover", source_center + np.array([0, 0, 0.16], dtype=np.float32), opened, 12),
+        ("descend", source_center + np.array([0, 0, close_offset], dtype=np.float32), opened, 8),
+        ("close", source_center + np.array([0, 0, close_offset], dtype=np.float32), closed, 8),
+        ("lift", source_center + np.array([0, 0, 0.18], dtype=np.float32), closed, 12),
+        ("transport", target_center + np.array([0, 0, 0.18], dtype=np.float32), closed, 14),
+        ("lower", target_center + np.array([0, 0, 0.095], dtype=np.float32), closed, 6),
+        ("release", target_center + np.array([0, 0, 0.09], dtype=np.float32), opened, 8),
     ]
     step_index = 0
     for phase, desired, grip, count in phases:
@@ -227,6 +234,7 @@ def run_episode(env, split, seed, episode_index, output, close_offset, orientati
         "grasp_steps": grasp_steps,
         "close_offset": float(close_offset),
         "orientation_yaw_deg": float(orientation_yaw_deg),
+        "finger_center_offset_from_tcp": finger_offset.tolist(),
         "timeline": timeline,
         "expert_control_start": 0,
         "expert_control_end": len(actions),
@@ -243,7 +251,7 @@ def main() -> None:
     parser.add_argument("--episodes", type=int, required=True)
     parser.add_argument("--seed-start", type=int, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--close-offset", type=float, default=0.025)
+    parser.add_argument("--close-offset", type=float, default=0.0)
     parser.add_argument("--orientation-yaw-deg", type=float, default=0.0)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
