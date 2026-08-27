@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "pipeline_id": "xvla_panda_put_vegetable_basket_object_ood_v1",
+  "authorized": true,
+  "owner_thread": "019ffbc4-f3a9-78f3-8684-e0b4cba3552a",
+  "owner_label": "codex-xvla-panda-vegetable-basket-object-ood",
+  "server_preference": [
+    "zhaozhixuan@111.198.58.150:12001",
+    "root@39.101.70.188:1012"
+  ],
+  "current_stage": "contract_registered",
+  "next_stage": "server_asset_preflight",
+  "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_panda_put_vegetable_basket_object_ood_v1/",
+  "plan": "docs/experiment_management/plans/XVLA_PandaPutVegetableBasket_ObjectVariation_OOD.md",
+  "source": {
+    "project_repo": "https://github.com/hrinnnn/Ask4Help",
+    "xvla_source": "X-VLA-Pt foundation; exact commit and checkout frozen by preflight",
+    "old_widowx_pipeline": "configs/pipelines/xvla_put_vegetable_basket_object_ood_v1.json",
+    "old_widowx_outputs_forbidden": true
+  },
+  "task": {
+    "official_template": "PutEggplantInBasketScene-v1",
+    "id_env": "XVLAPandaPutVegetableInBasketID-v1",
+    "ood_env": "XVLAPandaPutVegetableInBasketOOD-v1",
+    "id_object": "eggplant",
+    "ood_object": "bridge_carrot_generated_modified",
+    "ood_family": "object_variation",
+    "robot": "panda_bridgedataset_flat_table",
+    "instruction": "put the vegetable into the yellow basket",
+    "object_variation_only": true,
+    "frozen": [
+      "Panda robot and Panda controller",
+      "sink scene, yellow basket target and BridgeData assets",
+      "camera count, poses, intrinsics and image preprocessing",
+      "paired reset positions and canonical world-frame object orientation",
+      "control frequency, action normalization and episode horizon",
+      "language instruction, seed manifests and success predicate"
+    ],
+    "success_predicate": "after release the operated object is inside the basket target region, above the target plane, static, and not grasped",
+    "max_episode_steps": 120
+  },
+  "action_contract": {
+    "model_space": "single-arm EE6D active block (xyz, rot6d, gripper) padded to 20 dimensions",
+    "active_model_dimensions": 10,
+    "model_action_dimensions": 20,
+    "action_horizon": 30,
+    "panda_environment_control": "Panda EE delta pose plus gripper through PandaBridgeDatasetFlatTable",
+    "mapping": "Panda EE/controller adapter; direct joint-vector zero padding is forbidden",
+    "temporal_mask": "retain every observation anchor; repeat only the final real action for tail shape; mask padded timesteps and inactive dimensions"
+  },
+  "model": {
+    "family": "xvla",
+    "base_model": "X-VLA-Pt foundation; exact persistent path frozen after preflight",
+    "domain_name": "panda-vegetable-basket",
+    "domain_id": null,
+    "domain_id_status": "select a free row after auditing the foundation config; never reuse WidowX domain 4",
+    "use_proprio": true,
+    "fresh_id_adaptation": true,
+    "task_checkpoint_reuse_forbidden": true
+  },
+  "data": {
+    "id_demonstrations": 128,
+    "id_training_only": true,
+    "oracle_gate": "20 fixed paired ID/OOD resets; each split requires at least 19 strict successes",
+    "norm": "computed only from the 128 ID demonstrations and frozen before all training and evaluation",
+    "evidence": [
+      "actions",
+      "states",
+      "timelines",
+      "videos",
+      "reset_metadata",
+      "object_asset_metadata",
+      "expert_control_intervals",
+      "action_valid_mask"
+    ]
+  },
+  "training": {
+    "id_target_steps": 10000,
+    "checkpoint_interval": 500,
+    "id_probe_interval": 500,
+    "id_probe_episodes": 20,
+    "id_probe_gate": "at least 17 strict successes for checkpoint candidate; independent formal ID gate at least 80/100",
+    "global_batch_size": 128,
+    "micro_batch_size": 32,
+    "optimizer": "fresh optimizer from immutable X-VLA-Pt foundation",
+    "ood_training_forbidden": true,
+    "all_methods_same_steps": true
+  },
+  "detectors": {
+    "feature_fit": "ID expert observations only",
+    "threshold_calibration": "independent successful ID policy rollouts only; freeze before test",
+    "methods": [
+      "Input pooled PCA",
+      "Panda Bridge/internal-feature PCA",
+      "Panda Bridge LLMD",
+      "Panda Bridge kNN",
+      "Action Expert final LLMD",
+      "ACC",
+      "STAC",
+      "FIDeL-AD official ResNet18/euclidean without semantic VLM filter",
+      "CRSAIL observable-state k5",
+      "CRSAIL vision adaptation (explicitly labeled)"
+    ],
+    "metrics": ["AUPRC", "AUROC", "AUCPDT", "balanced_accuracy", "precision", "recall", "F1", "success_conditioned_false_alarm", "first_alarm_timing"]
+  },
+  "dagger": {
+    "methods": ["internal_pca", "diffdagger", "failure_recovery", "offline_bc"],
+    "gated_stream": "frozen mixed ID/OOD seed stream, raw attempts strictly alternating",
+    "gated_target": "100 successful trajectories with nonempty expert suffix per method",
+    "offline_target": "complete OOD oracle demonstrations under the matched expert-action budget",
+    "training_balance": "original ID data and each method's new expert source sampled 1:1",
+    "training_origin": "each method independently starts from the same immutable accepted ID checkpoint",
+    "ood_data_in_id_base_training": false
+  },
+  "seeds": {
+    "oracle_id": [96100, 96119],
+    "oracle_ood": [96200, 96219],
+    "id_demo": [96300, 96427],
+    "id_checkpoint_probe_formula": "97000 + checkpoint_step",
+    "formal_id": [98000, 98099],
+    "formal_ood": [99000, 99099]
+  },
+  "placement_preflight": {
+    "status": "pending",
+    "required_assets": [
+      "native X-VLA runtime",
+      "X-VLA-Pt foundation",
+      "PandaBridgeDatasetFlatTable source",
+      "BridgeData eggplant/carrot/sink assets",
+      "task source and manifest",
+      "persistent output disk with checkpoint/video headroom"
+    ],
+    "candidate_servers": [
+      {
+        "server": "zhaozhixuan@111.198.58.150:12001",
+        "reason": "native X-VLA runtime and persistent /data paths are historically co-located"
+      },
+      {
+        "server": "root@39.101.70.188:1012",
+        "reason": "ManiSkill/H20 fallback; requires native X-VLA runtime and asset audit"
+      }
+    ],
+    "selected_server": null,
+    "selected_reason": null,
+    "rejected_alternatives": [],
+    "resource_snapshot": {},
+    "persistent_output_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_panda_put_vegetable_basket_object_ood_v1/"
+  },
+  "execution_audit": {
+    "required": [
+      "manifest_vs_command",
+      "runtime_import_gpu",
+      "panda_task_registration",
+      "panda_camera_and_object_visibility",
+      "panda_ee6d_action_mapping",
+      "paired_reset_object_only",
+      "oracle_id_ood_evidence",
+      "id_data_tail_mask_norm_audit",
+      "checkpoint_reload_forward",
+      "id_checkpoint_gate_evidence",
+      "detector_calibration_provenance",
+      "matched_expert_action_budget",
+      "final_evaluation_evidence"
+    ],
+    "failure_marker": "ENGINEERING_PROTOCOL_DIAGNOSTIC",
+    "scientific_stop_markers": ["ORACLE_NOT_ACCEPTED", "ID_BASE_NOT_ACCEPTED", "NEEDS_USER_DECISION"],
+    "terminal_markers": ["PIPELINE_COMPLETE", "ORACLE_NOT_ACCEPTED", "ID_BASE_NOT_ACCEPTED", "NEEDS_USER_DECISION", "PIPELINE_FAILED"]
+  },
+  "forbidden": [
+    "reuse WidowX domain 4 or WidowX action-axis conversion",
+    "reuse old WidowX data, norm, checkpoint or evaluation rows",
+    "mix robot change into the object-only main comparison",
+    "train ID base with OOD data",
+    "change success predicate, seeds, horizon or threshold to rescue a failed gate",
+    "overwrite or delete old diagnostic artifacts",
+    "use a finite loss, smoke, partial evaluation or process exit as completion"
+  ]
+}
