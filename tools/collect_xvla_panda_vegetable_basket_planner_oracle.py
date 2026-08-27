@@ -104,7 +104,10 @@ class RecordingEnv:
     def step(self, action):
         action_array = _array(action).reshape(-1).astype(np.float32)
         if action_array.size:
-            self.gripper_01 = float(np.clip((action_array[-1] + 1.0) / 2.0, 0.0, 1.0))
+            if getattr(self.env.unwrapped, "control_mode", None) == "pd_joint_pos":
+                self.gripper_01 = float(np.clip((action_array[-1] + 0.01) / 0.05, 0.0, 1.0))
+            else:
+                self.gripper_01 = float(np.clip((action_array[-1] + 1.0) / 2.0, 0.0, 1.0))
         obs, reward, terminated, truncated, info = self.env.step(action)
         self.actions.append(action_array.copy())
         self.phases.append(self.current_phase)
