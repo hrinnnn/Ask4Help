@@ -95,6 +95,12 @@ D_{t+1}^{\mathrm{ERD}}>\tau_D(\phi_{t+1})\}.
 expert 接管，不是完整 policy-only failure trajectories；正式 ERD 需要在无接管
 的 OOD rollout 或动作 replay 中保存完整 task-state timeline。
 
+补充敏感性检查显示，若直接使用每个 phase 的 leave-one-out MAD threshold，
+StackCube 的所有 `step_100` prefixes 会在 `step=3` 左右越阈值；这表明逐 phase
+方差估计在早期动作阶段过于敏感。正式版本应优先使用成功 validation-policy
+prefixes 校准的 threshold，并报告 raw crossing 与 debounced crossing 两者，
+而不是直接采用这个 step-3 结果。
+
 ## 4. 与现有 detector alarm 的关系
 
 在 `failure-recovery horizon=50` 的右删失诊断中：
