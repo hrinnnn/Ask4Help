@@ -36,7 +36,9 @@ def _reset_configs() -> tuple[torch.Tensor, torch.Tensor]:
     """Return the paired central reset used by both object variants."""
 
     target = np.array([-0.125, 0.025, 1.0], dtype=np.float32)
-    center = np.array([-0.143, 0.269], dtype=np.float32)
+    # The WidowX sink camera's historical y=0.269 reset is at the edge of the
+    # Panda Bridge camera.  Keep one fixed Panda-specific central point.
+    center = np.array([-0.143, 0.140], dtype=np.float32)
     xyz = torch.tensor(
         np.stack([np.stack([np.array([center[0], center[1], 0.937]), target])]),
         dtype=torch.float32,
