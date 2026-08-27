@@ -218,6 +218,11 @@ def replay(args: argparse.Namespace) -> dict[str, Any]:
         for row in rows:
             action_path, video_path = _row_paths(row)
             actions = np.load(action_path).astype(np.float32)
+            print(
+                f"REPLAY_EPISODE_START task={args.task} "
+                f"episode={int(row['episode_index'])} seed={int(row['seed'])}",
+                flush=True,
+            )
             raw_obs, _ = env.reset(seed=int(row["seed"]))
             actual_metadata = _reset_metadata(env, args.task, args.split)
             expected_metadata = {
@@ -304,6 +309,12 @@ def replay(args: argparse.Namespace) -> dict[str, Any]:
                         / f"episode_{int(row['episode_index']):06d}_seed_{seed:06d}.npz"
                     ),
                 }
+            )
+            print(
+                f"REPLAY_EPISODE_COMPLETE task={args.task} "
+                f"episode={int(row['episode_index'])} seed={seed} "
+                f"steps={replay_steps} rgb_mae={float(frame_delta.mean()):.4f}",
+                flush=True,
             )
     finally:
         env.close()
