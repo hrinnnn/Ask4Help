@@ -43,6 +43,11 @@ train_one() {
     printf '%s\n' "missing budget dataset: $expert" >&2
     return 1
   fi
+  local config_path="$RL/examples/sft/config/open_drawer_retrieve_place_dagger_sft_openpi_pi05.yaml"
+  if ! grep -Fq 'default_prompt: open the drawer, retrieve the blue object, and place it in the green tray' "$config_path"; then
+    printf '%s\n' "canonical OpenDrawer prompt missing from training config: $config_path" >&2
+    return 1
+  fi
   if [[ -f "$checkpoint" ]]; then
     printf '%s\n' "checkpoint already present: $checkpoint"
     printf '%s\n' 'training checkpoint verified' > "$out/TRAINING_COMPLETE"
