@@ -30,6 +30,24 @@
 - `stage_c_diffdagger_budget_stop_20260827`: StackCube Diff-DAgger consumed the complete pre-registered `400/400` OOD pool but admitted only `2` full episodes (`52` expert actions), so the frozen whole-episode exact `520`-action selector failed closed. The collection and selector traceback are preserved; no threshold, suffix, success predicate, or method substitution was made. A remote `NEEDS_USER_DECISION_DIFFDAGGER_EXACT_BUDGET` marker is written, and the remaining gate-data training is paused pending approval of a larger pool, a new admission protocol, or an ineligible-branch reconciliation.
 - `forbidden`: do not use old Stage-2 timing as formal input; do not launch on any protected GPU; do not tune thresholds/anchors on OOD; do not claim completion from smoke or partial calibration
 
+## OpenDrawer Grasp-OOD Controlled Timing Sweep
+
+- `pipeline_id`: `open_drawer_grasp_timing_sweep_v1`
+- `authorized`: `true`; 用户已要求使用现有 ID success rate `>50%` checkpoint，固定 Grasp-OOD takeover timing 并训练/比较 downstream SR
+- `owner_thread`: `current-thread`; `owner_label`: `codex-open-drawer-grasp-timing-sweep`
+- `server`: `zhaozhixuan@111.198.58.150:12001`; GPU0/CPU0-19 for the current diagnostic, GPUs6/7 protected by another running workload
+- `current_stage`: `checkpoint_and_asset_audit_complete`
+- `next_stage`: `diagnostic_fixed_timing_collection`
+- `run_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_timing_grasp_ood_v1/`
+- `manifest`: `configs/pipelines/open_drawer_grasp_timing_sweep_v1.json`
+- `plan`: `docs/experiment_management/plans/OpenDrawer_Grasp_Timing_Sweep.md`
+- `source_commit`: `92e086b`; fixed-timing collector is synced from the local GitHub branch to the server source tree
+- `base_checkpoint`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000`; its independent ID policy rollout is `61/100` with complete `100/100` videos/actions/states/timelines/reset metadata. It remains labeled preliminary (`>50%` diagnostic base), not `ID_BASE_VALIDATED`.
+- `task`: OpenDrawer `grasp_ood` (object yaw 80-100 degrees), max episode steps 400, execute horizon 5; current pure-policy audit is `96/100` drawer-opened, `11/100` ever-grasped, `0/100` strict success.
+- `timing_anchors`: provisional frozen diagnostic set `{0,50,80,120,160,220}` representing immediate, pre-open, post-open, object approach, grasp boundary, and post-failure recovery. These are not changed after observing downstream SR; any revision requires a new manifest.
+- `diagnostic`: `t=0` single-episode smoke produced a complete expert suffix (`257` actions) and full task-state timeline; planner first failed under pi0.5 2.7/NumPy2 runtime, then succeeded with the isolated `simplerenv_ms3` planner environment. The final smoke process emitted `free(): invalid pointer` only after artifacts were written; retained as cleanup diagnostic.
+- `forbidden`: do not reuse old prompt-mismatch checkpoint or q80 gate collections; do not alter Grasp-OOD geometry, ID norm, success predicate, timing anchors after SR, expert budget, or protected GPU ownership; do not claim `PIPELINE_COMPLETE` from the smoke.
+
 ## OpenDrawer pi0.5 Continuation From global_step_10000
 
 - `pipeline_id`: `open_drawer_pi05_resume_from10000_v9`
@@ -96,12 +114,15 @@
 - `legacy_q95_diagnostic`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_v9_formal_failure_ood_v1_serial_retry3/` was stopped before completion and is marked `diagnostic_q95_stopped_user_switched_to_q90`; its accepted rows and partial Grasp/PCA parts remain unchanged and are not mixed into the new run.
 - `legacy_q90_diagnostic`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_v9_formal_failure_ood_v1_serial_q90_retry1/` was stopped on Grasp/PCA after `308` raw, `308` videos and `4` accepted (`2 OOD / 2 ID`) because the q=.90 trigger rate was too low; it is marked `Q90_GRASP_PCA_STOPPED_FOR_LOWER_THRESHOLD_DIAGNOSTIC` and is not mixed into q=.80.
 - `q80_retry_diagnostics`: retry1 failed because its calibration omitted the required `detectors` mapping; retry2 failed because the controller launch expanded an undefined `CTRL`. Both roots are preserved with engineering diagnostic markers and are excluded from retry3.
-- `current_stage`: `q80_four_method_cycle_handle_ood_pca_only`; the new controller PID is `183367` on physical GPU0, with the first `Handle/PCA` collector active. It uses the frozen successful-ID calibration at q=`.80`, PCA threshold `0.29928144812583923`, and a strict alternating ID/OOD stream. The per-split method order is `PCA → DiffDAgger → Failure-Recovery → Offline-Oracle`, with a total target of 100 accepted trajectories per method and split; q=.80 retry3 is now the only active root.
+- `current_stage`: `grasp_pca_ratio_retry6_collection`; retry4 completed all 12 method/split collections with 100 accepted trajectories each, complete raw videos and datasets, and independent raw-stream audits. The retry4 Grasp/PCA gate failure (`26 ID / 74 OOD`, pilot `12/20` OOD) remains preserved as diagnostic. Retry5 used the same q=`.80` threshold and disjoint seeds but omitted planner environment variables; all 79 trigger attempts were `planner exited before becoming ready`, so retry5 is preserved as an engineering diagnostic. Retry6 restores the known-good planner environment with the same fixed threshold, geometry and seeds `240000/340000`; controller PID `1701330`, collector PID `1701344`, and output root `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_v9_formal_failure_ood_v1_serial_q80_retry6_grasp_pca_plannerfix/`. It is accepted only if it reaches 100 accepted with both formal and first-20 pilot OOD ratios `>=80%`; otherwise it writes a final diagnostic and training remains locked. No training or downstream stage is active.
 - `disk_risk_update`: the completed task-owned archive `pi05_rlinf_v4_20260824.tar.zst` was byte-checked and migrated from `/sdd/ask4help-open-drawer/runtime_archives/` to `/data/zhaozhixuan/Ask4Help-open-drawer/archive/runtime_archives/pi05_rlinf_v4_20260824/`; the old `/sdd` filename remains a symlink, and active runtime/checkpoints were not touched.
 - `disk_risk_update_v2`: the completed, unreferenced `runtime/pi05_rlinf_v3` (`INSTALL_COMPLETE`, about 13G) was regular-file-byte/file-count/rsync-dry-run verified and migrated to `/data/zhaozhixuan/Ask4Help-open-drawer/archive/runtime/pi05_rlinf_v3_20260824/`; the old runtime path remains a symlink. Active `runtime/pi05_rlinf_v4` and all checkpoints were preserved.
 - `combined_metrics_update`: independently generated `combined_id_ood_v1` contains 72 rows for `id+handle_ood`, `id+grasp_ood`, and `id+goal_ood` (200 episodes each), using the existing trajectory-max score and frozen ID calibration; separate OOD splits were not merged together.
-- `next_stage`: finish q80 retry3 `handle_ood/pca_only`, then let the same persistent controller continue `handle_ood` DiffDAgger/Failure-Recovery/Offline-Oracle, followed by independent Grasp/Goal split collections, matched-budget training, and final evaluation. Oracle20 and detector assets are already complete; do not copy Airplane/StackCube metric values or q95/q90 rows into the q80 run.
+- `next_stage`: explicit protocol decision for the Grasp/PCA OOD-ratio failure, then (only if the decision preserves a valid pre-registered collection) rebuild the affected collection before matched-budget training and final evaluation. Oracle20 and detector assets are already complete; do not copy Airplane/StackCube metric values or q95/q90 rows into the q80 run.
 - `manifest`: `configs/pipelines/open_drawer_pi05_v9_formal_failure_ood_v1.json`
+- `retry6_live_update`: planner-fixed Grasp/PCA retry is active at `513 raw / 513 videos / 38 accepted` (`10 ID / 28 OOD`, 73.7% OOD; first-20 pilot 75% OOD), with zero planner errors and strict raw ID/OOD alternation; controller PID `1701330`, collector PID `1701344`. Retry5 remains an engineering diagnostic and retry4's 74% OOD-ratio gate failure remains scientific diagnostic.
+- `retry7_live_update`: q=.75 threshold was rebuilt from the same 61 successful ID trajectories, reproducing q=.80=`0.2992814481` and yielding q=.75=`0.2827334106`; ID asset audit passes with zero OOD calibration rows. The active retry7 Grasp/PCA controller is PID `1886504`, collector PID `1886515`, using disjoint seeds `250000/350000`; training remains locked until the formal and first-20 pilot OOD ratios both reach `>=80%`.
+- `retry8_live_update`: q=.65 threshold was rebuilt from the same 61 successful ID trajectories, q=.80 reproduction remains `0.2992814481`, and q=.65=`0.2680910826`; ID asset audit passes with zero OOD calibration rows. The retry8 Grasp/PCA controller PID `1968260` and collector PID `1968298` used disjoint seeds `260000/360000` on physical GPU2 and stopped at `211 raw / 211 videos / 48 accepted` (`17 ID / 31 OOD`, 64.6% OOD; first-20 pilot 65%), with planner errors=0 and strict raw alternation. Training remains locked.
 
 ## OpenDrawer X-VLA Foundation Adaptation
 
@@ -216,8 +237,8 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `authorized`: `true` by the user-set active goal; this is a new Panda line, not the existing WidowX line
 - `owner_thread`: `019ffbc4-f3a9-78f3-8684-e0b4cba3552a`; `owner_label`: `codex-xvla-panda-vegetable-basket-object-ood`
 - `server_preference`: 5090 selected after live preflight; H20 rejected because both cards belong to PID `276925` and its root filesystem is full
-- `current_stage`: `id_demo_raw_v2`
-- `next_stage`: `id_dataset_materialize_v2 -> ID-only SFT -> independent ID gate`
+- `current_stage`: `id_sft_10000_v2`
+- `next_stage`: `checkpoint selection -> independent ID gate -> passive detection`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_panda_put_vegetable_basket_object_ood_v1/`
 - `manifest`: `configs/pipelines/xvla_panda_put_vegetable_basket_object_ood_v1.json`
 - `plan`: `docs/experiment_management/plans/XVLA_PandaPutVegetableBasket_ObjectVariation_OOD.md`
@@ -226,7 +247,7 @@ Baseline：strict `45/100`、red grasp `56/100`、red place `52/100`、blue lift
 - `execution_contract`: `preflight -> task/oracle smoke -> 128 ID demos -> ID-only SFT and gate -> passive detection -> four data branches -> matched-budget training -> final evaluation -> result registration`
 - `placement_preflight`: passed on 5090; GPU5--7 were idle, `/data` had about 4.7TB free, native X-VLA runtime/foundation/Panda source/BridgeData assets were co-located; controller PID is recorded in remote `pipeline.pid`
 - `oracle_gate`: `oracle_gate_v11` passed ID `20/20` and OOD `20/20` strict; profile is lift `0.35m`, release wait `60`, horizon `150`, object-local-y closing axis, three fresh-environment retries retained under `raw_attempts/`
-- `controller`: `tools/run_xvla_panda_vegetable_basket_full_pipeline.py`; remote log=`full_pipeline.log`; current child is the ID demonstration collector on GPU6
+- `controller`: `tools/run_xvla_panda_vegetable_basket_full_pipeline.py`; remote PID is in `pipeline.pid`; current child is ID SFT on physical GPU5/7 with gloo, batch8 and accumulation8 (effective global batch128)
 - `forbidden`: do not modify or reuse `xvla_put_vegetable_basket_object_ood_v1`; do not mix WidowX data/norm/checkpoint/results; do not unlock OOD before the independent ID gate
 - `completion`: only `PIPELINE_COMPLETE`, `ORACLE_NOT_ACCEPTED`, `ID_BASE_NOT_ACCEPTED`, `NEEDS_USER_DECISION`, or unrecoverable `PIPELINE_FAILED` after evidence audit
 

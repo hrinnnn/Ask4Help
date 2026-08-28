@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "pipeline_id": "open_drawer_grasp_timing_sweep_v1",
+  "authorized": true,
+  "owner_thread": "01a037ef-1a71-7ad3-9594-a7dcfe06ad7b",
+  "owner_label": "codex-open-drawer-grasp-timing-sweep",
+  "server": "zhaozhixuan@111.198.58.150:12001",
+  "current_stage": "checkpoint_and_asset_audit_complete",
+  "next_stage": "diagnostic_fixed_timing_collection",
+  "run_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_timing_grasp_ood_v1",
+  "source_commit": "92e086b",
+  "runtime": {
+    "source_root": "/data/zhaozhixuan/Ask4Help-open-drawer",
+    "rlinf_root": "/data/zhaozhixuan/Ask4Help-open-drawer/RLinf",
+    "python": "/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python",
+    "planner_python": "/data/zhaozhixuan/simplerenv_ms3/env/bin/python",
+    "gpu": 0,
+    "cpu_set": "0-19",
+    "sim_backend": "physx_cpu"
+  },
+  "base_policy": {
+    "model_family": "pi0.5",
+    "checkpoint": "/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000",
+    "checkpoint_full_weights": "/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000/actor/model_state_dict/full_weights.pt",
+    "checkpoint_dcp": "/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000/actor/dcp_checkpoint",
+    "pi05_base": "/data/zhaozhixuan/Ask4Help-open-drawer/results/model_cache/pi05_base_pytorch_v1",
+    "norm_stats": "/data/zhaozhixuan/Ask4Help-open-drawer/results/id_policy_training_v1/norm_stats_open_drawer_id_raw_v1",
+    "prompt": "open the drawer, retrieve the blue object, and place it in the green tray",
+    "id_evidence": {
+      "summary": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_v9_formal_failure_ood_v1_retry12/failure_detection/policy_rollouts_100x4/id/summary.json",
+      "episodes": 100,
+      "successes": 61,
+      "success_rate": 0.61,
+      "videos": 100,
+      "actions": 100,
+      "states": 100,
+      "timelines": 100,
+      "reset_metadata": 100,
+      "status": "preliminary_id_checkpoint_gt_50_percent"
+    }
+  },
+  "task": {
+    "name": "OpenDrawerRetrievePlace",
+    "split": "grasp_ood",
+    "ood_factor": "object_yaw_80_to_100_deg",
+    "affected_stage": "object_grasp",
+    "success_predicate": "ever_drawer_opened and object_in_target and object_released and robot_static",
+    "max_episode_steps": 400,
+    "execute_horizon": 5,
+    "policy_rollout_reference": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_pi05_v9_formal_failure_ood_v1_retry12/failure_detection/policy_rollouts_100x4/grasp_ood",
+    "expert_reference_source": "new t=0 fixed-timing collection with task-state timeline"
+  },
+  "timing_protocol": {
+    "decision_stride": 5,
+    "candidate_anchors_steps": [0, 50, 80, 120, 160, 220],
+    "anchor_semantics": {
+      "0": "immediate_start",
+      "50": "pre_drawer_open",
+      "80": "post_drawer_open",
+      "120": "object_approach",
+      "160": "near_grasp_boundary",
+      "220": "post_failure_recovery"
+    },
+    "anchor_selection": "fixed from calibration event distributions before downstream utility",
+    "d_path": {
+      "representation": "task-relative TCP position/orientation, gripper width, drawer/object/target state timeline for simulator audit",
+      "reference": "same Grasp-OOD expert reference bank; nearest-context monotone causal phase alignment",
+      "threshold": "successful ID calibration only, persistent two decision points",
+      "critical_time": "first persistent D_path threshold crossing on policy-only rollout",
+      "timing_error": "signed anchor minus critical deviation time",
+      "contact_boundary": "if pose-only misses Grasp-OOD no-grasp failures, retain pose result and add contact/progress auxiliary analysis"
+    },
+    "diagnostic": {
+      "target_accepted_per_anchor": 5,
+      "max_attempts_per_anchor": 10,
+      "seed_start": 78100
+    },
+    "formal": {
+      "target_accepted_per_anchor": 50,
+      "max_attempts_per_anchor": 100,
+      "seed_start": 78200,
+      "training_seeds": [9301, 9302, 9303],
+      "training_steps": 2500,
+      "evaluation_episodes_per_split": 100,
+      "evaluation_id_seed_start": 78300,
+      "evaluation_ood_seed_start": 78400
+    },
+    "baselines": ["no_takeover", "immediate", "phase_anchor", "late_boundary", "failure_recovery"],
+    "budget": {
+      "matching": "exact whole-episode expert-action budget across anchors",
+      "selection": "deterministic complete episodes only; no suffix slicing or padding",
+      "resolve_before_training": true
+    }
+  },
+  "completion_markers": [
+    "DIAGNOSTIC_COLLECTION_COMPLETE",
+    "TIMING_COLLECTION_COMPLETE",
+    "TIMING_TRAINING_COMPLETE",
+    "TIMING_EVALUATION_COMPLETE",
+    "INDEPENDENT_RECONCILIATION_COMPLETE",
+    "PIPELINE_COMPLETE"
+  ],
+  "execution_audit": {
+    "required": [
+      "checkpoint_full_weights_and_dcp",
+      "id_denominator_and_artifact_audit",
+      "prompt_norm_action_contract",
+      "paired_grasp_ood_reset_metadata",
+      "planner_ready_smoke",
+      "prefix_state_task_timeline",
+      "expert_suffix_dataset_and_mask_audit",
+      "exact_budget_audit",
+      "training_checkpoint_reload_forward",
+      "evaluation_denominator_video_action_state_timeline_audit",
+      "independent_reconciliation"
+    ],
+    "failure_marker": "ENGINEERING_PROTOCOL_DIAGNOSTIC"
+  },
+  "forbidden": [
+    "reuse_old_prompt_mismatch_checkpoint",
+    "change_grasp_ood_yaw_range",
+    "tune_D_path_threshold_on_OOD_utility",
+    "select_anchors_after_observing_SR",
+    "slice_or_pad_partial_expert_episodes",
+    "mix_handle_or_goal_OOD",
+    "claim_ID_BASE_VALIDATED_80_percent_from_61_percent",
+    "claim_PIPELINE_COMPLETE_from_diagnostic_or_smoke"
+  ]
+}
