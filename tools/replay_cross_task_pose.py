@@ -12,7 +12,9 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -45,6 +47,15 @@ def _build_env(task: str, split: str, *, repo_root: Path, max_episode_steps: int
 
         register_stack_cube_splits()
         env_id = stack_cube_env_id(split)
+    elif task == "stackcube_pi05":
+        from rlinf.envs.maniskill.stack_cube_variants import (
+            STACK_CUBE_ID_ENV_ID,
+            STACK_CUBE_OOD_ENV_ID,
+            register_controlled_stack_cube_variants,
+        )
+
+        register_controlled_stack_cube_variants()
+        env_id = STACK_CUBE_ID_ENV_ID if split == "id" else STACK_CUBE_OOD_ENV_ID
     elif task == "ycb":
         from rlinf.envs.maniskill.pick_single_ycb_object_variation import (
             PICK_SINGLE_YCB_OBJECT_ID_ENV_ID,
@@ -54,6 +65,15 @@ def _build_env(task: str, split: str, *, repo_root: Path, max_episode_steps: int
 
         register_controlled_pick_single_ycb_object_variants()
         env_id = PICK_SINGLE_YCB_OBJECT_ID_ENV_ID if split == "id" else PICK_SINGLE_YCB_OBJECT_OOD_ENV_ID
+    elif task == "airplane":
+        from rlinf.envs.maniskill.pick_single_ycb_airplane_variants import (
+            PICK_SINGLE_YCB_AIRPLANE_ID_ENV_ID,
+            PICK_SINGLE_YCB_AIRPLANE_OOD_ENV_ID,
+            register_controlled_pick_single_ycb_airplane_variants,
+        )
+
+        register_controlled_pick_single_ycb_airplane_variants()
+        env_id = PICK_SINGLE_YCB_AIRPLANE_ID_ENV_ID if split == "id" else PICK_SINGLE_YCB_AIRPLANE_OOD_ENV_ID
     elif task == "opendrawer":
         import rlinf.envs.maniskill.open_drawer_retrieve_place  # noqa: F401
         from rlinf.envs.maniskill.open_drawer_retrieve_place_spec import ENV_IDS
@@ -89,13 +109,13 @@ def _snapshot(env: Any, task: str, info: dict[str, Any] | None = None) -> dict[s
         "quaternion_wxyz": _to_numpy(tcp.q).reshape(-1)[:4].astype(np.float32).tolist(),
         "gripper_width": float(qpos[-2:].sum()),
     }
-    if task == "stackcube":
+    if task in {"stackcube", "stackcube_pi05"}:
         result["object_position"] = _to_numpy(base.cubeA.pose.p).reshape(-1)[:3].astype(np.float32).tolist()
         result["target_position"] = _to_numpy(base.cubeB.pose.p).reshape(-1)[:3].astype(np.float32).tolist()
         result["grasped"] = bool(base.agent.is_grasping(base.cubeA))
         result["on_cube"] = _bool_scalar((info or {}).get("is_cubeA_on_cubeB", False))
         result["success"] = _bool_scalar((info or {}).get("success", False))
-    elif task == "ycb":
+    elif task in {"ycb", "airplane"}:
         result["object_position"] = _to_numpy(base.obj.pose.p).reshape(-1)[:3].astype(np.float32).tolist()
         result["target_position"] = _to_numpy(base.goal_site.pose.p).reshape(-1)[:3].astype(np.float32).tolist()
         result["grasped"] = bool(base.agent.is_grasping(base.obj))
@@ -125,17 +145,23 @@ def _save_pose(output: Path, episode_index: int, seed: int, poses: list[dict[str
     object_positions = np.asarray([item["object_position"] for item in poses], dtype=np.float32)
     target_positions = np.asarray([item["target_position"] for item in poses], dtype=np.float32)
     path = output / "pose" / f"episode_{episode_index:06d}_seed_{seed:06d}.npz"
-    np.savez_compressed(
-        path,
-        pose=pose_array,
-        position=pose_array[:, :3],
-        quaternion_wxyz=pose_array[:, 3:7],
-        gripper_width=pose_array[:, 7],
-        phase_flag_1=pose_array[:, 8],
-        phase_flag_2=pose_array[:, 9],
-        object_position=object_positions,
-        target_position=target_positions,
-    )
+    arrays = {
+        "pose": pose_array,
+        "position": pose_array[:, :3],
+        "quaternion_wxyz": pose_array[:, 3:7],
+        "gripper_width": pose_array[:, 7],
+        "phase_flag_1": pose_array[:, 8],
+        "phase_flag_2": pose_array[:, 9],
+        "object_position": object_positions,
+        "target_position": target_positions,
+    }
+    with tempfile.TemporaryDirectory(prefix="cross-task-pose-") as directory:
+        local = Path(directory) / path.name
+        np.savez_compressed(local, **arrays)
+        with np.load(local) as payload:
+            if set(payload.files) != set(arrays):
+                raise RuntimeError(f"local pose archive failed its key audit: {local}")
+        shutil.copyfile(local, path)
     metadata["pose_file"] = str(path)
     return str(path)
 
@@ -319,7 +345,11 @@ def replay(args: argparse.Namespace) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", type=Path, required=True)
-    parser.add_argument("--task", choices=("stackcube", "ycb", "opendrawer"), required=True)
+    parser.add_argument(
+        "--task",
+        choices=("stackcube", "stackcube_pi05", "ycb", "airplane", "opendrawer"),
+        required=True,
+    )
     parser.add_argument("--split", required=True)
     parser.add_argument("--source", choices=("summary", "qpos_dirs", "parquet"), required=True)
     parser.add_argument("--summary", type=Path)

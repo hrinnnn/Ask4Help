@@ -74,6 +74,8 @@ def main() -> None:
 
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    actions_dir = args.output_dir / "actions"
+    actions_dir.mkdir(exist_ok=True)
     model = _load_model(args.checkpoint, args.norm_stats, args.pi05_base)
     register_controlled_stack_cube_variants()
     env = gym.make(
@@ -133,13 +135,15 @@ def main() -> None:
                 main_camera=main_camera,
                 wrist_camera=wrist_camera,
             )
-            write_episode_video_durably(
+            video_path = write_episode_video_durably(
                 frames,
                 video_dir=args.output_dir / "videos",
                 episode_index=episode,
                 seed=seed,
                 fps=10,
             )
+            actions_path = actions_dir / f"episode_{episode:06d}_seed_{seed:06d}.npy"
+            np.save(actions_path, np.asarray(actions, dtype=np.float32))
             row = {
                 "episode_index": episode,
                 "seed": seed,
@@ -148,6 +152,8 @@ def main() -> None:
                 "on_cube_once": on_cube,
                 "static_once": static,
                 "steps": len(actions),
+                "video": str(video_path),
+                "actions": str(actions_path),
                 **metadata,
             }
             rows.append(row)

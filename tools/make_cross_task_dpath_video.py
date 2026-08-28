@@ -94,6 +94,7 @@ def draw_plot(canvas: Image.Image, draw: ImageDraw.ImageDraw, task: dict[str, An
         for row in data["time_distribution"]:
             if row["p95"] is not None:
                 y_max = max(y_max, float(row["p95"]))
+    y_max = max(y_max, float(task["threshold"]))
     y_max = max(10.0, float(np.ceil(y_max / 20.0) * 20.0))
 
     def sx(step: float) -> float:
@@ -125,8 +126,8 @@ def draw_plot(canvas: Image.Image, draw: ImageDraw.ImageDraw, task: dict[str, An
 
     threshold = float(task["threshold"])
     dashed(draw, (x0, sy(threshold)), (x0 + width, sy(threshold)), GREEN, width=2)
-    text(draw, (x0 + width - 180, int(sy(threshold) - 21)), f"calibrated tau {threshold:.2f}", F_SMALL, GREEN)
-    text(draw, (x0, y0 - 32), "phase-aware TCP-position D_path(t): median with P25–P75 bands", F_LABEL)
+    text(draw, (x0 + 10, int(sy(threshold) - 21)), f"calibrated tau {threshold:.2f}", F_SMALL, GREEN)
+    text(draw, (x0, y0 - 32), "D_path(t): median with P25–P75 bands", F_LABEL)
     legend = "  |  ".join(spec["label"] for spec in config["series"])
     text(draw, (x0 + 650, y0 - 29), legend, F_SMALL, MUTED)
     cursor = sx(current)

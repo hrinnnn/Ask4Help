@@ -4,6 +4,12 @@
 性质：diagnostic-only；没有重新训练 policy，也没有修改任何 formal pipeline、
 checkpoint、seed、success predicate、detector threshold 或 expert-action budget。
 
+> Grab Plane correction：后续关键帧与持续抓取审计确认旧 `ever_grasped=true`
+> 混入 22 条 transient/wrong grasps，只有 2 条为 stable mid-body grasp。Grab Plane
+> 的 corrected distribution 与 pi0.5 复核以
+> `DPath_GraspLabel_and_Pi05_Validation_20260828.md` 为准；本文件原 `ever_grasped`
+> 表格仅保留为旧 endpoint 诊断。
+
 ## 1. 验证问题
 
 验证 position-only、phase-aware 的末端路径偏离是否能在不同任务上提供稳定的
