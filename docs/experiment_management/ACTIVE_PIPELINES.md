@@ -35,14 +35,14 @@
 - `pipeline_id`: `open_drawer_grasp_timing_sweep_v1`
 - `authorized`: `true`; 用户已要求使用现有 ID success rate `>50%` checkpoint，固定 Grasp-OOD takeover timing 并训练/比较 downstream SR
 - `owner_thread`: `current-thread`; `owner_label`: `codex-open-drawer-grasp-timing-sweep`
-- `server`: `zhaozhixuan@111.198.58.150:12001`; GPU0/CPU0-19 for the current diagnostic, GPUs6/7 protected by another running workload
+- `server`: `zhaozhixuan@111.198.58.150:12001`; current matched-budget training/evaluation uses audited idle GPU4/CPU80-99 sequentially; GPUs0-3/5-7 remain protected by other workloads
 - `current_stage`: `matched_budget_training`
 - `next_stage`: `100-ID/100-Grasp-OOD evaluation -> independent reconciliation`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1/`
 - `active_execution_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/`; formal collection is reused read-only from `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal/`, policy-only D-path calibration from retry2, and exact 5006-action budget from retry3
 - `manifest`: `configs/pipelines/open_drawer_grasp_timing_sweep_v1.json`
 - `plan`: `docs/experiment_management/plans/OpenDrawer_Grasp_Timing_Sweep.md`
-- `source_commit`: `92e086b`; fixed-timing collector is synced from the local GitHub branch to the server source tree
+- `source_commit`: `244a1ed`; fixed-timing collector and timing controllers are synced from the local GitHub branch to the server source tree
 - `base_checkpoint`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000`; its independent ID policy rollout is `61/100` with complete `100/100` videos/actions/states/timelines/reset metadata. It remains labeled preliminary (`>50%` diagnostic base), not `ID_BASE_VALIDATED`.
 - `task`: OpenDrawer `grasp_ood` (object yaw 80-100 degrees), max episode steps 400, execute horizon 5; current pure-policy audit is `96/100` drawer-opened, `11/100` ever-grasped, `0/100` strict success.
 - `timing_anchors`: provisional frozen diagnostic set `{0,50,80,120,160,220}` representing immediate, pre-open, post-open, object approach, grasp boundary, and post-failure recovery. These are not changed after observing downstream SR; any revision requires a new manifest.

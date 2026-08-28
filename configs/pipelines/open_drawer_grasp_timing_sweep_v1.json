@@ -13,14 +13,14 @@
   "policy_only_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry2/policy_only_grasp_ood",
   "budget_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry3/formal_budget",
   "active_stage": "matched_budget_training",
-  "source_commit": "92e086b",
+  "source_commit": "244a1ed",
   "runtime": {
     "source_root": "/data/zhaozhixuan/Ask4Help-open-drawer",
     "rlinf_root": "/data/zhaozhixuan/Ask4Help-open-drawer/RLinf",
     "python": "/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python",
     "planner_python": "/data/zhaozhixuan/simplerenv_ms3/env/bin/python",
-    "gpu": 0,
-    "cpu_set": "0-19",
+    "gpu": 4,
+    "cpu_set": "80-99",
     "sim_backend": "physx_cpu"
   },
   "base_policy": {
