@@ -14,6 +14,7 @@ FORMAL=$RUN/formal
 FORMAL=${OPEN_DRAWER_TIMING_FORMAL_ROOT:-$RUN/formal}
 BUDGET=${OPEN_DRAWER_TIMING_BUDGET_ROOT:-$RUN/formal_budget}
 POLICY_ONLY=${OPEN_DRAWER_TIMING_POLICY_ONLY_ROOT:-$RUN/policy_only_grasp_ood}
+FORMAL_MARKER=${OPEN_DRAWER_TIMING_FORMAL_MARKER:-$RUN/TIMING_COLLECTION_COMPLETE}
 ANCHORS=(0 50 80 120 160 220)
 TRAIN_SEEDS=(9301 9302 9303)
 EVAL_GPU=4
@@ -33,7 +34,7 @@ fail() {
 }
 
 write_state waiting_for_formal_collection running marker_pending
-while [[ ! -e "$RUN/TIMING_COLLECTION_COMPLETE" ]]; do
+while [[ ! -e "$FORMAL_MARKER" ]]; do
   if [[ -e "$RUN/PIPELINE_FAILED" ]]; then fail formal_collection "collection_controller_failed"; fi
   if [[ -e "$RUN/formal/AUDIT_FAILED" ]]; then fail formal_collection "formal_audit_failed"; fi
   echo "$(date -Is) waiting for formal TIMING_COLLECTION_COMPLETE"
