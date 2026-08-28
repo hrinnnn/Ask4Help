@@ -53,6 +53,9 @@ def audit_anchor(path: Path, *, target: int) -> dict[str, Any]:
     checked = 0
     for row in rows:
         episode_dir = Path(str(row.get("accepted_dir", "")))
+        raw_video = row.get("raw_video") or row.get("video")
+        if not raw_video or not Path(str(raw_video)).is_file():
+            errors.append(f"missing raw video for accepted episode {row.get('episode_index')}")
         for name in ("actions.npy", "states.npy", "reset_metadata.json", "task_state_timeline.json"):
             if not (episode_dir / name).is_file():
                 errors.append(f"missing {episode_dir / name}")
