@@ -38,7 +38,7 @@
 - `server`: `zhaozhixuan@111.198.58.150:12001`; GPU0/CPU0-19 for the current diagnostic, GPUs6/7 protected by another running workload
 - `current_stage`: `checkpoint_and_asset_audit_complete`
 - `next_stage`: `diagnostic_fixed_timing_collection`
-- `run_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_timing_grasp_ood_v1/`
+- `run_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1/`
 - `manifest`: `configs/pipelines/open_drawer_grasp_timing_sweep_v1.json`
 - `plan`: `docs/experiment_management/plans/OpenDrawer_Grasp_Timing_Sweep.md`
 - `source_commit`: `92e086b`; fixed-timing collector is synced from the local GitHub branch to the server source tree

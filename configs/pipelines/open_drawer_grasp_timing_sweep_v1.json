@@ -7,7 +7,7 @@
   "server": "zhaozhixuan@111.198.58.150:12001",
   "current_stage": "checkpoint_and_asset_audit_complete",
   "next_stage": "diagnostic_fixed_timing_collection",
-  "run_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_timing_grasp_ood_v1",
+  "run_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1",
   "source_commit": "92e086b",
   "runtime": {
     "source_root": "/data/zhaozhixuan/Ask4Help-open-drawer",
