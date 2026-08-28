@@ -82,8 +82,8 @@
       "training_seeds": [9301, 9302, 9303],
       "training_steps": 2500,
       "evaluation_episodes_per_split": 100,
-      "evaluation_id_seed_start": 78300,
-      "evaluation_ood_seed_start": 78400
+      "evaluation_id_seed_start": 78500,
+      "evaluation_ood_seed_start": 78600
     },
     "baselines": ["no_takeover", "immediate", "phase_anchor", "late_boundary", "failure_recovery"],
     "budget": {
