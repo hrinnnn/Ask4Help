@@ -27,7 +27,7 @@ from tools.pick_single_ycb_airplane_external_detectors import (  # noqa: E402
 )
 from tools.panda_vegetable_basket_adapter import (  # noqa: E402
     encode_base_ee6d,
-    model_target_to_panda_action,
+    model_target_to_panda_joint_action,
     tcp_pose_world,
     world_pose_to_base,
 )
@@ -197,12 +197,13 @@ def run_episode(
         obs_mode="rgb+segmentation",
         render_mode="rgb_array",
         sim_backend="physx_cpu",
-        control_mode="pd_ee_body_target_delta_pose_real",
+        control_mode="pd_joint_pos",
         max_episode_steps=max_episode_steps,
     )
     try:
         obs, _ = env.reset(seed=int(seed))
         base = env.unwrapped
+        pinocchio = base.agent.robot.create_pinocchio_model()
         frames = [rgb(obs)]
         commands: list[np.ndarray] = []
         states: list[np.ndarray] = []
@@ -260,7 +261,9 @@ def run_episode(
             )
             previous_points = points
             for model_action in generated_np[:execute_horizon, :10]:
-                command = model_target_to_panda_action(env, model_action)
+                command = model_target_to_panda_joint_action(
+                    env, model_action, pinocchio=pinocchio
+                )
                 obs, _reward, term, trunc, _info = env.step(command)
                 command = np.asarray(command, dtype=np.float32).reshape(-1)
                 commands.append(command)

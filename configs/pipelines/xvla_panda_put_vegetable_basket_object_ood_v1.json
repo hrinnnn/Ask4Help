@@ -46,8 +46,8 @@
     "active_model_dimensions": 10,
     "model_action_dimensions": 20,
     "action_horizon": 30,
-    "panda_environment_control": "Panda EE delta pose plus gripper through PandaBridgeDatasetFlatTable",
-    "mapping": "Panda EE/controller adapter; direct joint-vector zero padding is forbidden",
+    "panda_environment_control": "Panda joint-position control through canonical IK from absolute EE6D targets",
+    "mapping": "absolute base-frame EE6D target -> Panda TCP IK -> pd_joint_pos; direct joint-vector zero padding is forbidden",
     "temporal_mask": "retain every observation anchor; repeat only the final real action for tail shape; mask padded timesteps and inactive dimensions"
   },
   "model": {

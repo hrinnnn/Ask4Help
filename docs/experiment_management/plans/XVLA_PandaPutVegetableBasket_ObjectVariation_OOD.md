@@ -15,7 +15,8 @@ shared by both splits.
 
 ## 2. Frozen task contract
 
-- Robot: `PandaBridgeDatasetFlatTable` with its Panda EE delta-pose controller.
+- Robot: `PandaBridgeDatasetFlatTable` with Panda `pd_joint_pos` control driven
+  by the canonical TCP IK adapter.
 - ID object: `eggplant`.
 - OOD object: `eggplant` with fixed model scale `1.25` (object-size variation).
 - Instruction: `put the vegetable into the yellow basket`.
@@ -31,8 +32,9 @@ shared by both splits.
 - Success: after release, the object is inside the basket target region, above
   the target plane, static, and not grasped.
 - X-VLA output: one active 10D EE6D arm block padded to the 20D model width;
-  the Panda adapter maps this to the Panda controller. Directly putting Panda
-  joint deltas into the X-VLA padding slots is invalid.
+  the Panda adapter maps each absolute TCP target through IK to the
+  `pd_joint_pos` controller. Directly putting Panda joint deltas into the
+  X-VLA padding slots is invalid.
 - X-VLA domain row: `20`, audited free in the 30-row foundation configuration;
   the old WidowX row `4` is never reused.
 - Action chunk: 30 model actions, matching the foundation checkpoint contract.

@@ -6,6 +6,7 @@ from typing import Any
 
 import gymnasium as gym
 import numpy as np
+import sapien
 from scipy.spatial.transform import Rotation
 
 
@@ -182,3 +183,46 @@ def action_space_gripper_bounds(env: Any) -> tuple[float, float]:
     else:
         low, high = space.low[-1], space.high[-1]
     return float(low), float(high)
+
+
+def model_target_to_panda_joint_action(
+    env: Any,
+    model_action: np.ndarray,
+    *,
+    pinocchio: Any | None = None,
+    tcp_link_name: str = "panda_hand_tcp",
+) -> np.ndarray:
+    """Map an absolute base-frame EE6D target to Panda joint-position control.
+
+    Oracle trajectories are generated with ManiSkill's Panda joint-position
+    planner. Using the same IK target here keeps policy rollout dynamics
+    aligned with the recorded EE6D targets instead of mixing them with a
+    delta-pose controller.
+    """
+
+    value = _array(model_action).reshape(-1)
+    if value.size < ACTIVE_ACTION_DIM:
+        raise ValueError(f"model action must have at least 10 values, got {value.size}")
+    if pinocchio is None:
+        pinocchio = env.unwrapped.agent.robot.create_pinocchio_model()
+    link_names = [link.name for link in env.unwrapped.agent.robot.get_links()]
+    if tcp_link_name not in link_names:
+        raise ValueError(f"cannot resolve {tcp_link_name}; available={link_names}")
+    target_rotation = rotation_from_6d(value[3:9])
+    target_pose = sapien.Pose(
+        p=value[:3], q=target_rotation.as_quat()[[3, 0, 1, 2]]
+    )
+    current = _array(env.unwrapped.agent.robot.get_qpos()).reshape(-1).astype(np.float64)
+    result, success, _error = pinocchio.compute_inverse_kinematics(
+        link_names.index(tcp_link_name),
+        target_pose,
+        initial_qpos=current[:7],
+        active_qmask=np.ones(7, dtype=np.int32),
+        max_iterations=100,
+        dt=0.1,
+        damp=1e-6,
+    )
+    arm = np.asarray(result if success else current[:7], dtype=np.float32).reshape(-1)[:7]
+    arm = np.clip(arm, env.action_space.low[:7], env.action_space.high[:7])
+    gripper = float(np.clip(-0.01 + 0.05 * value[9], -0.01, 0.04))
+    return np.concatenate([arm, [gripper]]).astype(np.float32)

@@ -363,7 +363,7 @@ def existing_complete_eval(base: Path, episodes: int) -> Path | None:
 
 
 def select_and_gate(training: Path) -> tuple[Path, Path]:
-    root = RESULT_ROOT / "id_checkpoint_selection_v2"
+    root = RESULT_ROOT / "id_checkpoint_selection_v3"
     root.mkdir(parents=True, exist_ok=True)
     selection_path = root / "selection.json"
     if selection_path.is_file() and (root / "CHECKPOINT_SELECTION_COMPLETE").is_file():

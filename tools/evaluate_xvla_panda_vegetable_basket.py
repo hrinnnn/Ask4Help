@@ -17,7 +17,7 @@ from PIL import Image
 
 from panda_vegetable_basket_adapter import (
     encode_base_ee6d,
-    model_target_to_panda_action,
+    model_target_to_panda_joint_action,
     tcp_pose_world,
     world_pose_to_base,
 )
@@ -78,6 +78,7 @@ def _save_video(path: Path, frames: list[np.ndarray]) -> None:
 def _eval_one(model, processor, env, split: str, seed: int, episode_index: int, output: Path, domain_id: int, flow_steps: int, execute_horizon: int, max_steps: int) -> dict:
     obs, _ = env.reset(seed=int(seed))
     base = env.unwrapped
+    pinocchio = base.agent.robot.create_pinocchio_model()
     source = base.objs[base.source_obj_name]
     target = base.objs[base.target_obj_name]
     frames = [_rgb(obs)]
@@ -113,7 +114,9 @@ def _eval_one(model, processor, env, split: str, seed: int, episode_index: int, 
             )[0].float().cpu().numpy()
         chunk_rows = []
         for action_index, predicted_action in enumerate(predicted[:execute_horizon]):
-            command = model_target_to_panda_action(env, predicted_action[:10])
+            command = model_target_to_panda_joint_action(
+                env, predicted_action[:10], pinocchio=pinocchio
+            )
             obs, _reward, terminated_value, truncated_value, info = env.step(command)
             command_array = _array(command).reshape(-1).astype(np.float32)
             actions.append(command_array)
@@ -232,7 +235,7 @@ def main() -> None:
             obs_mode="rgb+segmentation",
             render_mode="rgb_array",
             sim_backend="physx_cpu",
-            control_mode="pd_ee_body_target_delta_pose_real",
+            control_mode="pd_joint_pos",
             max_episode_steps=args.max_episode_steps,
         )
         try:
@@ -285,4 +288,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
