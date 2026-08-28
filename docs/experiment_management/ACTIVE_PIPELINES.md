@@ -36,9 +36,10 @@
 - `authorized`: `true`; 用户已要求使用现有 ID success rate `>50%` checkpoint，固定 Grasp-OOD takeover timing 并训练/比较 downstream SR
 - `owner_thread`: `current-thread`; `owner_label`: `codex-open-drawer-grasp-timing-sweep`
 - `server`: `zhaozhixuan@111.198.58.150:12001`; GPU0/CPU0-19 for the current diagnostic, GPUs6/7 protected by another running workload
-- `current_stage`: `checkpoint_and_asset_audit_complete`
-- `next_stage`: `diagnostic_fixed_timing_collection`
+- `current_stage`: `matched_budget_training`
+- `next_stage`: `100-ID/100-Grasp-OOD evaluation -> independent reconciliation`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1/`
+- `active_execution_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/`; formal collection is reused read-only from `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal/`, policy-only D-path calibration from retry2, and exact 5006-action budget from retry3
 - `manifest`: `configs/pipelines/open_drawer_grasp_timing_sweep_v1.json`
 - `plan`: `docs/experiment_management/plans/OpenDrawer_Grasp_Timing_Sweep.md`
 - `source_commit`: `92e086b`; fixed-timing collector is synced from the local GitHub branch to the server source tree
@@ -155,6 +156,28 @@
 6. 50k fresh adaptation，每5k checkpoint；
 7. 固定20-ID selection和独立100-ID gate；ckpt-15000 diagnostic retry5 已完成并通过完整 evidence audit（strict `0/20`，不解锁）；
 8. `>=80/100` 后按已批准下游计划继续，否则执行 manifest 中的 ID recovery/科学停止。
+
+## OpenDrawer pi0.5 Representative Detector Calibration Recovery
+
+- `pipeline_id`: `open_drawer_representative_detector_calibration_v3`
+- `authorized`: `true`; active Goal owner `019fdb64-2df4-7a53-9a66-7a5c9b9fe97a`
+- `server`: `zhaozhixuan@111.198.58.150:12001`
+- `current_stage`: `completed_timing_diagnostic_clean_all_layers_not_met`
+- `next_stage`: `user_decision_for_more_successful_policy_ID_calibration_or_new_temporal_detector`
+- `run_root`: `/sdd/ask4help-open-drawer/results/open_drawer_calibration_recovery_v3/`
+- `checkpoint`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000`; fixed prior seed=`0`; canonical prompt and ID norm are recorded in the manifest
+- `ID_provenance`: expert-ID is the 128-demo full observation bank; policy-success-ID is 20 independent strict-success episodes from `open_drawer_policy_id_calibration_v1_retry3`, matched at video/action/state level
+- `representative_layers`: VLM visual input, VLM bridge, VLM block 08, Action Expert block 08, Action Expert final/pre-output
+- `detectors`: pooled PCA residual versus source-aware tokenwise PCA+OT; q=`.80/.95`; visual valid masks are retained and action tokens remain time ordered
+- `live_processes`: none; expert/policy asset builders and all rescore processes exited after their artifacts were audited
+- `asset_audit`: expert-ID tokenwise=`22,973` observations; policy-success raw-replay tokenwise=`4,853`; raw-replay qpos reproduction=`0`; pooled and phase-aligned assets also audited finite
+- `smoke`: tokenwise expert smoke=`1000` observations; policy-success video smoke=`2` episodes (`329` matched observations); remote unit tests=`5 passed`
+- `timing_sources`: fixed saved ID source `/sdd/ask4help-open-drawer/results/open_drawer_representative_pca_v1_id_control_retry1` and Grasp-OOD source `/sdd/ask4help-open-drawer/results/open_drawer_representative_pca_v1_retry4/grasp_ood_smoke`; passive replay only, no new policy action sampling
+- `forbidden`: no formal OOD collection, DAgger or training in this Goal; old q=.80 outputs remain Bridge-PCA diagnostics and are not relabeled as Input PCA
+- `plan`: `docs/experiment_management/plans/OpenDrawer_Representative_Detector_Calibration_Recovery.md`
+- `manifest`: `configs/pipelines/open_drawer_representative_detector_calibration_v3.json`
+- `results`: `/sdd/ask4help-open-drawer/results/open_drawer_calibration_recovery_v3/metrics_final_v2/comparison.{json,csv,md}`; final audit=`/sdd/ask4help-open-drawer/results/open_drawer_calibration_recovery_v3/FINAL_AUDIT.json`; annotated videos=`/sdd/ask4help-open-drawer/results/open_drawer_calibration_recovery_v3/annotated_videos/`
+- `completion`: `OPEN_DRAWER_REPRESENTATIVE_CALIBRATION_COMPLETE` is present. This closes the approved diagnostic plan; it does not claim all five layers meet clean timing, and formal OOD/DAgger/training remain locked.
 
 ## StackPyramid Grasp Recovery
 

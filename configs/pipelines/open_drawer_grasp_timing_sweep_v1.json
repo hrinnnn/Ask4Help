@@ -8,6 +8,11 @@
   "current_stage": "checkpoint_and_asset_audit_complete",
   "next_stage": "diagnostic_fixed_timing_collection",
   "run_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1",
+  "active_execution_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5",
+  "formal_collection_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal",
+  "policy_only_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry2/policy_only_grasp_ood",
+  "budget_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry3/formal_budget",
+  "active_stage": "matched_budget_training",
   "source_commit": "92e086b",
   "runtime": {
     "source_root": "/data/zhaozhixuan/Ask4Help-open-drawer",
