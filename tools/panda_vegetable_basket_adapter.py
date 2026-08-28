@@ -213,15 +213,21 @@ def model_target_to_panda_joint_action(
         p=value[:3], q=target_rotation.as_quat()[[3, 0, 1, 2]]
     )
     current = _array(env.unwrapped.agent.robot.get_qpos()).reshape(-1).astype(np.float64)
-    result, success, _error = pinocchio.compute_inverse_kinematics(
-        link_names.index(tcp_link_name),
-        target_pose,
-        initial_qpos=current[:7],
-        active_qmask=np.ones(7, dtype=np.int32),
-        max_iterations=100,
-        dt=0.1,
-        damp=1e-6,
-    )
+    try:
+        result, success, _error = pinocchio.compute_inverse_kinematics(
+            link_names.index(tcp_link_name),
+            target_pose,
+            initial_qpos=current[:7],
+            active_qmask=np.ones(7, dtype=np.int32),
+            max_iterations=100,
+            dt=0.1,
+            damp=1e-6,
+        )
+    except RuntimeError:
+        # A policy can emit a temporarily unreachable target. Keep the raw
+        # rollout alive and record a no-motion command for that decision;
+        # the episode outcome remains governed by the task predicate.
+        result, success = current[:7], False
     arm = np.asarray(result if success else current[:7], dtype=np.float32).reshape(-1)[:7]
     arm = np.clip(arm, env.action_space.low[:7], env.action_space.high[:7])
     gripper = float(np.clip(-0.01 + 0.05 * value[9], -0.01, 0.04))

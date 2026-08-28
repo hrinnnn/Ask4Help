@@ -60,15 +60,18 @@ def target_to_joint_action(env, model_action: np.ndarray, pinocchio, tcp_index: 
     target_rotation = rotation_from_6d(value[3:9])
     target_pose = sapien.Pose(p=value[:3], q=target_rotation.as_quat()[[3, 0, 1, 2]])
     current = np.asarray(env.unwrapped.agent.robot.get_qpos(), dtype=np.float64).reshape(-1)
-    result, success, _error = pinocchio.compute_inverse_kinematics(
-        tcp_index,
-        target_pose,
-        initial_qpos=current[:7],
-        active_qmask=np.ones(7, dtype=np.int32),
-        max_iterations=100,
-        dt=0.1,
-        damp=1e-6,
-    )
+    try:
+        result, success, _error = pinocchio.compute_inverse_kinematics(
+            tcp_index,
+            target_pose,
+            initial_qpos=current[:7],
+            active_qmask=np.ones(7, dtype=np.int32),
+            max_iterations=100,
+            dt=0.1,
+            damp=1e-6,
+        )
+    except RuntimeError:
+        result, success = current[:7], False
     arm = np.asarray(result if success else current[:7], dtype=np.float32).reshape(-1)[:7]
     arm = np.clip(arm, env.action_space.low[:7], env.action_space.high[:7])
     gripper = float(np.clip(-0.01 + 0.05 * value[9], -0.01, 0.04))
