@@ -13,8 +13,10 @@ RAY_BASE=${OPEN_DRAWER_TIMING_RAY_BASE:-/data/odray_open_drawer_timing}
 TMP_BASE=${OPEN_DRAWER_TIMING_TMP_BASE:-/tmp/od_open_drawer_timing}
 STEPS=${OPEN_DRAWER_TIMING_TRAIN_STEPS:-2500}
 SEEDS=(9301 9302 9303)
-GPUS=(0 1 2)
-CPUS=(0-19 20-39 40-59)
+# A live resource audit found GPU0 occupied by collection and GPUs1--3 owned
+# by other workloads; run timing updates sequentially on the verified idle GPU4.
+GPU=4
+CPU_SET=80-99
 ANCHORS=(0 50 80 120 160 220)
 STATE=$RUN/training_pipeline_state.json
 LOG=$RUN/training_controller.log
@@ -83,24 +85,14 @@ train_one() {
 
 write_state preflight running "exact_budget=$BUDGET_ROOT"
 for anchor in "${ANCHORS[@]}"; do
-  pids=()
-  failed=0
-  for index in "${!SEEDS[@]}"; do
-    seed=${SEEDS[$index]}
-    gpu=${GPUS[$index]}
-    cpuset=${CPUS[$index]}
-    train_one "$anchor" "$seed" "$gpu" "$cpuset" >> "$LOG" 2>&1 &
-    pids+=("$!")
+  write_state "training_anchor_${anchor}" running "sequential_seeds=${SEEDS[*]} gpu=$GPU"
+  for seed in "${SEEDS[@]}"; do
+    train_one "$anchor" "$seed" "$GPU" "$CPU_SET" >> "$LOG" 2>&1 || {
+      write_state "training_anchor_${anchor}_seed_${seed}" failed "training failed"
+      printf '%s\n' "anchor=$anchor seed=$seed training failed" > "$RUN/TRAINING_FAILED"
+      exit 1
+    }
   done
-  write_state "training_anchor_${anchor}" running "seeds=${SEEDS[*]}"
-  for pid in "${pids[@]}"; do
-    wait "$pid" || failed=1
-  done
-  if [[ $failed -ne 0 ]]; then
-    write_state "training_anchor_${anchor}" failed "one or more seeds failed"
-    printf '%s\n' "anchor=$anchor training failed" > "$RUN/TRAINING_FAILED"
-    exit 1
-  fi
 done
 write_state all_timing_training complete "all anchors and seeds checkpointed"
 printf '%s\n' 'all timing anchors trained with three seeds' > "$RUN/TIMING_TRAINING_COMPLETE"

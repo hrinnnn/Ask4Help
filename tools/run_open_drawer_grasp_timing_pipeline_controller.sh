@@ -15,8 +15,8 @@ BUDGET=$RUN/formal_budget
 POLICY_ONLY=$RUN/policy_only_grasp_ood
 ANCHORS=(0 50 80 120 160 220)
 TRAIN_SEEDS=(9301 9302 9303)
-EVAL_GPUS=(0 1 2)
-EVAL_CPUS=(0-19 20-39 40-59)
+EVAL_GPU=4
+EVAL_CPU=80-99
 
 mkdir -p "$RUN" "$RUN/logs"
 exec > >(tee -a "$LOG") 2>&1
@@ -93,11 +93,10 @@ fi
 if [[ ! -e "$RUN/TIMING_EVALUATION_COMPLETE" ]]; then
   write_state matched_budget_evaluation running id_and_grasp_ood
   for anchor in "${ANCHORS[@]}"; do
-    pids=()
     for index in "${!TRAIN_SEEDS[@]}"; do
       seed=${TRAIN_SEEDS[$index]}
-      gpu=${EVAL_GPUS[$index]}
-      cpuset=${EVAL_CPUS[$index]}
+      gpu=$EVAL_GPU
+      cpuset=$EVAL_CPU
       out="$RUN/evaluation/anchor_${anchor}/seed_${seed}"
       checkpoint="$RUN/training/anchor_${anchor}/seed_${seed}/run/checkpoints/global_step_2500"
       if [[ -e "$out/EVAL_COMPLETE" ]]; then
@@ -115,12 +114,11 @@ if [[ ! -e "$RUN/TIMING_EVALUATION_COMPLETE" ]]; then
         --root "$ROOT" --checkpoint "$checkpoint" --pi05-base "$PI05_BASE" --norm-stats "$NORM" \
         --evaluator "$ROOT/tools/evaluate_open_drawer_id_pi05.py" --output-root "$out" \
         --python "$PY" --episodes 100 --id-seed 78500 --ood-seed 78600 --gpu "$gpu" --cpu-set "$cpuset" \
-        > "$RUN/logs/eval_anchor_${anchor}_seed_${seed}.log" 2>&1 &
-      pids+=("$!")
+        > "$RUN/logs/eval_anchor_${anchor}_seed_${seed}.log" 2>&1
+      if [[ ! -e "$out/EVAL_COMPLETE" ]]; then
+        fail matched_budget_evaluation "evaluation_anchor_${anchor}_seed_${seed}_failed"
+      fi
     done
-    failed=0
-    for pid in "${pids[@]}"; do wait "$pid" || failed=1; done
-    [[ $failed -eq 0 ]] || fail matched_budget_evaluation "evaluation_wave_anchor_${anchor}_failed"
   done
   printf '%s\n' 'all timing anchors and training seeds evaluated on 100 ID/100 Grasp-OOD episodes' > "$RUN/TIMING_EVALUATION_COMPLETE"
 fi
