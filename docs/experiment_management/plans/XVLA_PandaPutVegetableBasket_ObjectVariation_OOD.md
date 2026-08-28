@@ -92,6 +92,13 @@ candidate; a separate 100-episode ID gate must reach at least 80/100 before
 OOD detector or DAgger stages unlock. If no checkpoint qualifies, write
 `ID_BASE_NOT_ACCEPTED` and preserve all evidence.
 
+Current result: after the training contract was frozen and the evaluator was
+aligned to the same Panda IK control, every checkpoint from 500 through 10,000
+produced a complete 20-episode ID probe but `0/20` strict successes. The
+pipeline therefore writes `NEEDS_USER_DECISION` and locks passive detection,
+OOD collection, DAgger and updated training. A new training or observation
+contract must be pre-registered before this line can resume.
+
 ### Stage D: passive failure detection
 
 Use the accepted ID policy and ID expert observations only for detector assets.

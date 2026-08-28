@@ -8,8 +8,10 @@
     "zhaozhixuan@111.198.58.150:12001",
     "root@39.101.70.188:1012"
   ],
-  "current_stage": "candidate_oracle_profile_selected",
-  "next_stage": "oracle_gate_id_ood",
+  "current_stage": "id_checkpoint_selection_v3_scientific_stop",
+  "next_stage": "needs_user_decision_before_new_id_training_contract",
+  "status": "scientific_stop",
+  "terminal_marker": "NEEDS_USER_DECISION",
   "run_root": "/data/zhaozhixuan/Ask4Help-airplane-5090/results/xvla_panda_put_vegetable_basket_object_ood_v1/",
   "plan": "docs/experiment_management/plans/XVLA_PandaPutVegetableBasket_ObjectVariation_OOD.md",
   "source": {
