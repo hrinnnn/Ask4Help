@@ -116,6 +116,15 @@ def run_logged(stage: str, command: list[str], *, visible_devices: str, log_path
         # The short sleep avoids a tight polling loop before reaping it.
         time.sleep(60)
         return_code = process.wait()
+    if return_code != 0 and evaluator_command_complete(command):
+        write_state(
+            stage,
+            "process_complete_with_complete_evidence",
+            pid=process.pid,
+            return_code=return_code,
+            log=str(log_path),
+        )
+        return
     if return_code != 0:
         write_state(stage, "engineering_failure", pid=process.pid, return_code=return_code, log=str(log_path))
         raise RuntimeError(f"{stage} exited with {return_code}")
@@ -124,6 +133,33 @@ def run_logged(stage: str, command: list[str], *, visible_devices: str, log_path
 
 def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def evaluator_command_complete(command: list[str]) -> bool:
+    """Accept a native simulator shutdown abort only after full evidence exists."""
+
+    output_flag = "--output" if "--output" in command else "--output-dir" if "--output-dir" in command else None
+    if output_flag is None:
+        return False
+    try:
+        output = Path(command[command.index(output_flag) + 1])
+        episodes = int(command[command.index("--episodes") + 1])
+    except (ValueError, IndexError):
+        return False
+    summary_path = output / "summary.json"
+    if not summary_path.is_file():
+        return False
+    try:
+        summary = read_json(summary_path)
+    except (OSError, json.JSONDecodeError):
+        return False
+    marker = (output / "EVAL_COMPLETE").is_file() or (output / "EVALUATION_COMPLETE").is_file()
+    return (
+        marker
+        and summary.get("episodes") == episodes
+        and summary.get("videos") == episodes
+        and summary.get("actions") == episodes
+    )
 
 
 def valid_oracle_split(path: Path) -> tuple[bool, dict | None]:
@@ -314,6 +350,18 @@ def complete_eval(output: Path, episodes: int) -> bool:
     )
 
 
+def existing_complete_eval(base: Path, episodes: int) -> Path | None:
+    """Find a completed base or retry output without creating a duplicate."""
+
+    candidates = [base]
+    if base.parent.exists():
+        candidates.extend(sorted(base.parent.glob(f"{base.name}_retry*")))
+    for candidate in candidates:
+        if complete_eval(candidate, episodes):
+            return candidate
+    return None
+
+
 def select_and_gate(training: Path) -> tuple[Path, Path]:
     root = RESULT_ROOT / "id_checkpoint_selection_v2"
     root.mkdir(parents=True, exist_ok=True)
@@ -327,13 +375,15 @@ def select_and_gate(training: Path) -> tuple[Path, Path]:
         checkpoint = training / f"ckpt-{step}"
         if not checkpoint.is_dir():
             raise RuntimeError(f"missing checkpoint {checkpoint}")
-        output = fresh_path(root / f"probe_{step}")
-        run_logged(
-            f"id_probe_{step}",
-            evaluator_command(checkpoint, "id", 20, 97000 + step, output),
-            visible_devices="7",
-            log_path=LOG_ROOT / f"id_probe_{step}.log",
-        )
+        output = existing_complete_eval(root / f"probe_{step}", 20)
+        if output is None:
+            output = fresh_path(root / f"probe_{step}")
+            run_logged(
+                f"id_probe_{step}",
+                evaluator_command(checkpoint, "id", 20, 97000 + step, output),
+                visible_devices="7",
+                log_path=LOG_ROOT / f"id_probe_{step}.log",
+            )
         if not complete_eval(output, 20):
             raise RuntimeError(f"incomplete ID probe {output}")
         summary = read_json(output / "summary.json")
@@ -347,13 +397,15 @@ def select_and_gate(training: Path) -> tuple[Path, Path]:
         marker.write_text(json.dumps({"records": records, "required": "17/20 probe and 80/100 formal ID gate"}, indent=2) + "\n", encoding="utf-8")
         write_state("id_checkpoint_selection_v2", "scientific_stop", marker=str(marker), records=records)
         raise SystemExit("ID_BASE_NOT_ACCEPTED")
-    formal = fresh_path(root / f"formal_id_{selected.name}")
-    run_logged(
-        "id_formal_gate_100_v2",
-        evaluator_command(selected, "id", 100, 98000, formal),
-        visible_devices="7",
-        log_path=LOG_ROOT / "id_formal_gate_100_v2.log",
-    )
+    formal = existing_complete_eval(root / f"formal_id_{selected.name}", 100)
+    if formal is None:
+        formal = fresh_path(root / f"formal_id_{selected.name}")
+        run_logged(
+            "id_formal_gate_100_v2",
+            evaluator_command(selected, "id", 100, 98000, formal),
+            visible_devices="7",
+            log_path=LOG_ROOT / "id_formal_gate_100_v2.log",
+        )
     if not complete_eval(formal, 100):
         raise RuntimeError("formal ID gate evidence incomplete")
     formal_summary = read_json(formal / "summary.json")
