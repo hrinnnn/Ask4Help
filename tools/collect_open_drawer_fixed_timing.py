@@ -34,6 +34,7 @@ from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (  # noqa: E402
     MAIN_CAMERA_CANDIDATES,
     WRIST_CAMERA_CANDIDATES,
     _build_frames,
+    _camera_image,
     _convert_solver_action_to_joint_delta,
     _create_dataset,
     _extract_record,
@@ -210,6 +211,25 @@ def collect_one(
     high = np.asarray(env.action_space.high, dtype=np.float32).reshape(-1)
     raw_obs, _info = env.reset(seed=seed)
     metadata = reset_metadata(env, split=env.unwrapped.rlinf_split)
+    main_camera = _select_camera(
+        _extract_record(raw_obs).obs,
+        "",
+        ("base_camera",) + MAIN_CAMERA_CANDIDATES,
+        "main",
+    )
+    wrist_camera = _select_camera(
+        _extract_record(raw_obs).obs,
+        "",
+        ("hand_camera",) + WRIST_CAMERA_CANDIDATES,
+        "wrist",
+    )
+    metadata["camera"] = {
+        "main": main_camera,
+        "wrist": wrist_camera,
+        "main_shape": list(_camera_image(_extract_record(raw_obs).obs, main_camera).shape),
+        "wrist_shape": list(_camera_image(_extract_record(raw_obs).obs, wrist_camera).shape),
+        "requested_size": [384, 384],
+    }
     errors = validate_reset_metadata(metadata, split=env.unwrapped.rlinf_split)
     if errors:
         raise RuntimeError(f"reset metadata failed for seed {seed}: {errors}")
