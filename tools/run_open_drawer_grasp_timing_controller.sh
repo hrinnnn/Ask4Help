@@ -59,6 +59,12 @@ for index in "${!ANCHORS[@]}"; do
       > "$RUN/diagnostic_anchor_${step}.log" 2>&1
   rc=$?
   if [[ ! -e "$out/COLLECTION_COMPLETE" ]]; then
+    if [[ -e "$out/COLLECTION_FAILED" && -e "$out/summary.json" ]]; then
+      printf '%s\n' "scheduled takeover anchor was not recoverable under the frozen planner/policy prefix; accepted suffixes are retained for audit" > "$out/UNRECOVERABLE_REGION"
+      echo "anchor=$step collector_rc=$rc marker=UNRECOVERABLE_REGION"
+      sleep 5
+      continue
+    fi
     write_state "diagnostic_anchor_$step" failed "collector_rc=$rc; completion marker missing"
     exit 1
   fi

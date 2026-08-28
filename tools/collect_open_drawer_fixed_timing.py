@@ -480,12 +480,6 @@ def main() -> None:
         del model
         torch.cuda.empty_cache()
 
-    if len(accepted_rows) < args.target:
-        (args.output_root / "COLLECTION_FAILED").write_text(
-            f"accepted={len(accepted_rows)} target={args.target} attempts={len(raw_rows)}\n"
-        )
-        raise SystemExit(f"fixed timing collection incomplete: {len(accepted_rows)}/{args.target}")
-
     summary = {
         "format": "open_drawer_fixed_timing_collection_v1",
         "task": "OpenDrawerRetrievePlace",
@@ -500,8 +494,14 @@ def main() -> None:
         "episodes": str(args.output_root / "accepted_experts.jsonl"),
         "raw_attempt_manifest": str(args.output_root / "raw_attempts.jsonl"),
         "dataset": str(args.output_root / "lerobot_dataset"),
+        "status": "complete" if len(accepted_rows) >= args.target else "incomplete_unrecoverable_candidate",
     }
     (args.output_root / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    if len(accepted_rows) < args.target:
+        (args.output_root / "COLLECTION_FAILED").write_text(
+            f"accepted={len(accepted_rows)} target={args.target} attempts={len(raw_rows)}\n"
+        )
+        raise SystemExit(f"fixed timing collection incomplete: {len(accepted_rows)}/{args.target}")
     (args.output_root / "COLLECTION_COMPLETE").write_text("complete fixed-timing Grasp-OOD suffix collection\n", encoding="utf-8")
 
 

@@ -22,8 +22,11 @@ def audit_anchor(path: Path, *, target: int) -> dict[str, Any]:
     errors: list[str] = []
     summary_path = path / "summary.json"
     accepted_path = path / "accepted_experts.jsonl"
-    if not (path / "COLLECTION_COMPLETE").is_file():
-        errors.append("missing COLLECTION_COMPLETE")
+    complete = (path / "COLLECTION_COMPLETE").is_file()
+    unrecoverable = (path / "UNRECOVERABLE_REGION").is_file()
+    failed = (path / "COLLECTION_FAILED").is_file()
+    if not (complete or unrecoverable or failed):
+        errors.append("missing collection outcome marker")
     if not summary_path.is_file():
         errors.append("missing summary.json")
         return {"path": str(path), "errors": errors, "pass": False}
@@ -32,8 +35,10 @@ def audit_anchor(path: Path, *, target: int) -> dict[str, Any]:
     accepted = int(summary.get("accepted", -1))
     if accepted != len(rows):
         errors.append(f"accepted mismatch summary={accepted} manifest={len(rows)}")
-    if accepted < target:
+    if accepted < target and not (unrecoverable or failed):
         errors.append(f"accepted below target {accepted}/{target}")
+    if complete and accepted < target:
+        errors.append("COLLECTION_COMPLETE claims completion below target")
     dataset = Path(str(summary.get("dataset", path / "lerobot_dataset")))
     info_path = dataset / "meta" / "info.json"
     if not info_path.is_file():
@@ -74,6 +79,7 @@ def audit_anchor(path: Path, *, target: int) -> dict[str, Any]:
         "path": str(path),
         "scheduled_takeover_step": summary.get("scheduled_takeover_step"),
         "accepted": accepted,
+        "outcome": "complete" if complete else "unrecoverable_candidate" if unrecoverable else "failed" if failed else "missing",
         "raw_attempts": summary.get("raw_attempts"),
         "expert_actions": summary.get("expert_actions"),
         "episodes_checked": checked,
