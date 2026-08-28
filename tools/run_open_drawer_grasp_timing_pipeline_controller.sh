@@ -11,8 +11,9 @@ ID_DATASET=${OPEN_DRAWER_TIMING_ID_DATASET:?set OPEN_DRAWER_TIMING_ID_DATASET}
 STATE=$RUN/pipeline_supervisor_state.json
 LOG=$RUN/pipeline_supervisor.log
 FORMAL=$RUN/formal
-BUDGET=$RUN/formal_budget
-POLICY_ONLY=$RUN/policy_only_grasp_ood
+FORMAL=${OPEN_DRAWER_TIMING_FORMAL_ROOT:-$RUN/formal}
+BUDGET=${OPEN_DRAWER_TIMING_BUDGET_ROOT:-$RUN/formal_budget}
+POLICY_ONLY=${OPEN_DRAWER_TIMING_POLICY_ONLY_ROOT:-$RUN/policy_only_grasp_ood}
 ANCHORS=(0 50 80 120 160 220)
 TRAIN_SEEDS=(9301 9302 9303)
 EVAL_GPU=4
@@ -52,7 +53,7 @@ if [[ ! -e "$POLICY_ONLY/POLICY_ONLY_COMPLETE" ]]; then
     taskset -c 0-19 "$PY" -u "$ROOT/tools/collect_open_drawer_policy_only_timeline.py" \
       --checkpoint "$MODEL" --pi05-base "$PI05_BASE" --norm-stats "$NORM" \
       --output-root "$POLICY_ONLY" --episodes 20 --seed 78700 > "$RUN/policy_only.log" 2>&1 || true
-  "$PY" - "$POLICY_ONLY" <<'PY'
+  if ! "$PY" - "$POLICY_ONLY" <<'PY'
 import json, sys
 from pathlib import Path
 root=Path(sys.argv[1])
@@ -63,6 +64,9 @@ if d.get("episodes") != 20 or len(d.get("rows",[])) != 20 or len(list((root/"vid
     raise SystemExit("policy-only denominator/artifact mismatch")
 (root/"POLICY_ONLY_COMPLETE").write_text("20 policy-only task-state timelines complete\n")
 PY
+  then
+    fail policy_only_timeline "denominator_or_artifact_audit_failed"
+  fi
 fi
 write_state d_path_analysis running prefix_and_reference
 CUDA_VISIBLE_DEVICES=0 "$PY" -u "$ROOT/tools/analyze_open_drawer_grasp_timing.py" --root "$FORMAL" --reference-anchor 0 --anchors "${ANCHORS[@]}" --policy-only-root "$POLICY_ONLY" --output "$FORMAL/d_path_summary.json" > "$RUN/d_path_analysis.log" 2>&1 || fail d_path_analysis "analysis_failed"

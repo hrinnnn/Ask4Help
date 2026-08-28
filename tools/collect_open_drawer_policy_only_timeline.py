@@ -87,7 +87,7 @@ def main() -> None:
             video = write_episode_video_durably(frames, video_dir=args.output_root / "videos", episode_index=episode, seed=seed, fps=10)
             (episode_dir / "timeline.json").write_text(json.dumps({"seed": seed, "steps": len(actions), "tail_observation_retained": len(records) == len(actions) + 1, "timeline": [{"step": i, "events": {"phase": _phase(s), "ever_drawer_opened": s["ever_drawer_opened"], "ever_grasped": s["ever_grasped"], "ever_lifted": s["ever_lifted"], "success": s["success"]}} for i, s in enumerate(task_states)]}, indent=2) + "\n", encoding="utf-8")
             rows.append({"episode_index": episode, "seed": seed, "split": "grasp_ood", "success": bool(task_states[-1]["success"]), "steps": len(actions), "video": str(video), "actions": str(episode_dir / "actions.npy"), "states": str(episode_dir / "states.npy"), "timeline": str(episode_dir / "timeline.json"), "task_state_timeline": str(episode_dir / "task_state_timeline.json"), "reset_metadata": str(episode_dir / "reset_metadata.json")})
-            print(json.dumps({"episode": episode, "steps": len(actions), "success": bool(task_states[-1]["success"])}, flush=True))
+            print(json.dumps({"episode": episode, "steps": len(actions), "success": bool(task_states[-1]["success"])}, separators=(",", ":")), flush=True)
     finally:
         env.close()
         del model
