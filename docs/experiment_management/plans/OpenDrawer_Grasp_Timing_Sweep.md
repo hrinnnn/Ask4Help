@@ -94,13 +94,14 @@ pose-only 结果并单独报告 contact/progress auxiliary channel，不调整 p
   states、task-state timeline；
 - 先核对 prefix phase、planner continuation、D-path crossing、dataset shape 和
   action/state/video 对齐；
-- diagnostic 通过后才扩展到每个 anchor 50 条 accepted episodes。
+- diagnostic 通过后才扩展到每个 anchor 30 条 accepted episodes；不足的 anchor 保留为
+  `UNRECOVERABLE_REGION`，不得为了凑齐分母改变 policy prefix 或 planner 协议。
 
 ## 7. Matched-budget training and evaluation
 
 正式阶段每个 anchor：
 
-- 50 accepted Grasp-OOD suffixes，完整 episode only；
+- 30 accepted Grasp-OOD suffixes，完整 episode only；
 - 与固定 128-ID dataset 组合，source-balanced `1:1`；
 - 在所有 anchor 之间选择同一 exact whole-episode expert-action budget；
 - 从同一 immutable checkpoint 独立训练 3 个 seeds，2500 update steps；

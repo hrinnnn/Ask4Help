@@ -76,9 +76,9 @@
       "seed_start": 78100
     },
     "formal": {
-      "target_accepted_per_anchor": 50,
-      "max_attempts_per_anchor": 100,
-      "seed_start": 78200,
+      "target_accepted_per_anchor": 30,
+      "max_attempts_per_anchor": 80,
+      "seed_start": 78300,
       "training_seeds": [9301, 9302, 9303],
       "training_steps": 2500,
       "evaluation_episodes_per_split": 100,

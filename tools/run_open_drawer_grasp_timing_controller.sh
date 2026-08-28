@@ -4,7 +4,9 @@ set -u
 ROOT=${OPEN_DRAWER_ROOT:-/data/zhaozhixuan/Ask4Help-open-drawer}
 PY=${OPEN_DRAWER_PYTHON:-/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python}
 PLANNER=${PANDA_PLANNER_PYTHON:-/data/zhaozhixuan/simplerenv_ms3/env/bin/python}
-RUN=${OPEN_DRAWER_TIMING_ROOT:-$ROOT/results/open_drawer_timing_grasp_ood_v1}
+RUN=${OPEN_DRAWER_TIMING_ROOT:-$ROOT/results/open_drawer_grasp_timing_sweep_v1}
+STAGE_DIR=${OPEN_DRAWER_TIMING_STAGE_DIR:-diagnostic}
+COMPLETE_MARKER=${OPEN_DRAWER_TIMING_COMPLETE_MARKER:-DIAGNOSTIC_COLLECTION_COMPLETE}
 CHECKPOINT=${OPEN_DRAWER_TIMING_CHECKPOINT:?set OPEN_DRAWER_TIMING_CHECKPOINT}
 PI05_BASE=${OPEN_DRAWER_TIMING_PI05_BASE:?set OPEN_DRAWER_TIMING_PI05_BASE}
 NORM=${OPEN_DRAWER_TIMING_NORM:?set OPEN_DRAWER_TIMING_NORM}
@@ -18,7 +20,7 @@ SEED_START=${OPEN_DRAWER_TIMING_SEED_START:-78100}
 STATE=$RUN/pipeline_state.json
 LOG=$RUN/controller.log
 
-if [[ -e "$RUN/DIAGNOSTIC_COLLECTION_COMPLETE" || -e "$RUN/PIPELINE_COMPLETE" ]]; then
+if [[ -e "$RUN/$COMPLETE_MARKER" || -e "$RUN/PIPELINE_COMPLETE" ]]; then
   echo "timing controller already completed: $RUN" >&2
   exit 2
 fi
@@ -26,7 +28,7 @@ if [[ -e "$RUN" && -n "$(find "$RUN" -mindepth 1 -maxdepth 1 -print -quit 2>/dev
   echo "refusing to reuse non-empty timing root: $RUN" >&2
   exit 2
 fi
-mkdir -p "$RUN/diagnostic"
+mkdir -p "$RUN/$STAGE_DIR"
 
 write_state() {
   local stage=$1 status=$2 detail=${3:-}
@@ -38,7 +40,7 @@ write_state checkpoint_and_asset_audit running "base=$CHECKPOINT"
 
 for index in "${!ANCHORS[@]}"; do
   step=${ANCHORS[$index]}
-  out=$RUN/diagnostic/anchor_$step
+  out=$RUN/$STAGE_DIR/anchor_$step
   if [[ -e "$out/COLLECTION_COMPLETE" ]]; then
     echo "anchor=$step already complete; keeping evidence"
     continue
@@ -72,15 +74,15 @@ for index in "${!ANCHORS[@]}"; do
   sleep 5
 done
 
-write_state diagnostic_artifact_audit running "anchors=${ANCHORS[*]}"
+write_state "${STAGE_DIR}_artifact_audit" running "anchors=${ANCHORS[*]}"
 AUDIT_PYTHON="$PY" "$PY" -u "$ROOT/tools/audit_open_drawer_grasp_timing.py" \
-  --root "$RUN/diagnostic" --anchors "${ANCHORS[@]}" --target "$TARGET" \
-  > "$RUN/diagnostic_audit.log" 2>&1
+  --root "$RUN/$STAGE_DIR" --anchors "${ANCHORS[@]}" --target "$TARGET" \
+  > "$RUN/${STAGE_DIR}_audit.log" 2>&1
 rc=$?
-if [[ $rc -ne 0 || ! -e "$RUN/diagnostic/AUDIT_PASS" ]]; then
-  write_state diagnostic_artifact_audit failed "audit_rc=$rc"
+if [[ $rc -ne 0 || ! -e "$RUN/$STAGE_DIR/AUDIT_PASS" ]]; then
+  write_state "${STAGE_DIR}_artifact_audit" failed "audit_rc=$rc"
   exit 1
 fi
-(cd "$RUN" && printf '%s\n' 'diagnostic collection and independent artifact audit passed' > DIAGNOSTIC_COLLECTION_COMPLETE)
-write_state diagnostic_fixed_timing_collection complete "artifact audit passed"
-echo "OPEN_DRAWER_GRASP_TIMING_DIAGNOSTIC_COMPLETE"
+(cd "$RUN" && printf '%s\n' "${STAGE_DIR} collection and independent artifact audit passed" > "$COMPLETE_MARKER")
+write_state "${STAGE_DIR}_collection" complete "artifact audit passed"
+echo "OPEN_DRAWER_GRASP_TIMING_${STAGE_DIR^^}_COMPLETE"
