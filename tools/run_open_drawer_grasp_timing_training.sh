@@ -9,6 +9,8 @@ MODEL=${OPEN_DRAWER_TIMING_CHECKPOINT:?set OPEN_DRAWER_TIMING_CHECKPOINT}
 ID_DATASET=${OPEN_DRAWER_TIMING_ID_DATASET:?set OPEN_DRAWER_TIMING_ID_DATASET}
 NORM=${OPEN_DRAWER_TIMING_NORM:?set OPEN_DRAWER_TIMING_NORM}
 BUDGET_ROOT=${OPEN_DRAWER_TIMING_BUDGET_ROOT:-$RUN/formal_budget}
+RAY_BASE=${OPEN_DRAWER_TIMING_RAY_BASE:-/data/odray_open_drawer_timing}
+TMP_BASE=${OPEN_DRAWER_TIMING_TMP_BASE:-/tmp/od_open_drawer_timing}
 STEPS=${OPEN_DRAWER_TIMING_TRAIN_STEPS:-2500}
 SEEDS=(9301 9302 9303)
 GPUS=(0 1 2)
@@ -21,7 +23,7 @@ if [[ ! -e "$BUDGET_ROOT/BUDGET_AUDIT_PASS" ]]; then
   printf '%s\n' '{"stage":"training","status":"failed","detail":"missing exact budget audit"}' > "$STATE"
   exit 1
 fi
-mkdir -p "$RUN/training" "$RUN/training_logs" "$RUN/runtime/ray" "$RUN/runtime/tmp"
+mkdir -p "$RUN/training" "$RUN/training_logs" "$RAY_BASE" "$TMP_BASE"
 
 write_state() {
   printf '%s\n' "{\"format\":\"open_drawer_grasp_timing_training_v1\",\"stage\":\"$1\",\"status\":\"$2\",\"detail\":\"${3:-}\",\"updated_at\":\"$(date -Is)\"}" > "$STATE"
@@ -59,8 +61,8 @@ train_one() {
     OPEN_DRAWER_TRAIN_SEED="$seed" OPEN_DRAWER_RESUME_DIR="" \
     HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false \
     HF_DATASETS_CACHE="$RUN/runtime/hf_datasets" HF_HOME="$RUN/runtime/hf_home" \
-    RAY_TMPDIR="$RUN/runtime/ray/${condition}_seed_${seed}" \
-    TMPDIR="$RUN/runtime/tmp/${condition}_seed_${seed}" PYTHONUNBUFFERED=1 \
+    RAY_TMPDIR="$RAY_BASE/${condition}_${seed}" \
+    TMPDIR="$TMP_BASE/${condition}_${seed}" PYTHONUNBUFFERED=1 \
     taskset -c "$cpuset" "$PY" "$RL/examples/sft/train_vla_sft.py" \
       --config-path "$RL/examples/sft/config" \
       --config-name open_drawer_retrieve_place_dagger_sft_openpi_pi05 \
