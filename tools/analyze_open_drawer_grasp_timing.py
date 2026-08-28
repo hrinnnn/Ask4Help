@@ -73,6 +73,7 @@ def main() -> None:
     parser.add_argument("--reference-anchor", type=int, default=0)
     parser.add_argument("--anchors", type=int, nargs="+", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--policy-only-root", type=Path)
     parser.add_argument("--quantile", type=float, default=0.95)
     parser.add_argument("--persistence", type=int, default=2)
     args = parser.parse_args()
@@ -141,6 +142,29 @@ def main() -> None:
             "phase_counts": {phase: phases.count(phase) for phase in sorted(set(phases))},
             "rows": rows_out,
         })
+    policy_only_summary: dict[str, Any] | None = None
+    if args.policy_only_root is not None:
+        policy_rows: list[dict[str, Any]] = []
+        for path in sorted((args.policy_only_root / "episodes").glob("episode_*/")):
+            context, rows, reset = load_episode(path)
+            ref_index = _nearest_reference(context, references)
+            ref_rows = references[ref_index][1]
+            limit = min(len(rows), len(ref_rows))
+            steps = list(range(0, limit, 5))
+            values = [float(np.linalg.norm(_feature(rows[s]) - _feature(ref_rows[s]))) for s in steps]
+            crossing = _persistent_crossing(values, steps, threshold, args.persistence)
+            policy_rows.append({"seed": reset.get("seed"), "crossing_step": crossing, "steps": steps, "d_path": values, "reference_index": ref_index})
+        crossings = [row["crossing_step"] for row in policy_rows if row["crossing_step"] is not None]
+        policy_only_summary = {
+            "episodes": len(policy_rows),
+            "crossing_observed": len(crossings),
+            "crossing_observed_rate": len(crossings) / len(policy_rows) if policy_rows else None,
+            "crossing_median": float(median(crossings)) if crossings else None,
+            "crossing_p25": float(np.quantile(crossings, 0.25)) if crossings else None,
+            "crossing_p75": float(np.quantile(crossings, 0.75)) if crossings else None,
+            "rows": policy_rows,
+        }
+
     payload = {
         "format": "open_drawer_grasp_timing_d_path_summary_v1",
         "reference_anchor": args.reference_anchor,
@@ -151,6 +175,7 @@ def main() -> None:
         "persistence_decisions": args.persistence,
         "prefix_censored": True,
         "anchors": anchor_results,
+        "policy_only": policy_only_summary,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

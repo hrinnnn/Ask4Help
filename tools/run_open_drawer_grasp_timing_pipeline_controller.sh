@@ -12,6 +12,7 @@ STATE=$RUN/pipeline_supervisor_state.json
 LOG=$RUN/pipeline_supervisor.log
 FORMAL=$RUN/formal
 BUDGET=$RUN/formal_budget
+POLICY_ONLY=$RUN/policy_only_grasp_ood
 ANCHORS=(0 50 80 120 160 220)
 TRAIN_SEEDS=(9301 9302 9303)
 EVAL_GPUS=(0 1 2)
@@ -40,8 +41,31 @@ done
 
 write_state formal_collection_audit running denominator_and_evidence
 "$PY" -u "$ROOT/tools/audit_open_drawer_grasp_timing.py" --root "$FORMAL" --anchors "${ANCHORS[@]}" --target 30 > "$RUN/formal_audit.log" 2>&1 || fail formal_collection_audit "audit_failed"
+if [[ ! -e "$POLICY_ONLY/POLICY_ONLY_COMPLETE" ]]; then
+  if [[ -e "$POLICY_ONLY" && -n "$(find "$POLICY_ONLY" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
+    fail policy_only_timeline "partial_policy_only_output_exists"
+  fi
+  write_state policy_only_timeline running "20 Grasp-OOD policy-only episodes"
+  OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 CUDA_VISIBLE_DEVICES=0 \
+    ASK4HELP_RLINF_ROOT="$ROOT/RLinf" PYTHONPATH="$ROOT:$ROOT/RLinf" \
+    HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONUNBUFFERED=1 \
+    taskset -c 0-19 "$PY" -u "$ROOT/tools/collect_open_drawer_policy_only_timeline.py" \
+      --checkpoint "$MODEL" --pi05-base "$PI05_BASE" --norm-stats "$NORM" \
+      --output-root "$POLICY_ONLY" --episodes 20 --seed 78700 > "$RUN/policy_only.log" 2>&1 || true
+  "$PY" - "$POLICY_ONLY" <<'PY'
+import json, sys
+from pathlib import Path
+root=Path(sys.argv[1])
+summary=root/"summary.json"
+if not summary.is_file(): raise SystemExit("missing policy-only summary")
+d=json.loads(summary.read_text())
+if d.get("episodes") != 20 or len(d.get("rows",[])) != 20 or len(list((root/"videos").glob("*.mp4"))) != 20:
+    raise SystemExit("policy-only denominator/artifact mismatch")
+(root/"POLICY_ONLY_COMPLETE").write_text("20 policy-only task-state timelines complete\n")
+PY
+fi
 write_state d_path_analysis running prefix_and_reference
-CUDA_VISIBLE_DEVICES=0 "$PY" -u "$ROOT/tools/analyze_open_drawer_grasp_timing.py" --root "$FORMAL" --reference-anchor 0 --anchors "${ANCHORS[@]}" --output "$FORMAL/d_path_summary.json" > "$RUN/d_path_analysis.log" 2>&1 || fail d_path_analysis "analysis_failed"
+CUDA_VISIBLE_DEVICES=0 "$PY" -u "$ROOT/tools/analyze_open_drawer_grasp_timing.py" --root "$FORMAL" --reference-anchor 0 --anchors "${ANCHORS[@]}" --policy-only-root "$POLICY_ONLY" --output "$FORMAL/d_path_summary.json" > "$RUN/d_path_analysis.log" 2>&1 || fail d_path_analysis "analysis_failed"
 
 if [[ ! -e "$BUDGET/BUDGET_AUDIT_PASS" ]]; then
   write_state exact_budget_selection running all_complete_anchor_datasets
