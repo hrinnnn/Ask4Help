@@ -217,8 +217,8 @@ def model_target_to_panda_joint_action(
         result, success, _error = pinocchio.compute_inverse_kinematics(
             link_names.index(tcp_link_name),
             target_pose,
-            initial_qpos=current[:7],
-            active_qmask=np.ones(7, dtype=np.int32),
+            initial_qpos=current,
+            active_qmask=np.asarray([1] * 7 + [0, 0], dtype=np.int32),
             max_iterations=100,
             dt=0.1,
             damp=1e-6,

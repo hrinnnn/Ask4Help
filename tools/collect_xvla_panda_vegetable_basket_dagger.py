@@ -64,8 +64,8 @@ def target_to_joint_action(env, model_action: np.ndarray, pinocchio, tcp_index: 
         result, success, _error = pinocchio.compute_inverse_kinematics(
             tcp_index,
             target_pose,
-            initial_qpos=current[:7],
-            active_qmask=np.ones(7, dtype=np.int32),
+            initial_qpos=current,
+            active_qmask=np.asarray([1] * 7 + [0, 0], dtype=np.int32),
             max_iterations=100,
             dt=0.1,
             damp=1e-6,
