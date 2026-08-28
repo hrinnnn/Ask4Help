@@ -102,6 +102,8 @@ pose-only 结果并单独报告 contact/progress auxiliary channel，不调整 p
 正式阶段每个 anchor：
 
 - 30 accepted Grasp-OOD suffixes，完整 episode only；
+- 六个 anchor 的共同专家动作预算冻结为 `5006`，由完整 episode length 的最大共同可达
+  exact sum 决定，不根据 SR 或 D-path 结果调整；
 - 与固定 128-ID dataset 组合，source-balanced `1:1`；
 - 在所有 anchor 之间选择同一 exact whole-episode expert-action budget；
 - 从同一 immutable checkpoint 独立训练 3 个 seeds，2500 update steps；

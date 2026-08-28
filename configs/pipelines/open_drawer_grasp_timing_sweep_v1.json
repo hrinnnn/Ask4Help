@@ -79,6 +79,8 @@
       "target_accepted_per_anchor": 30,
       "max_attempts_per_anchor": 80,
       "seed_start": 78300,
+      "common_expert_action_budget": 5006,
+      "budget_selection_rule": "maximum common exact sum over complete episode lengths, frozen before training",
       "training_seeds": [9301, 9302, 9303],
       "training_steps": 2500,
       "evaluation_episodes_per_split": 100,

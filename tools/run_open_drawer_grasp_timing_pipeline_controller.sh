@@ -15,6 +15,7 @@ FORMAL=${OPEN_DRAWER_TIMING_FORMAL_ROOT:-$RUN/formal}
 BUDGET=${OPEN_DRAWER_TIMING_BUDGET_ROOT:-$RUN/formal_budget}
 POLICY_ONLY=${OPEN_DRAWER_TIMING_POLICY_ONLY_ROOT:-$RUN/policy_only_grasp_ood}
 FORMAL_MARKER=${OPEN_DRAWER_TIMING_FORMAL_MARKER:-$RUN/TIMING_COLLECTION_COMPLETE}
+BUDGET_VALUE=${OPEN_DRAWER_TIMING_BUDGET:-5006}
 ANCHORS=(0 50 80 120 160 220)
 TRAIN_SEEDS=(9301 9302 9303)
 EVAL_GPU=4
@@ -77,7 +78,7 @@ if [[ ! -e "$BUDGET/BUDGET_AUDIT_PASS" ]]; then
   if [[ -e "$BUDGET" && -n "$(find "$BUDGET" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
     fail exact_budget_selection "partial_budget_output_exists"
   fi
-  args=(--output-root "$BUDGET")
+  args=(--output-root "$BUDGET" --budget "$BUDGET_VALUE")
   for step in "${ANCHORS[@]}"; do
     args+=(--condition "anchor_${step}=$FORMAL/anchor_${step}/lerobot_dataset")
   done
