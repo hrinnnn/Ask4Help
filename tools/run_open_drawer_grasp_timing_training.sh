@@ -67,7 +67,7 @@ train_one() {
       --config-path "$RL/examples/sft/config" \
       --config-name open_drawer_retrieve_place_dagger_sft_openpi_pi05 \
       runner.max_steps="$STEPS" runner.save_interval=500 \
-      actor.optim.total_training_steps="$STEPS" \
+      actor.optim.total_training_steps="$STEPS" runner.resume_dir=null \
       > "$log" 2>&1 &
   local pid=$!
   echo "$pid" > "$out/train.pid"
