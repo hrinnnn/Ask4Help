@@ -113,6 +113,11 @@ pose-only 结果并单独报告 contact/progress auxiliary channel，不调整 p
 - 主 endpoint 为 strict OpenDrawer success，辅助报告 drawer-opened、grasp、lift、
   in-target rates。
 
+在训练过程中，独立的 OOD20 probe controller 会对每个已经完成的 timing checkpoint
+运行 20 条 Grasp-OOD episode（GPU2/CPU40--59，seed 从 79000 起）。该 probe 只用于
+提前观察已训练模型的 OOD 行为，拥有独立目录和分母，不替代正式的 100-ID/100-OOD
+评估，也不参与 timing anchor 或 D-path 阈值选择。
+
 主表为：
 
 | Timing | (D/\tau_D) | (T_g-T_D) | EAS | DCA | ID SR | Grasp-OOD SR |
