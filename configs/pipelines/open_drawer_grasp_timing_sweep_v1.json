@@ -14,6 +14,7 @@
   "budget_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry3/formal_budget",
   "active_stage": "matched_budget_training",
   "source_commit": "244a1ed",
+  "parallel_helper_source_commit": "6adbe09",
   "runtime": {
     "source_root": "/data/zhaozhixuan/Ask4Help-open-drawer",
     "rlinf_root": "/data/zhaozhixuan/Ask4Help-open-drawer/RLinf",
@@ -22,6 +23,13 @@
     "gpu": 4,
     "cpu_set": "80-99",
     "sim_backend": "physx_cpu"
+  },
+  "training_parallelism": {
+    "max_concurrent_jobs": 2,
+    "gpu_pool": [0, 4],
+    "cpu_sets": {"0": "0-19", "4": "80-99"},
+    "ray_object_store_per_job_gb": 200,
+    "schedule": "GPU4 keeps the active serial controller order; GPU0 helper runs only reserved future jobs and writes per-model TRAINING_COMPLETE markers"
   },
   "base_policy": {
     "model_family": "pi0.5",
