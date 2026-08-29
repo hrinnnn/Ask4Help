@@ -41,6 +41,7 @@
 - `run_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1/`
 - `active_execution_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/`; formal collection is reused read-only from `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal/`, policy-only D-path calibration from retry2, and exact 5006-action budget from retry3
 - `auxiliary_ood20_probe`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/ood20_probe/`; 20 Grasp-OOD episodes per completed model on the first audited idle GPU among GPU2/5 (CPU40-59), diagnostic only and separate from formal 100-episode denominators
+- `priority_ood20_gate_20260829`: 用户最新决定：每个新完成的 timing checkpoint 先完成对应 20 条 Grasp-OOD 诊断评测并通过独立产物审计，再启动下一个 checkpoint 训练；探针资源等待时训练停在边界，seed/anchor/budget/success predicate 与已登记 GPU 候选不变，正式100-ID/100-OOD顺序与分母不变
 - `manifest`: `configs/pipelines/open_drawer_grasp_timing_sweep_v1.json`
 - `plan`: `docs/experiment_management/plans/OpenDrawer_Grasp_Timing_Sweep.md`
 - `source_commit`: `244a1ed`; fixed-timing collector and timing controllers are synced from the local GitHub branch; parallel helper is `6adbe09` and the OOD20 probe controller is `c425fa7`, both synced to the server source tree

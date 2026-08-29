@@ -40,6 +40,16 @@
     "output_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/ood20_probe",
     "purpose": "auxiliary early OOD readout; uses the first audited idle candidate; never replaces formal 100-ID/100-Grasp-OOD evaluation or final denominator"
   },
+  "priority_ood20_gate": {
+    "enabled": true,
+    "ordering": "after_each_final_timing_checkpoint_before_next_training_job",
+    "marker_template": "ood20_probe/{condition}/seed_{seed}/OOD20_COMPLETE",
+    "required_before_next_training": true,
+    "evaluation": "diagnostic_ood20",
+    "resource_scope": "existing diagnostic_ood20_probe GPU candidates only",
+    "formal_evaluation_unchanged": true,
+    "decision_recorded": "2026-08-29 user decision: evaluate a newly completed checkpoint first; do not rush the next checkpoint training"
+  },
   "base_policy": {
     "model_family": "pi0.5",
     "checkpoint": "/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000",

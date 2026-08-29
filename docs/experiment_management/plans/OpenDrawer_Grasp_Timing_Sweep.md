@@ -118,6 +118,13 @@ pose-only 结果并单独报告 contact/progress auxiliary channel，不调整 p
 提前观察已训练模型的 OOD 行为，拥有独立目录和分母，不替代正式的 100-ID/100-OOD
 评估，也不参与 timing anchor 或 D-path 阈值选择。
 
+自 2026-08-29 起，用户明确要求“出现新的 checkpoint 后先评估，不要急着启动下一个
+checkpoint 的训练”。因此训练控制器在每个最终 `global_step_2500` checkpoint 写出后，
+必须等待对应的 `ood20_probe/{condition}/seed_{seed}/OOD20_COMPLETE`，通过该 20 条
+诊断评测的独立产物审计后才可启动下一个 timing job。若探针资源暂时不可用，训练保持
+等待而不改变 seed、anchor、预算、success predicate 或资源候选；若探针失败则 fail closed，
+不把中间 checkpoint 当作可报告的 SR。正式 100-ID/100-Grasp-OOD 评估顺序和分母不变。
+
 主表为：
 
 | Timing | (D/\tau_D) | (T_g-T_D) | EAS | DCA | ID SR | Grasp-OOD SR |

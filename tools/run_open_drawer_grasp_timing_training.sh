@@ -17,6 +17,7 @@ SEEDS=(9301 9302 9303)
 # by other workloads; run timing updates sequentially on the verified idle GPU4.
 GPU=4
 CPU_SET=80-99
+PRIORITY_OOD20_GATE=${OPEN_DRAWER_PRIORITY_OOD20_GATE:-1}
 ANCHORS=(0 50 80 120 160 220)
 STATE=$RUN/training_pipeline_state.json
 LOG=$RUN/training_controller.log
@@ -29,6 +30,24 @@ mkdir -p "$RUN/training" "$RUN/training_logs" "$RAY_BASE" "$TMP_BASE"
 
 write_state() {
   printf '%s\n' "{\"format\":\"open_drawer_grasp_timing_training_v1\",\"stage\":\"$1\",\"status\":\"$2\",\"detail\":\"${3:-}\",\"updated_at\":\"$(date -Is)\"}" > "$STATE"
+}
+
+wait_for_priority_ood20() {
+  local condition=$1 seed=$2
+  case "$PRIORITY_OOD20_GATE" in
+    1|true|TRUE|yes|YES) ;;
+    *) return 0 ;;
+  esac
+  local marker="$RUN/ood20_probe/$condition/seed_${seed}/OOD20_COMPLETE"
+  while [[ ! -f "$marker" ]]; do
+    if [[ -e "$RUN/OOD20_PROBE_FAILED" ]]; then
+      write_state "waiting_ood20_${condition}_seed_${seed}" failed "priority_probe_failed"
+      return 1
+    fi
+    write_state "waiting_ood20_${condition}_seed_${seed}" waiting "priority OOD20 audit required before next training job"
+    sleep 300
+  done
+  return 0
 }
 
 train_one() {
@@ -51,6 +70,7 @@ train_one() {
   if [[ -f "$checkpoint" ]]; then
     printf '%s\n' "checkpoint already present: $checkpoint"
     printf '%s\n' 'training checkpoint verified' > "$out/TRAINING_COMPLETE"
+    wait_for_priority_ood20 "$condition" "$seed" || return 1
     return 0
   fi
   if [[ -e "$out" && -n "$(find "$out" -mindepth 1 -maxdepth 1 -print -quit 2>/dev/null)" ]]; then
@@ -85,6 +105,7 @@ train_one() {
     return 1
   fi
   printf '%s\n' "training checkpoint verified rc=$rc" > "$out/TRAINING_COMPLETE"
+  wait_for_priority_ood20 "$condition" "$seed" || return 1
   return 0
 }
 
