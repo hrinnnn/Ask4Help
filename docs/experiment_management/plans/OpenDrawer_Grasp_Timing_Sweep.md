@@ -143,6 +143,13 @@ adaptive formal comparison。20-OOD 仍不替代最终 100-ID/100-Grasp-OOD 分�
 冻结训练 seed `9301`，以避免 seed 差异混入 timing 效应；因此最终比较的单位是六个
 anchor 模型，而不是 18 个 seed replicate。旧 retry5 的多 seed 结果仅作 diagnostic。
 
+自适应训练完成后，持久化的 `run_open_drawer_adaptive_formal_eval_controller.sh` 会按
+anchor 顺序对每个模型运行冻结的 `100` 条 ID 与 `100` 条 Grasp-OOD rollout；每一对
+评测在一张重新审计的空闲 GPU 上完成，ID/OOD 使用不重叠的 seed 区间。评测结束后由
+`summarize_open_drawer_adaptive_timing.py` 独立核对 checkpoint、视频/actions/states/
+timeline 分母、D-path 与 intervention-quality 指标，只有 reconciliation 通过才写入
+`INDEPENDENT_RECONCILIATION_COMPLETE` 和最终报告。
+
 主表为：
 
 | Timing | (D/\tau_D) | (T_g-T_D) | EAS | DCA | ID SR | Grasp-OOD SR |

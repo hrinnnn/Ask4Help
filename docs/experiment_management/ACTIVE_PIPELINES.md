@@ -46,6 +46,7 @@
 - `adaptive_training_policy_20260830`: 用户新增规则：每个 checkpoint 至少 5000 步；20 条 Grasp-OOD 严格 SR `<=40%` 时每次追加 2500 步，直到首次 `>40%`；冻结该累计步数供后续所有 checkpoint 使用，并严格按“训练→20-OOD 审计→下一训练”交替。retry5 的 2500-step 结果仅 diagnostic。
 - `one_model_per_anchor_20260830`: 用户进一步确定每个 anchor 只训练一个模型，不再重复 seed；当前采用所有 anchor 共用冻结 seed `9301` 的映射，最终比较为 6 个 anchor 模型。每个模型至少5000步，首个 `>40%` 的累计步数冻结给后续 anchor；旧多seed结果不混入。
 - `adaptive_active_root_20260830`: adaptive 单 seed 训练/交替 OOD20 结果写入 retry6；pilot 首次 `>40%` 的累计步数写入 `adaptive_steps.json` 并冻结，后续 anchor 只训练该步数。训练池实时审计，最多一个自适应 job 并持有同一张卡完成 OOD20。
+- `adaptive_formal_eval_20260830`: adaptive 完成后由 `tools/run_open_drawer_adaptive_formal_eval_controller.sh` 按冻结步数逐 anchor 运行 100-ID/100-Grasp-OOD；`tools/summarize_open_drawer_adaptive_timing.py` 独立核对分母、checkpoint、D-path/EAS/DCA 和最终 reconciliation。该控制器不改变训练 seed、anchor、预算或成功定义。
 - `resource_preflight_20260830`: H20 两卡只读预检因缺少 OpenDrawer immutable 资产、rootfs 100% 满和其他进程占用而拒绝；5090 保持选中，adaptive 控制器等待无外部进程的实际空闲 GPU。
 - `manifest`: `configs/pipelines/open_drawer_grasp_timing_sweep_v1.json`
 - `plan`: `docs/experiment_management/plans/OpenDrawer_Grasp_Timing_Sweep.md`
