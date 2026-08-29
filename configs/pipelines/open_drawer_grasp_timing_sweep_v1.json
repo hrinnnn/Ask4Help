@@ -35,10 +35,10 @@
     "split": "grasp_ood",
     "episodes_per_completed_model": 20,
     "seed_start": 79000,
-    "gpu": 2,
+    "gpu_candidates": [2, 5],
     "cpu_set": "40-59",
     "output_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/ood20_probe",
-    "purpose": "auxiliary early OOD readout; never replaces formal 100-ID/100-Grasp-OOD evaluation or final denominator"
+    "purpose": "auxiliary early OOD readout; uses the first audited idle candidate; never replaces formal 100-ID/100-Grasp-OOD evaluation or final denominator"
   },
   "base_policy": {
     "model_family": "pi0.5",

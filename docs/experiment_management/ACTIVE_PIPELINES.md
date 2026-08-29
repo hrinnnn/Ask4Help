@@ -40,10 +40,10 @@
 - `next_stage`: `100-ID/100-Grasp-OOD evaluation -> independent reconciliation`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1/`
 - `active_execution_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/`; formal collection is reused read-only from `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal/`, policy-only D-path calibration from retry2, and exact 5006-action budget from retry3
-- `auxiliary_ood20_probe`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/ood20_probe/`; 20 Grasp-OOD episodes per completed model on GPU2/CPU40-59, diagnostic only and separate from formal 100-episode denominators
+- `auxiliary_ood20_probe`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/ood20_probe/`; 20 Grasp-OOD episodes per completed model on the first audited idle GPU among GPU2/5 (CPU40-59), diagnostic only and separate from formal 100-episode denominators
 - `manifest`: `configs/pipelines/open_drawer_grasp_timing_sweep_v1.json`
 - `plan`: `docs/experiment_management/plans/OpenDrawer_Grasp_Timing_Sweep.md`
-- `source_commit`: `244a1ed`; fixed-timing collector and timing controllers are synced from the local GitHub branch; parallel helper is `6adbe09` and the OOD20 probe controller is `3060c35`, both synced to the server source tree
+- `source_commit`: `244a1ed`; fixed-timing collector and timing controllers are synced from the local GitHub branch; parallel helper is `6adbe09` and the OOD20 probe controller is `c425fa7`, both synced to the server source tree
 - `base_checkpoint`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000`; its independent ID policy rollout is `61/100` with complete `100/100` videos/actions/states/timelines/reset metadata. It remains labeled preliminary (`>50%` diagnostic base), not `ID_BASE_VALIDATED`.
 - `task`: OpenDrawer `grasp_ood` (object yaw 80-100 degrees), max episode steps 400, execute horizon 5; current pure-policy audit is `96/100` drawer-opened, `11/100` ever-grasped, `0/100` strict success.
 - `timing_anchors`: provisional frozen diagnostic set `{0,50,80,120,160,220}` representing immediate, pre-open, post-open, object approach, grasp boundary, and post-failure recovery. These are not changed after observing downstream SR; any revision requires a new manifest.
