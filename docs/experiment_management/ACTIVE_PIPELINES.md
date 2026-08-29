@@ -35,17 +35,19 @@
 - `pipeline_id`: `open_drawer_grasp_timing_sweep_v1`
 - `authorized`: `true`; 用户已要求使用现有 ID success rate `>50%` checkpoint，固定 Grasp-OOD takeover timing 并训练/比较 downstream SR
 - `owner_thread`: `current-thread`; `owner_label`: `codex-open-drawer-grasp-timing-sweep`
-- `server`: `zhaozhixuan@111.198.58.150:12001`; matched-budget training now audits GPU ownership at each job boundary and acquires only actually idle cards from the 8-GPU pool, with at most 2 concurrent Ray jobs (user-authorized upper bound 4; GPUs with other processes remain protected)
-- `current_stage`: `matched_budget_training`
+- `server`: `zhaozhixuan@111.198.58.150:12001`; adaptive timing training audits GPU ownership at each job boundary and acquires only actually idle cards from the 8-GPU pool, with at most 2 concurrent Ray jobs (user-authorized upper bound 4; GPUs with other processes remain protected)
+- `current_stage`: `adaptive_single_seed_training`
 - `next_stage`: `100-ID/100-Grasp-OOD evaluation -> independent reconciliation`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1/`
-- `active_execution_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/`; formal collection is reused read-only from `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal/`, policy-only D-path calibration from retry2, and exact 5006-action budget from retry3
-- `auxiliary_ood20_probe`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/ood20_probe/`; 20 Grasp-OOD episodes per completed model on the first audited idle GPU among GPU2/5 (CPU40-59), diagnostic only and separate from formal 100-episode denominators
+- `active_execution_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry6_adaptive/`; retry5 multi-seed/2500-step results remain diagnostic; formal collection is reused read-only from `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal/`, policy-only D-path calibration from retry2, and exact 5006-action budget from retry3
+- `auxiliary_ood20_probe`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry6_adaptive/ood20_probe/`; 20 Grasp-OOD episodes after each adaptive checkpoint on the held audited GPU, diagnostic only and separate from formal 100-episode denominators
 - `priority_ood20_gate_20260829`: 用户最新决定：每个新完成的 timing checkpoint 先完成对应 20 条 Grasp-OOD 诊断评测并通过独立产物审计，再启动下一个 checkpoint 训练；探针资源等待时训练停在边界，seed/anchor/budget/success predicate 与已登记 GPU 候选不变，正式100-ID/100-OOD顺序与分母不变
-- `dynamic_gpu_policy_20260830`: 用户授权实时监测 GPU；最多使用 4 张实际空闲卡训练。当前因每个 Ray job 200GB `/dev/shm` 预算仍保持最多 2 个并发，训练池为 GPU0/1/3/4/6/7，并避让预留给 OOD20 探针的 GPU2/5；控制器按 GPU/CPU 映射加锁并在有其他进程时等待，禁止抢占。
+- `dynamic_gpu_policy_20260830`: 用户授权实时监测 GPU；最多使用 4 张实际空闲卡训练。adaptive 控制器逐 job 审计 8-GPU 池并持有一张卡完成训练/20-OOD 交替，严格单 job 以避免 `/dev/shm` 超额；任何有其他进程的 GPU 都保持保护。
+- `adaptive_training_policy_20260830`: 用户新增规则：每个 checkpoint 至少 5000 步；20 条 Grasp-OOD 严格 SR `<=40%` 时每次追加 2500 步，直到首次 `>40%`；冻结该累计步数供后续所有 checkpoint 使用，并严格按“训练→20-OOD 审计→下一训练”交替。retry5 的 2500-step 结果仅 diagnostic。
+- `one_model_per_anchor_20260830`: 用户进一步确定每个 anchor 只训练一个模型，不再重复 seed；当前采用所有 anchor 共用冻结 seed `9301` 的映射，最终比较为 6 个 anchor 模型。每个模型至少5000步，首个 `>40%` 的累计步数冻结给后续 anchor；旧多seed结果不混入。
 - `manifest`: `configs/pipelines/open_drawer_grasp_timing_sweep_v1.json`
 - `plan`: `docs/experiment_management/plans/OpenDrawer_Grasp_Timing_Sweep.md`
-- `source_commit`: `244a1ed`; fixed-timing collector and timing controllers are synced from the local GitHub branch; parallel helper is `6adbe09` and the OOD20 probe controller is `c425fa7`, both synced to the server source tree
+- `source_commit`: `244a1ed`; fixed-timing collector and timing inputs remain synced from the local GitHub branch; adaptive controller `run_open_drawer_adaptive_timing_controller.sh` is recorded in the manifest and synced to the server source tree
 - `base_checkpoint`: `/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000`; its independent ID policy rollout is `61/100` with complete `100/100` videos/actions/states/timelines/reset metadata. It remains labeled preliminary (`>50%` diagnostic base), not `ID_BASE_VALIDATED`.
 - `task`: OpenDrawer `grasp_ood` (object yaw 80-100 degrees), max episode steps 400, execute horizon 5; current pure-policy audit is `96/100` drawer-opened, `11/100` ever-grasped, `0/100` strict success.
 - `timing_anchors`: provisional frozen diagnostic set `{0,50,80,120,160,220}` representing immediate, pre-open, post-open, object approach, grasp boundary, and post-failure recovery. These are not changed after observing downstream SR; any revision requires a new manifest.

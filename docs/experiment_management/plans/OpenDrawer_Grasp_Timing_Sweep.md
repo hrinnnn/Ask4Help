@@ -1,6 +1,6 @@
 # OpenDrawer Grasp-OOD Controlled Timing Sweep
 
-**状态：已授权，正在进行 checkpoint/asset audit 后的 diagnostic 阶段。**
+**状态：已授权，adaptive 单模型/anchor 训练与交替 20-OOD 评测已冻结，正在等待动态 GPU 资源。**
 
 本 pipeline 只研究 OpenDrawerRetrievePlace 的 `grasp_ood` 条件：保持 handle、drawer、
 goal、robot、camera、prompt、norm、action contract 和 success predicate 不变，只把
@@ -130,6 +130,19 @@ shell，让正在计算的子进程完成当前 checkpoint，随后替换总控/
 的版本；不终止正在计算的子进程，不改变已登记 GPU 候选。该接管过程写入独立状态和日志，
 若边界 checkpoint 或旧 PID 校验失败则 fail closed。
 
+### 2026-08-30：自适应训练步数与交替评测
+
+用户进一步规定：每个 timing checkpoint 至少训练 `5000` 步；若 20 条 Grasp-OOD
+诊断评测的严格成功率仍为 `<=40%`，就在同一模型上继续增加 `2500` 步并再次评测。
+第一个严格成功率超过 `40%` 的模型所用的累计训练步数记为冻结步数 `S^*`；之后所有
+anchor/seed 都训练到相同的 `S^*`，每个 checkpoint 评测完成后才启动下一个训练作业。
+该规则在观察新结果前预先冻结；旧 retry5 的 2500-step 结果只作 diagnostic，不混入
+adaptive formal comparison。20-OOD 仍不替代最终 100-ID/100-Grasp-OOD 分母。
+
+每个 anchor 只训练一个模型，不再对同一 anchor 重复多个 seed。所有 anchor 使用同一个
+冻结训练 seed `9301`，以避免 seed 差异混入 timing 效应；因此最终比较的单位是六个
+anchor 模型，而不是 18 个 seed replicate。旧 retry5 的多 seed 结果仅作 diagnostic。
+
 主表为：
 
 | Timing | (D/\tau_D) | (T_g-T_D) | EAS | DCA | ID SR | Grasp-OOD SR |
@@ -144,7 +157,7 @@ shell，让正在计算的子进程完成当前 checkpoint，随后替换总控/
 
 1. 所有 anchor 的 raw/accepted denominator 与 evidence audit；
 2. exact budget selection manifest；
-3. 所有 timing policy 的 3-seed training checkpoints 和 reload/forward audit；
+3. 六个 timing anchor 的单模型 training checkpoints 和 reload/forward audit；
 4. 所有 ID/OOD evaluation 的 100/100 video/action/state/timeline evidence；
 5. D-path、EAS、DCA、SR 汇总和独立 reconciliation report。
 
