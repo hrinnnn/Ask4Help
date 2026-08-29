@@ -7,7 +7,7 @@ RUN=${OPEN_DRAWER_TIMING_ROOT:?set OPEN_DRAWER_TIMING_ROOT}
 MODEL=${OPEN_DRAWER_TIMING_CHECKPOINT:?set OPEN_DRAWER_TIMING_CHECKPOINT}
 PI05_BASE=${OPEN_DRAWER_TIMING_PI05_BASE:?set OPEN_DRAWER_TIMING_PI05_BASE}
 NORM=${OPEN_DRAWER_TIMING_NORM:?set OPEN_DRAWER_TIMING_NORM}
-GPU=${OPEN_DRAWER_OOD20_GPU:-2}
+GPU_CANDIDATES=(${OPEN_DRAWER_OOD20_GPUS:-"2 5"})
 CPU_SET=${OPEN_DRAWER_OOD20_CPU_SET:-40-59}
 SEED_START=${OPEN_DRAWER_OOD20_SEED_START:-79000}
 PROBE_ROOT="$RUN/ood20_probe"
@@ -60,21 +60,28 @@ PY
 }
 
 gpu_is_idle() {
+  local gpu=$1
   local used util uuid apps
-  read -r used util < <(nvidia-smi -i "$GPU" --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits | awk -F, '{gsub(/ /,"",$1); gsub(/ /,"",$2); print $1, $2}')
-  uuid=$(nvidia-smi -i "$GPU" --query-gpu=uuid --format=csv,noheader | tr -d " ")
+  read -r used util < <(nvidia-smi -i "$gpu" --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits | awk -F, '{gsub(/ /,"",$1); gsub(/ /,"",$2); print $1, $2}')
+  uuid=$(nvidia-smi -i "$gpu" --query-gpu=uuid --format=csv,noheader | tr -d " ")
   apps=$(nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name,used_memory --format=csv,noheader | grep "$uuid" || true)
   [[ "$used" -le 100 && "$util" -le 5 && -z "$apps" ]]
 }
 
 wait_for_gpu() {
-  while ! gpu_is_idle; do
-    write_state "$1" waiting "GPU$GPU not idle"
+  while true; do
+    for candidate in "${GPU_CANDIDATES[@]}"; do
+      if gpu_is_idle "$candidate"; then
+        GPU=$candidate
+        return 0
+      fi
+    done
+    write_state "$1" waiting "candidate GPUs ${GPU_CANDIDATES[*]} not idle"
     sleep 300
   done
 }
 
-write_state preflight running "20-OOD probe per completed timing model on GPU$GPU"
+write_state preflight running "20-OOD probe per completed timing model; candidate GPUs=${GPU_CANDIDATES[*]}"
 index=0
 for anchor in "${ANCHORS[@]}"; do
   for seed in "${SEEDS[@]}"; do
