@@ -16,7 +16,9 @@ SEEDS=(9301 9302 9303)
 # The user authorized up to four actually idle GPUs.  Each job still acquires
 # one audited idle card at launch; two controllers are retained because each
 # Ray job reserves 200 GB of /dev/shm on this host.
-GPU_POOL=(${OPEN_DRAWER_TIMING_GPU_POOL:-"0 1 2 3 4 5 6 7"})
+# GPU2/5 are pre-registered for the diagnostic OOD20 probe; keep them out of
+# the training pool while that controller is active to avoid a race.
+GPU_POOL=(${OPEN_DRAWER_TIMING_GPU_POOL:-"0 1 3 4 6 7"})
 LOCK_ROOT=${OPEN_DRAWER_TIMING_GPU_LOCK_ROOT:-$RUN/.gpu_locks}
 PRIORITY_OOD20_GATE=${OPEN_DRAWER_PRIORITY_OOD20_GATE:-1}
 ANCHORS=(0 50 80 120 160 220)

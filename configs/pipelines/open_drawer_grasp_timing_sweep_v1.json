@@ -28,7 +28,8 @@
   "training_parallelism": {
     "max_concurrent_jobs": 2,
     "authorized_max_cards": 4,
-    "gpu_pool": [0, 1, 2, 3, 4, 5, 6, 7],
+    "gpu_pool": [0, 1, 3, 4, 6, 7],
+    "probe_reserved_gpu_candidates": [2, 5],
     "cpu_sets": {"0": "0-19", "1": "20-39", "2": "40-59", "3": "60-79", "4": "80-99", "5": "100-119", "6": "120-139", "7": "140-159"},
     "ray_object_store_per_job_gb": 200,
     "scheduler": "audited_idle_gpu_lock",
