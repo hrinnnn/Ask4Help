@@ -16,6 +16,7 @@
   "active_stage": "adaptive_single_seed_training",
   "source_commit": "244a1ed",
   "parallel_helper_source_commit": "6adbe09",
+  "adaptive_source_commit": "3be1672",
   "runtime": {
     "source_root": "/data/zhaozhixuan/Ask4Help-open-drawer",
     "rlinf_root": "/data/zhaozhixuan/Ask4Help-open-drawer/RLinf",
