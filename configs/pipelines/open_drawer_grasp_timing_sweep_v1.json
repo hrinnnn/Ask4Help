@@ -46,6 +46,7 @@
     "marker_template": "ood20_probe/{condition}/seed_{seed}/OOD20_COMPLETE",
     "required_before_next_training": true,
     "evaluation": "diagnostic_ood20",
+    "boundary_controller": "tools/run_open_drawer_priority_ood_gate_controller.sh",
     "resource_scope": "existing diagnostic_ood20_probe GPU candidates only",
     "formal_evaluation_unchanged": true,
     "decision_recorded": "2026-08-29 user decision: evaluate a newly completed checkpoint first; do not rush the next checkpoint training"

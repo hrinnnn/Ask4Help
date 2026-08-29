@@ -124,6 +124,10 @@ checkpoint 的训练”。因此训练控制器在每个最终 `global_step_2500
 诊断评测的独立产物审计后才可启动下一个 timing job。若探针资源暂时不可用，训练保持
 等待而不改变 seed、anchor、预算、success predicate 或资源候选；若探针失败则 fail closed，
 不把中间 checkpoint 当作可报告的 SR。正式 100-ID/100-Grasp-OOD 评估顺序和分母不变。
+当前正在运行的旧版控制器在该决定后由一次性的边界控制器安全接管：它只暂停训练父
+shell，让正在计算的子进程完成当前 checkpoint，随后替换总控/并行 helper 为包含等待门
+的版本；不终止正在计算的子进程，不改变已登记 GPU 候选。该接管过程写入独立状态和日志，
+若边界 checkpoint 或旧 PID 校验失败则 fail closed。
 
 主表为：
 
