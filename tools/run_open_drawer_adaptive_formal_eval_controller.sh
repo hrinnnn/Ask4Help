@@ -158,7 +158,7 @@ for index in "${!ANCHORS[@]}"; do
       "$PY" -u "$EVAL_WRAPPER" --root "$ROOT" --checkpoint "$checkpoint" \
       --pi05-base "$PI05_BASE" --norm-stats "$NORM" --evaluator "$EVALUATOR" \
       --output-root "$eval_root" --python "$PY" --episodes 100 \
-      --id-seed "$((78500 + index * 200))" --ood-seed "$((78600 + index * 200))" \
+      --id-seed "$((81000 + index * 200))" --ood-seed "$((81100 + index * 200))" \
       --gpu "$SELECTED_GPU" --cpu-set "$SELECTED_CPU_SET" \
       > "$RUN/logs/formal_eval_anchor_${anchor}_steps_${frozen_steps}.log" 2>&1; then
     fail "evaluation_anchor_${anchor}" "evaluator_failed"

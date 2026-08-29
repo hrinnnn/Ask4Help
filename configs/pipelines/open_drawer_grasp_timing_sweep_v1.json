@@ -85,8 +85,8 @@
     "models": "one per anchor, shared seed 9301",
     "splits": ["id", "grasp_ood"],
     "episodes_per_split": 100,
-    "id_seed_starts": [78500, 78700, 78900, 79100, 79300, 79500],
-    "grasp_ood_seed_starts": [78600, 78800, 79000, 79200, 79400, 79600],
+    "id_seed_starts": [81000, 81200, 81400, 81600, 81800, 82000],
+    "grasp_ood_seed_starts": [81100, 81300, 81500, 81700, 81900, 82100],
     "evaluation_order": "anchor order; each ID/OOD pair stays on one audited idle GPU",
     "completion_requires": [
       "six checkpoint markers with full_weights and DCP",
