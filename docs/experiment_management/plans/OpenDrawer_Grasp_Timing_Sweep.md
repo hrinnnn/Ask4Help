@@ -31,9 +31,10 @@ Grasp-OOD 的纯 policy rollout 应能够完成开抽屉前缀，但在抓取阶
 - norm：`/data/zhaozhixuan/Ask4Help-open-drawer/results/id_policy_training_v1/norm_stats_open_drawer_id_raw_v1`
 - pi0.5 base：`/data/zhaozhixuan/Ask4Help-open-drawer/results/model_cache/pi05_base_pytorch_v1`
 - runtime：`/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python`；planner 使用
-  `/data/zhaozhixuan/simplerenv_ms3/env/bin/python`；matched-budget training uses at most two concurrent
-  world-size-1 jobs on audited idle GPU4/CPU80--99 and GPU0/CPU0--19。每个 Ray 实例的对象存储配置为
-  200 GB；在 504 GB `/dev/shm` 下不再增加并发卡数。所有 seed、anchor、预算和训练步数保持不变。
+  `/data/zhaozhixuan/simplerenv_ms3/env/bin/python`；训练控制器在每个 job 启动前实时审计并锁定
+  实际空闲 GPU，最多同时运行两个 world-size-1 job（每个 Ray 实例对象存储 200 GB；在 504 GB
+  `/dev/shm` 通过四-job 审计前保持两-job上限）。用户授权的最多四卡只作为安全上限，绝不占用有其他
+  进程的 GPU；CPU sets 按 GPU 固定为 `0--19,20--39,...,140--159`。所有 seed、anchor、预算和训练步数保持不变。
 
 ## 3. 现有 OOD evidence
 

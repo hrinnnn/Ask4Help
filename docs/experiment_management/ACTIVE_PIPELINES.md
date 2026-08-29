@@ -35,13 +35,14 @@
 - `pipeline_id`: `open_drawer_grasp_timing_sweep_v1`
 - `authorized`: `true`; 用户已要求使用现有 ID success rate `>50%` checkpoint，固定 Grasp-OOD takeover timing 并训练/比较 downstream SR
 - `owner_thread`: `current-thread`; `owner_label`: `codex-open-drawer-grasp-timing-sweep`
-- `server`: `zhaozhixuan@111.198.58.150:12001`; matched-budget training now uses audited idle GPU4/CPU80-99 plus GPU0/CPU0-19 helper (maximum 2 concurrent jobs); GPUs1-3/5-7 remain protected by other workloads
+- `server`: `zhaozhixuan@111.198.58.150:12001`; matched-budget training now audits GPU ownership at each job boundary and acquires only actually idle cards from the 8-GPU pool, with at most 2 concurrent Ray jobs (user-authorized upper bound 4; GPUs with other processes remain protected)
 - `current_stage`: `matched_budget_training`
 - `next_stage`: `100-ID/100-Grasp-OOD evaluation -> independent reconciliation`
 - `run_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1/`
 - `active_execution_root`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/`; formal collection is reused read-only from `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal/`, policy-only D-path calibration from retry2, and exact 5006-action budget from retry3
 - `auxiliary_ood20_probe`: `/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5/ood20_probe/`; 20 Grasp-OOD episodes per completed model on the first audited idle GPU among GPU2/5 (CPU40-59), diagnostic only and separate from formal 100-episode denominators
 - `priority_ood20_gate_20260829`: 用户最新决定：每个新完成的 timing checkpoint 先完成对应 20 条 Grasp-OOD 诊断评测并通过独立产物审计，再启动下一个 checkpoint 训练；探针资源等待时训练停在边界，seed/anchor/budget/success predicate 与已登记 GPU 候选不变，正式100-ID/100-OOD顺序与分母不变
+- `dynamic_gpu_policy_20260830`: 用户授权实时监测 GPU；最多使用 4 张实际空闲卡训练。当前因每个 Ray job 200GB `/dev/shm` 预算仍保持最多 2 个并发，控制器按 GPU/CPU 映射加锁并在有其他进程时等待，禁止抢占。
 - `manifest`: `configs/pipelines/open_drawer_grasp_timing_sweep_v1.json`
 - `plan`: `docs/experiment_management/plans/OpenDrawer_Grasp_Timing_Sweep.md`
 - `source_commit`: `244a1ed`; fixed-timing collector and timing controllers are synced from the local GitHub branch; parallel helper is `6adbe09` and the OOD20 probe controller is `c425fa7`, both synced to the server source tree

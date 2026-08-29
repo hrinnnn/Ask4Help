@@ -13,10 +13,11 @@ RAY_BASE=${OPEN_DRAWER_TIMING_RAY_BASE:-/tmp/rayod}
 TMP_BASE=${OPEN_DRAWER_TIMING_TMP_BASE:-/tmp/timod}
 STEPS=${OPEN_DRAWER_TIMING_TRAIN_STEPS:-2500}
 SEEDS=(9301 9302 9303)
-# A live resource audit found GPU0 occupied by collection and GPUs1--3 owned
-# by other workloads; run timing updates sequentially on the verified idle GPU4.
-GPU=4
-CPU_SET=80-99
+# The user authorized up to four actually idle GPUs.  Each job still acquires
+# one audited idle card at launch; two controllers are retained because each
+# Ray job reserves 200 GB of /dev/shm on this host.
+GPU_POOL=(${OPEN_DRAWER_TIMING_GPU_POOL:-"0 1 2 3 4 5 6 7"})
+LOCK_ROOT=${OPEN_DRAWER_TIMING_GPU_LOCK_ROOT:-$RUN/.gpu_locks}
 PRIORITY_OOD20_GATE=${OPEN_DRAWER_PRIORITY_OOD20_GATE:-1}
 ANCHORS=(0 50 80 120 160 220)
 STATE=$RUN/training_pipeline_state.json
@@ -30,6 +31,66 @@ mkdir -p "$RUN/training" "$RUN/training_logs" "$RAY_BASE" "$TMP_BASE"
 
 write_state() {
   printf '%s\n' "{\"format\":\"open_drawer_grasp_timing_training_v1\",\"stage\":\"$1\",\"status\":\"$2\",\"detail\":\"${3:-}\",\"updated_at\":\"$(date -Is)\"}" > "$STATE"
+}
+
+cpu_set_for_gpu() {
+  case "$1" in
+    0) printf '%s\n' '0-19' ;;
+    1) printf '%s\n' '20-39' ;;
+    2) printf '%s\n' '40-59' ;;
+    3) printf '%s\n' '60-79' ;;
+    4) printf '%s\n' '80-99' ;;
+    5) printf '%s\n' '100-119' ;;
+    6) printf '%s\n' '120-139' ;;
+    7) printf '%s\n' '140-159' ;;
+    *) return 1 ;;
+  esac
+}
+
+gpu_is_idle() {
+  local gpu=$1 used util uuid apps
+  read -r used util < <(nvidia-smi -i "$gpu" --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits | awk -F, '{gsub(/ /,"",$1); gsub(/ /,"",$2); print $1, $2}')
+  uuid=$(nvidia-smi -i "$gpu" --query-gpu=uuid --format=csv,noheader | tr -d ' ')
+  apps=$(nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name,used_memory --format=csv,noheader | grep "$uuid" || true)
+  [[ "$used" -le 100 && "$util" -le 5 && -z "$apps" ]]
+}
+
+acquire_gpu() {
+  local gpu lock owner cpuset
+  mkdir -p "$LOCK_ROOT"
+  while true; do
+    for gpu in "${GPU_POOL[@]}"; do
+      gpu_is_idle "$gpu" || continue
+      lock="$LOCK_ROOT/gpu_$gpu"
+      if ! mkdir "$lock" 2>/dev/null; then
+        owner=$(cat "$lock/owner" 2>/dev/null || true)
+        if [[ -n "$owner" ]] && ! kill -0 "$owner" 2>/dev/null; then
+          rm -f "$lock/owner" 2>/dev/null || true
+          rmdir "$lock" 2>/dev/null || true
+        fi
+        continue
+      fi
+      cpuset=$(cpu_set_for_gpu "$gpu") || { rmdir "$lock"; continue; }
+      # Recheck after locking so a newly started external process is never
+      # treated as ours.
+      if ! gpu_is_idle "$gpu"; then
+        rmdir "$lock" 2>/dev/null || true
+        continue
+      fi
+      printf '%s\n' "$$" > "$lock/owner"
+      SELECTED_GPU=$gpu
+      SELECTED_CPU_SET=$cpuset
+      return 0
+    done
+    write_state waiting_for_idle_gpu waiting "gpu_pool=${GPU_POOL[*]}"
+    sleep 300
+  done
+}
+
+release_gpu() {
+  local gpu=$1 lock="$LOCK_ROOT/gpu_$1"
+  rm -f "$lock/owner" 2>/dev/null || true
+  rmdir "$lock" 2>/dev/null || true
 }
 
 wait_for_priority_ood20() {
@@ -109,15 +170,30 @@ train_one() {
   return 0
 }
 
-write_state preflight running "exact_budget=$BUDGET_ROOT"
+write_state preflight running "exact_budget=$BUDGET_ROOT gpu_pool=${GPU_POOL[*]}"
 for anchor in "${ANCHORS[@]}"; do
-  write_state "training_anchor_${anchor}" running "sequential_seeds=${SEEDS[*]} gpu=$GPU"
+  write_state "training_anchor_${anchor}" running "sequential_seeds=${SEEDS[*]} gpu_pool=${GPU_POOL[*]}"
   for seed in "${SEEDS[@]}"; do
-    train_one "$anchor" "$seed" "$GPU" "$CPU_SET" >> "$LOG" 2>&1 || {
+    condition="anchor_${anchor}"
+    checkpoint="$RUN/training/$condition/seed_$seed/run/checkpoints/global_step_$STEPS/actor/model_state_dict/full_weights.pt"
+    if [[ -f "$checkpoint" ]]; then
+      train_one "$anchor" "$seed" "" "" >> "$LOG" 2>&1 || {
+        write_state "training_anchor_${anchor}_seed_${seed}" failed "priority gate failed"
+        printf '%s\n' "anchor=$anchor seed=$seed priority gate failed" > "$RUN/TRAINING_FAILED"
+        exit 1
+      }
+      continue
+    fi
+    acquire_gpu
+    gpu=$SELECTED_GPU
+    cpuset=$SELECTED_CPU_SET
+    if ! train_one "$anchor" "$seed" "$gpu" "$cpuset" >> "$LOG" 2>&1; then
+      release_gpu "$gpu"
       write_state "training_anchor_${anchor}_seed_${seed}" failed "training failed"
       printf '%s\n' "anchor=$anchor seed=$seed training failed" > "$RUN/TRAINING_FAILED"
       exit 1
-    }
+    fi
+    release_gpu "$gpu"
   done
 done
 write_state all_timing_training complete "all anchors and seeds checkpointed"

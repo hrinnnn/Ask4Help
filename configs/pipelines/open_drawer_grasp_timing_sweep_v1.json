@@ -10,6 +10,7 @@
   "run_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1",
   "active_execution_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry5",
   "formal_collection_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal",
+  "formal_collection_marker": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/TIMING_COLLECTION_COMPLETE",
   "policy_only_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry2/policy_only_grasp_ood",
   "budget_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry3/formal_budget",
   "active_stage": "matched_budget_training",
@@ -26,10 +27,12 @@
   },
   "training_parallelism": {
     "max_concurrent_jobs": 2,
-    "gpu_pool": [0, 4],
-    "cpu_sets": {"0": "0-19", "4": "80-99"},
+    "authorized_max_cards": 4,
+    "gpu_pool": [0, 1, 2, 3, 4, 5, 6, 7],
+    "cpu_sets": {"0": "0-19", "1": "20-39", "2": "40-59", "3": "60-79", "4": "80-99", "5": "100-119", "6": "120-139", "7": "140-159"},
     "ray_object_store_per_job_gb": 200,
-    "schedule": "GPU4 keeps the active serial controller order; GPU0 helper runs only reserved future jobs and writes per-model TRAINING_COMPLETE markers"
+    "scheduler": "audited_idle_gpu_lock",
+    "schedule": "up to two concurrent jobs acquire the first actually idle GPU from the pool; never use a GPU with another process; max two is retained until a four-job /dev/shm audit passes"
   },
   "diagnostic_ood20_probe": {
     "split": "grasp_ood",

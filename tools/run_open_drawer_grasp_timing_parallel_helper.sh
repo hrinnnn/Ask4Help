@@ -10,8 +10,8 @@ ID_DATASET=${OPEN_DRAWER_TIMING_ID_DATASET:?set OPEN_DRAWER_TIMING_ID_DATASET}
 NORM=${OPEN_DRAWER_TIMING_NORM:?set OPEN_DRAWER_TIMING_NORM}
 BUDGET_ROOT=${OPEN_DRAWER_TIMING_BUDGET_ROOT:-$RUN/formal_budget}
 STEPS=${OPEN_DRAWER_TIMING_TRAIN_STEPS:-2500}
-GPU=${OPEN_DRAWER_TIMING_PARALLEL_GPU:-0}
-CPU_SET=${OPEN_DRAWER_TIMING_PARALLEL_CPU_SET:-0-19}
+GPU_POOL=(${OPEN_DRAWER_TIMING_GPU_POOL:-"0 1 2 3 4 5 6 7"})
+LOCK_ROOT=${OPEN_DRAWER_TIMING_GPU_LOCK_ROOT:-$RUN/.gpu_locks}
 PRIORITY_OOD20_GATE=${OPEN_DRAWER_PRIORITY_OOD20_GATE:-1}
 RAY_BASE=${OPEN_DRAWER_TIMING_PARALLEL_RAY_BASE:-/sdd/rod_parallel}
 TMP_BASE=${OPEN_DRAWER_TIMING_PARALLEL_TMP_BASE:-/sdd/timod_parallel}
@@ -35,6 +35,64 @@ write_state() {
   printf '%s\n' "{\"format\":\"open_drawer_grasp_timing_parallel_helper_v1\",\"stage\":\"$1\",\"status\":\"$2\",\"detail\":\"${3:-}\",\"updated_at\":\"$(date -Is)\"}" > "$STATE"
 }
 
+cpu_set_for_gpu() {
+  case "$1" in
+    0) printf '%s\n' '0-19' ;;
+    1) printf '%s\n' '20-39' ;;
+    2) printf '%s\n' '40-59' ;;
+    3) printf '%s\n' '60-79' ;;
+    4) printf '%s\n' '80-99' ;;
+    5) printf '%s\n' '100-119' ;;
+    6) printf '%s\n' '120-139' ;;
+    7) printf '%s\n' '140-159' ;;
+    *) return 1 ;;
+  esac
+}
+
+gpu_is_idle() {
+  local gpu=$1 used util uuid apps
+  read -r used util < <(nvidia-smi -i "$gpu" --query-gpu=memory.used,utilization.gpu --format=csv,noheader,nounits | awk -F, '{gsub(/ /,"",$1); gsub(/ /,"",$2); print $1, $2}')
+  uuid=$(nvidia-smi -i "$gpu" --query-gpu=uuid --format=csv,noheader | tr -d ' ')
+  apps=$(nvidia-smi --query-compute-apps=gpu_uuid,pid,process_name,used_memory --format=csv,noheader | grep "$uuid" || true)
+  [[ "$used" -le 100 && "$util" -le 5 && -z "$apps" ]]
+}
+
+acquire_gpu() {
+  local gpu lock owner cpuset
+  mkdir -p "$LOCK_ROOT"
+  while true; do
+    for gpu in "${GPU_POOL[@]}"; do
+      gpu_is_idle "$gpu" || continue
+      lock="$LOCK_ROOT/gpu_$gpu"
+      if ! mkdir "$lock" 2>/dev/null; then
+        owner=$(cat "$lock/owner" 2>/dev/null || true)
+        if [[ -n "$owner" ]] && ! kill -0 "$owner" 2>/dev/null; then
+          rm -f "$lock/owner" 2>/dev/null || true
+          rmdir "$lock" 2>/dev/null || true
+        fi
+        continue
+      fi
+      cpuset=$(cpu_set_for_gpu "$gpu") || { rmdir "$lock"; continue; }
+      if ! gpu_is_idle "$gpu"; then
+        rmdir "$lock" 2>/dev/null || true
+        continue
+      fi
+      printf '%s\n' "$$" > "$lock/owner"
+      SELECTED_GPU=$gpu
+      SELECTED_CPU_SET=$cpuset
+      return 0
+    done
+    write_state waiting_for_idle_gpu waiting "gpu_pool=${GPU_POOL[*]}"
+    sleep 300
+  done
+}
+
+release_gpu() {
+  local lock="$LOCK_ROOT/gpu_$1"
+  rm -f "$lock/owner" 2>/dev/null || true
+  rmdir "$lock" 2>/dev/null || true
+}
+
 wait_for_priority_ood20() {
   local condition=$1 seed=$2
   case "$PRIORITY_OOD20_GATE" in
@@ -54,7 +112,7 @@ wait_for_priority_ood20() {
 }
 
 train_one() {
-  local anchor=$1 seed=$2
+  local anchor=$1 seed=$2 gpu=$3 cpuset=$4
   local condition="anchor_${anchor}"
   local expert="$BUDGET_ROOT/$condition"
   local out="$RUN/training/$condition/seed_$seed"
@@ -82,9 +140,9 @@ train_one() {
   fi
 
   mkdir -p "$out"
-  write_state "parallel_training_${condition}_seed_${seed}" running "gpu=$GPU cpu_set=$CPU_SET"
-  env CUDA_VISIBLE_DEVICES="$GPU" CUDA_DEVICE_ORDER=PCI_BUS_ID \
-    ASK4HELP_RLINF_PLACEMENT="$GPU-$GPU" RLINF_RAY_ADDRESS=local \
+  write_state "parallel_training_${condition}_seed_${seed}" running "gpu=$gpu cpu_set=$cpuset"
+  env CUDA_VISIBLE_DEVICES="$gpu" CUDA_DEVICE_ORDER=PCI_BUS_ID \
+    ASK4HELP_RLINF_PLACEMENT="$gpu-$gpu" RLINF_RAY_ADDRESS=local \
     EMBODIED_PATH="$RL/examples/sft" PYTHONPATH="$ROOT:$RL" \
     OPEN_DRAWER_ID_DATASET="$ID_DATASET" OPEN_DRAWER_EXPERT_DATASET="$expert" \
     OPEN_DRAWER_ID_NORM_STATS="$NORM" OPEN_DRAWER_PI05_MODEL_PATH="$MODEL" \
@@ -94,7 +152,7 @@ train_one() {
     HF_DATASETS_CACHE="$RUN/runtime/hf_datasets" HF_HOME="$RUN/runtime/hf_home" \
     RAY_TMPDIR="$RAY_BASE/${condition}_${seed}" \
     TMPDIR="$TMP_BASE/${condition}_${seed}" PYTHONUNBUFFERED=1 \
-    taskset -c "$CPU_SET" "$PY" "$RL/examples/sft/train_vla_sft.py" \
+    taskset -c "$cpuset" "$PY" "$RL/examples/sft/train_vla_sft.py" \
       --config-path "$RL/examples/sft/config" \
       --config-name open_drawer_retrieve_place_dagger_sft_openpi_pi05 \
       runner.max_steps="$STEPS" runner.save_interval=500 \
@@ -113,14 +171,29 @@ train_one() {
   return 0
 }
 
-write_state preflight running "gpu=$GPU cpu_set=$CPU_SET jobs=${#JOBS[@]}"
+write_state preflight running "gpu_pool=${GPU_POOL[*]} jobs=${#JOBS[@]}"
 for job in "${JOBS[@]}"; do
   IFS=: read -r anchor seed <<< "$job"
-  train_one "$anchor" "$seed" || {
+  condition="anchor_${anchor}"
+  checkpoint="$RUN/training/$condition/seed_$seed/run/checkpoints/global_step_$STEPS/actor/model_state_dict/full_weights.pt"
+  if [[ -f "$checkpoint" ]]; then
+    train_one "$anchor" "$seed" "" "" || {
+      write_state "parallel_training_anchor_${anchor}_seed_${seed}" failed "priority gate failed"
+      printf '%s\n' "anchor=$anchor seed=$seed priority gate failed" > "$RUN/PARALLEL_HELPER_FAILED"
+      exit 1
+    }
+    continue
+  fi
+  acquire_gpu
+  gpu=$SELECTED_GPU
+  cpuset=$SELECTED_CPU_SET
+  train_one "$anchor" "$seed" "$gpu" "$cpuset" || {
+    release_gpu "$gpu"
     write_state "parallel_training_anchor_${anchor}_seed_${seed}" failed "training_failed"
     printf '%s\n' "anchor=$anchor seed=$seed parallel training failed" > "$RUN/PARALLEL_HELPER_FAILED"
     exit 1
   }
+  release_gpu "$gpu"
 done
 write_state all_parallel_jobs complete "all selected jobs checkpointed"
 printf '%s\n' 'selected timing models trained on parallel helper GPU' > "$RUN/PARALLEL_HELPER_COMPLETE"
