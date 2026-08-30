@@ -1,6 +1,6 @@
 # OpenDrawer Grasp-OOD Controlled Timing Sweep
 
-**状态：已授权，adaptive 单模型/anchor 训练与交替 20-OOD 评测已冻结，正在等待动态 GPU 资源。**
+**状态：已授权，adaptive 单模型/anchor 训练与交替 20-OOD 评测已冻结；retry6 因 Ray socket 临时路径过长在启动阶段失败，retry7 正在按相同协议恢复。**
 
 本 pipeline 只研究 OpenDrawerRetrievePlace 的 `grasp_ood` 条件：保持 handle、drawer、
 goal、robot、camera、prompt、norm、action contract 和 success predicate 不变，只把
@@ -142,6 +142,11 @@ adaptive formal comparison。20-OOD 仍不替代最终 100-ID/100-Grasp-OOD 分�
 每个 anchor 只训练一个模型，不再对同一 anchor 重复多个 seed。所有 anchor 使用同一个
 冻结训练 seed `9301`，以避免 seed 差异混入 timing 效应；因此最终比较的单位是六个
 anchor 模型，而不是 18 个 seed replicate。旧 retry5 的多 seed 结果仅作 diagnostic。
+
+retry6 的训练没有进入模型更新：Ray 在初始化时因临时目录过长而触发 AF_UNIX 路径限制。
+该失败根与空的 partial output 均保留为工程 diagnostic；retry7 仅把 Ray/TMP scratch
+迁移到短的服务器路径，科学变量（checkpoint、seed、anchor、5000/+2500 规则、预算和
+success predicate）全部不变。
 
 自适应训练完成后，持久化的 `run_open_drawer_adaptive_formal_eval_controller.sh` 会按
 anchor 顺序对每个模型运行冻结的 `100` 条 ID 与 `100` 条 Grasp-OOD rollout；每一对

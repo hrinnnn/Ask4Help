@@ -23,6 +23,8 @@ OOD_THRESHOLD=${OPEN_DRAWER_TIMING_OOD_THRESHOLD:-0.4}
 OOD_SEED_START=${OPEN_DRAWER_TIMING_OOD_SEED_START:-79000}
 GPU_POOL=(${OPEN_DRAWER_TIMING_GPU_POOL:-"0 1 2 3 4 5 6 7"})
 LOCK_ROOT=${OPEN_DRAWER_TIMING_GPU_LOCK_ROOT:-$RUN/.gpu_locks}
+RAY_TMP_ROOT=${OPEN_DRAWER_TIMING_RAY_TMP_ROOT:-/sdd/od_adaptive_ray}
+TMP_ROOT=${OPEN_DRAWER_TIMING_TMP_ROOT:-/sdd/od_adaptive_tmp}
 STATE=$RUN/adaptive_timing_pipeline_state.json
 LOG=$RUN/adaptive_timing_controller.log
 FROZEN_STEPS=$RUN/adaptive_steps.json
@@ -131,6 +133,9 @@ train_segment() {
   write_state "training_anchor_${anchor}_to_${cumulative_steps}" running "segment_steps=$segment_steps source=$source_model gpu=$SELECTED_GPU"
   local config_path="$RL/examples/sft/config/open_drawer_retrieve_place_dagger_sft_openpi_pi05.yaml"
   grep -Fq 'default_prompt: open the drawer, retrieve the blue object, and place it in the green tray' "$config_path" || return 1
+  # Keep Ray's AF_UNIX socket path below the Linux 107-byte limit.  The
+  # output root remains fully qualified in provenance; only runtime scratch
+  # paths use the short server-local roots.
   env CUDA_VISIBLE_DEVICES="$SELECTED_GPU" CUDA_DEVICE_ORDER=PCI_BUS_ID \
     ASK4HELP_RLINF_PLACEMENT="$SELECTED_GPU-$SELECTED_GPU" RLINF_RAY_ADDRESS=local \
     EMBODIED_PATH="$RL/examples/sft" PYTHONPATH="$ROOT:$RL" \
@@ -140,8 +145,8 @@ train_segment() {
     OPEN_DRAWER_TRAIN_SEED="$TRAIN_SEED" OPEN_DRAWER_RESUME_DIR="" \
     HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 TOKENIZERS_PARALLELISM=false \
     HF_DATASETS_CACHE="$RUN/runtime/hf_datasets" HF_HOME="$RUN/runtime/hf_home" \
-    RAY_TMPDIR="$RUN/runtime/ray/anchor_${anchor}_steps_${cumulative_steps}" \
-    TMPDIR="$RUN/runtime/tmp/anchor_${anchor}_steps_${cumulative_steps}" PYTHONUNBUFFERED=1 \
+    RAY_TMPDIR="$RAY_TMP_ROOT/a${anchor}s${cumulative_steps}" \
+    TMPDIR="$TMP_ROOT/a${anchor}s${cumulative_steps}" PYTHONUNBUFFERED=1 \
     taskset -c "$SELECTED_CPU_SET" "$PY" "$RL/examples/sft/train_vla_sft.py" \
       --config-path "$RL/examples/sft/config" \
       --config-name open_drawer_retrieve_place_dagger_sft_openpi_pi05 \
@@ -233,7 +238,7 @@ freeze_steps() {
   printf '{"frozen_steps":%s,"pilot_anchor":0,"training_seed":%s,"ood_success_rate":%s,"threshold":%s,"rule":"first strict OOD20 rate above threshold"}\n' "$steps" "$TRAIN_SEED" "$rate" "$OOD_THRESHOLD" > "$FROZEN_STEPS"
 }
 
-mkdir -p "$RUN/runtime/ray" "$RUN/runtime/tmp"
+mkdir -p "$RUN/runtime/ray" "$RUN/runtime/tmp" "$RAY_TMP_ROOT" "$TMP_ROOT"
 [[ -e "$RUN/formal" ]] || ln -s "$FORMAL_ROOT" "$RUN/formal"
 [[ -e "$RUN/formal_budget" ]] || ln -s "$BUDGET_ROOT" "$RUN/formal_budget"
 [[ -f "$RUN/ADAPTIVE_TIMING_TRAINING_COMPLETE" ]] && { write_state all_adaptive_training complete; exit 0; }
