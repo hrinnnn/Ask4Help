@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 
 from rlinf.envs.maniskill.open_drawer_retrieve_place_spec import DRAWER_OPEN_THRESHOLD
-from rlinf.toolkits.lerobot.validate_open_drawer_retrieve_place_oracle import (
+from toolkits.lerobot.validate_open_drawer_retrieve_place_oracle import (
     _close_until_object_grasped,
     _hold_gripper,
     _move_to_best_pose,
