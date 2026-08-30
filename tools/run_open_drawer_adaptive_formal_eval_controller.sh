@@ -15,6 +15,7 @@ PI05_BASE=${OPEN_DRAWER_TIMING_PI05_BASE:?set OPEN_DRAWER_TIMING_PI05_BASE}
 NORM=${OPEN_DRAWER_TIMING_NORM:?set OPEN_DRAWER_TIMING_NORM}
 FORMAL_ROOT=${OPEN_DRAWER_TIMING_FORMAL_ROOT:-$RUN/formal}
 BUDGET_ROOT=${OPEN_DRAWER_TIMING_BUDGET_ROOT:-$RUN/formal_budget}
+FORMAL_MARKER=${OPEN_DRAWER_TIMING_FORMAL_MARKER:-$(dirname "$FORMAL_ROOT")/TIMING_COLLECTION_COMPLETE}
 POLICY_ONLY=${OPEN_DRAWER_TIMING_POLICY_ONLY_ROOT:-$ROOT/results/open_drawer_grasp_timing_sweep_v1_retry2/policy_only_grasp_ood}
 EVALUATOR=${OPEN_DRAWER_TIMING_EVALUATOR:-$ROOT/tools/evaluate_open_drawer_id_pi05.py}
 EVAL_WRAPPER=${OPEN_DRAWER_TIMING_EVAL_WRAPPER:-$ROOT/tools/run_open_drawer_timing_eval.py}
@@ -127,7 +128,7 @@ while [[ ! -f "$TRAINING_MARKER" ]]; do
 done
 
 [[ -s "$MODEL/actor/model_state_dict/full_weights.pt" ]] || fail preflight "missing immutable base full_weights"
-[[ -f "$FORMAL_ROOT/TIMING_COLLECTION_COMPLETE" ]] || fail preflight "missing formal collection marker"
+[[ -f "$FORMAL_MARKER" || -f "$FORMAL_ROOT/TIMING_COLLECTION_COMPLETE" ]] || fail preflight "missing formal collection marker"
 [[ -f "$FORMAL_ROOT/AUDIT_PASS" ]] || fail preflight "missing formal collection audit"
 [[ -f "$BUDGET_ROOT/BUDGET_AUDIT_PASS" ]] || fail preflight "missing exact budget audit"
 

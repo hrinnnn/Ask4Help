@@ -382,7 +382,10 @@ def main() -> None:
     (RUN / "runtime").mkdir(exist_ok=True)
     if not MODEL:
         fail("preflight", "OPEN_DRAWER_TIMING_CHECKPOINT is required")
-    for path in (MODEL / "actor/model_state_dict/full_weights.pt", FORMAL_ROOT / "TIMING_COLLECTION_COMPLETE", FORMAL_ROOT / "AUDIT_PASS", BUDGET_ROOT / "BUDGET_AUDIT_PASS"):
+    formal_marker = FORMAL_ROOT / "TIMING_COLLECTION_COMPLETE"
+    if not formal_marker.exists():
+        formal_marker = FORMAL_ROOT.parent / "TIMING_COLLECTION_COMPLETE"
+    for path in (MODEL / "actor/model_state_dict/full_weights.pt", formal_marker, FORMAL_ROOT / "AUDIT_PASS", BUDGET_ROOT / "BUDGET_AUDIT_PASS"):
         if not path.exists():
             fail("preflight", f"missing {path}")
     (RUN / "formal").symlink_to(FORMAL_ROOT, target_is_directory=True) if not (RUN / "formal").exists() else None
