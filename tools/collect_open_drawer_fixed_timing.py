@@ -336,6 +336,12 @@ def collect_one(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--split",
+        choices=tuple(ENV_IDS),
+        default="grasp_ood",
+        help="controlled task split used for the policy prefix and Oracle suffix",
+    )
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--pi05-base", type=Path, required=True)
     parser.add_argument("--norm-stats", type=Path, required=True)
@@ -370,7 +376,7 @@ def main() -> None:
     model = _load_model(args.checkpoint, args.norm_stats, args.pi05_base)
     planner = PandaPosePlannerClient()
     env = _build_env(
-        "grasp_ood",
+        args.split,
         max_episode_steps=args.max_episode_steps,
         sim_backend=args.sim_backend,
         image_size=args.image_size,
@@ -498,7 +504,7 @@ def main() -> None:
     summary = {
         "format": "open_drawer_fixed_timing_collection_v1",
         "task": "OpenDrawerRetrievePlace",
-        "split": "grasp_ood",
+        "split": args.split,
         "checkpoint": str(args.checkpoint),
         "scheduled_takeover_step": args.takeover_step,
         "target_accepted": args.target,

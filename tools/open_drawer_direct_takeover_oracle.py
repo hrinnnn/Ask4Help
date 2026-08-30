@@ -31,6 +31,28 @@ def _drawer_is_open(base: Any) -> bool:
     return bool(_vector(base.drawer.get_qpos(), 1)[0] <= -DRAWER_OPEN_THRESHOLD)
 
 
+def _handle_is_grasped(base: Any, *, max_tcp_handle_distance: float = 0.075) -> bool:
+    """Detect an existing handle grasp without confusing drawer contact.
+
+    The drawer is one articulation, so the handle collision belongs to
+    ``drawer_link`` rather than a separate actor.  ``Panda.is_grasping`` on
+    that link verifies bilateral finger contact; the TCP--handle distance
+    gates out incidental contact with the drawer front or bottom.  This is
+    deliberately a live-state predicate: no rollout history or image label is
+    needed at takeover.
+    """
+
+    try:
+        bilateral_contact = _scalar(base.agent.is_grasping(base.drawer_link))
+    except (AttributeError, RuntimeError, TypeError):
+        return False
+    if not bilateral_contact:
+        return False
+    tcp = _vector(base.agent.tcp.pose.p, 3)
+    handle = _vector(base.handle_world_position, 3)
+    return bool(np.linalg.norm(tcp - handle) <= max_tcp_handle_distance)
+
+
 def _object_grasp_candidates(base: Any, center: np.ndarray, closing: np.ndarray) -> list[Any]:
     """Return two sign choices so the planner can choose the shortest rotation."""
 
@@ -53,6 +75,31 @@ def _open_drawer_from_current_state(env: Any, planner: Any, stages: dict[str, An
     import sapien
 
     base = env.unwrapped
+    handle_grasped = _handle_is_grasped(base)
+    stages["handle_grasped_before_takeover"] = handle_grasped
+    if handle_grasped:
+        # The policy may have already closed both fingers on the yellow
+        # handle.  Continue the pull from the live TCP pose; re-planning a
+        # pregrasp would lift/rotate the already-held handle and is not a
+        # valid takeover continuation.
+        stages["direct_handle_pregrasp_completed"] = True
+        stages["direct_handle_pregrasp_steps"] = 0
+        stages["direct_handle_reach_completed"] = True
+        stages["direct_handle_reach_steps"] = 0
+        stages["direct_pull_from_existing_handle_grasp"] = True
+        _hold_gripper(env, gripper=-1.0, steps=4)
+        stages["handle_grasp_stable_after_takeover"] = _handle_is_grasped(base)
+        tcp = base.agent.tcp.pose.sp
+        pull_target = sapien.Pose(tcp.p + np.asarray([-0.37, 0.0, 0.0]), tcp.q)
+        moved, steps = _move_to_pose(
+            env, planner, pull_target, gripper=-1.0, position_tolerance=0.018
+        )
+        stages["direct_pull_completed"] = moved
+        stages["direct_pull_steps"] = steps
+        return _drawer_is_open(base)
+
+    stages["direct_pull_from_existing_handle_grasp"] = False
+    stages["handle_grasp_stable_after_takeover"] = False
     handle_center = _vector(base.handle_world_position, 3)
     handle_grasp = _top_down_grasp(base, handle_center, np.asarray([0.0, 1.0, 0.0]))
     reached, steps = _move_to_pose(
@@ -112,6 +159,9 @@ def continue_episode(env: Any, planner: Any, *, seed: int | None = None) -> dict
         stages["handle_planner_mode"] = "screw_then_qpos"
     else:
         drawer_opened = True
+        stages["handle_grasped_before_takeover"] = False
+        stages["direct_pull_from_existing_handle_grasp"] = False
+        stages["handle_grasp_stable_after_takeover"] = False
         stages["direct_handle_pregrasp_completed"] = True
         stages["direct_handle_pregrasp_steps"] = 0
         stages["direct_handle_reach_completed"] = True
