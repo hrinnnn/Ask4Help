@@ -30,6 +30,7 @@ import numpy as np
 
 ANCHORS = (0, 50, 80, 120, 160, 220)
 MAX_WORKERS = 4
+RAY_OBJECT_STORE_MEMORY = int(os.environ.get("OPEN_DRAWER_RAY_OBJECT_STORE_MEMORY", str(100 * 1024**3)))
 MIN_STEPS = 5000
 INCREMENT = 2500
 OOD_THRESHOLD = 0.4
@@ -262,7 +263,8 @@ def run_probe(anchor: int, cumulative: int, checkpoint: Path, gpu: int, cpuset: 
         "CUDA_VISIBLE_DEVICES": str(gpu),
         "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
         "ASK4HELP_RLINF_ROOT": str(RL),
-        "PYTHONPATH": f"{ROOT}:{RL}",
+        "PYTHONPATH": f"{ROOT / 'tools' / 'adaptive_ray_shim'}:{ROOT}:{RL}",
+        "ASK4HELP_RAY_OBJECT_STORE_MEMORY": str(RAY_OBJECT_STORE_MEMORY),
         "HF_HUB_OFFLINE": "1",
         "TRANSFORMERS_OFFLINE": "1",
         "TOKENIZERS_PARALLELISM": "false",
@@ -312,7 +314,8 @@ def launch_training(anchor: int, target_steps: int, segment_steps: int, source: 
         "ASK4HELP_RLINF_PLACEMENT": f"{gpu}-{gpu}",
         "RLINF_RAY_ADDRESS": "local",
         "EMBODIED_PATH": str(RL / "examples/sft"),
-        "PYTHONPATH": f"{ROOT}:{RL}",
+        "PYTHONPATH": f"{ROOT / 'tools' / 'adaptive_ray_shim'}:{ROOT}:{RL}",
+        "ASK4HELP_RAY_OBJECT_STORE_MEMORY": str(RAY_OBJECT_STORE_MEMORY),
         "OPEN_DRAWER_ID_DATASET": str(ID_DATASET),
         "OPEN_DRAWER_EXPERT_DATASET": str(BUDGET_ROOT / f"anchor_{anchor}"),
         "OPEN_DRAWER_ID_NORM_STATS": str(NORM),
