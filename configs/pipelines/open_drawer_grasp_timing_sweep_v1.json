@@ -128,7 +128,12 @@
     "formal_collection_max_attempts_per_anchor": 80,
     "formal_collection_seed_start": 78300,
     "formal_budget_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_direct_oracle_formal_retry1/formal_budget",
-    "adaptive_training_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_direct_oracle_adaptive_retry1"
+    "adaptive_training_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_direct_oracle_adaptive_retry1",
+    "adaptive_runtime_scratch": {
+      "ray_tmp_root": "/sdd/r_od1",
+      "tmp_root": "/sdd/t_od1",
+      "reason": "retry1 Ray AF_UNIX path diagnostic; shorten only runtime scratch paths"
+    }
   },
   "base_policy": {
     "model_family": "pi0.5",

@@ -227,6 +227,11 @@ denominator/evidence audit，再由 exact whole-episode selector 生成新的 `f
 2500 步，首个 `>40%` 的累计步数冻结，并让所有 anchor 使用同一冻结步数。训练、OOD20、后续
 100-ID/100-Grasp-OOD evaluation 继续保持交替和独立产物审计。
 
+第一次 direct-Oracle adaptive 启动在 Ray 初始化时因 scratch 路径仍导致 AF\_UNIX socket 超过
+107 字节而退出；该日志保留为 engineering diagnostic。重试只把运行时 scratch 缩短为
+`/sdd/r_od1` 与 `/sdd/t_od1`，不改变 checkpoint、数据、seed、anchor、budget、训练步数或
+成功定义。
+
 ## 9. Completion
 
 只有以下内容全部存在才写入 `PIPELINE_COMPLETE`：

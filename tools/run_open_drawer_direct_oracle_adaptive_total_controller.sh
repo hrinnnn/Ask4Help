@@ -18,8 +18,8 @@ BUDGET_ROOT=${OPEN_DRAWER_DIRECT_ORACLE_BUDGET_ROOT:-$FORMAL_RUN/formal_budget}
 RUN=${OPEN_DRAWER_DIRECT_ORACLE_ADAPTIVE_ROOT:-$ROOT/results/open_drawer_grasp_timing_sweep_v1_direct_oracle_adaptive_retry1}
 FORMAL_MARKER=$FORMAL_RUN/TIMING_COLLECTION_COMPLETE
 GPU_POOL=${OPEN_DRAWER_TIMING_GPU_POOL:-"0 1 2 3 4 5 6 7"}
-RAY_TMP_ROOT=${OPEN_DRAWER_TIMING_RAY_TMP_ROOT:-/sdd/od_direct_oracle_adaptive_ray_retry1}
-TMP_ROOT=${OPEN_DRAWER_TIMING_TMP_ROOT:-/sdd/od_direct_oracle_adaptive_tmp_retry1}
+RAY_TMP_ROOT=${OPEN_DRAWER_TIMING_RAY_TMP_ROOT:-/sdd/r_od1}
+TMP_ROOT=${OPEN_DRAWER_TIMING_TMP_ROOT:-/sdd/t_od1}
 STATE=$RUN/direct_oracle_adaptive_total_state.json
 LOG=$RUN/direct_oracle_adaptive_total_controller.log
 
