@@ -8,7 +8,7 @@
   "current_stage": "adaptive_single_seed_training",
   "next_stage": "100-ID/100-Grasp-OOD evaluation -> independent reconciliation",
   "run_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1",
-  "active_execution_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry7_adaptive",
+  "active_execution_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry8_adaptive",
   "formal_collection_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal",
   "formal_collection_marker": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/TIMING_COLLECTION_COMPLETE",
   "policy_only_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry2/policy_only_grasp_ood",
@@ -42,7 +42,7 @@
     "seed_start": 79000,
     "gpu_candidates": [2, 5],
     "cpu_set": "40-59",
-    "output_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry7_adaptive/ood20_probe",
+    "output_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry8_adaptive/ood20_probe",
     "purpose": "auxiliary early OOD readout; uses the first audited idle candidate; never replaces formal 100-ID/100-Grasp-OOD evaluation or final denominator"
   },
   "priority_ood20_gate": {
@@ -72,9 +72,15 @@
     "freeze_step_count_after_first_rate_above_threshold": true,
     "all_subsequent_models_use_frozen_steps": true,
     "order": "train_checkpoint -> audited_20_ood_probe -> next_training_checkpoint",
+    "parallel_initial_training": {
+      "enabled": true,
+      "max_concurrent_models": 4,
+      "initial_target_steps": 5000,
+      "scheduling_note": "all six anchors may be queued concurrently up to four audited idle GPUs; pilot anchor 0 still determines frozen_steps"
+    },
     "old_2500_step_root": "retry5 diagnostic only; never mixed into formal comparison",
-    "active_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry7_adaptive",
-    "controller": "tools/run_open_drawer_adaptive_timing_controller.sh",
+    "active_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry8_adaptive",
+    "controller": "tools/run_open_drawer_adaptive_parallel_controller.py",
     "decision_recorded": "2026-08-30 user decision: train at least 5k; continue below/equal 40%; freeze the first passing step count for later checkpoints"
   },
   "adaptive_formal_evaluation": {
