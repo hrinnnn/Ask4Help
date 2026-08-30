@@ -1,6 +1,6 @@
 # OpenDrawer Grasp-OOD Controlled Timing Sweep
 
-**状态：Oracle repair 的 extended validation 正在运行；它覆盖 `grasp_ood`、`handle_ood`、`goal_ood` 的
+**状态：Oracle repair 的 extended validation 已完成，等待用户审核视频；它覆盖 `grasp_ood`、`handle_ood`、`goal_ood` 的
 `t=0/80/160/220/300`，并显式验证“已抓住把手时从当前姿态继续拉”。retry10 的旧 Oracle adaptive
 training 已暂停且只作 diagnostic，未经用户审核不进入正式训练。**
 
@@ -205,9 +205,10 @@ handle pregrasp/reach，也不会先抬升把手。这个几何门控用于排�
 
 为检查 Oracle 不依赖单一 Grasp-OOD 分布，新增 diagnostic video sweep 覆盖三个受控 OOD split
 （`grasp_ood`、`handle_ood`、`goal_ood`）和五个 takeover step（`0,80,160,220,300`），每个条件
-目标接受 2 条成功 continuation，最多 6 条 raw attempts。每个条件单独保存 summary、raw attempts、
-task-state timeline、actions/states 与视频；accepted 不足只标记该条件的 diagnostic failure，
-不改变 formal 分母或训练协议。用户审核这些视频后，才决定是否解锁 adaptive training。
+目标接受 2 条成功 continuation，最多 6 条 raw attempts；实际得到 30 条 accepted、33 条 raw 视频，
+每个条件均达到 2 条 accepted。每个条件单独保存 summary、raw attempts、task-state timeline、
+actions/states 与视频；不改变 formal 分母或训练协议。用户审核这些视频后，才决定是否解锁
+adaptive training。
 
 ## 9. Completion
 

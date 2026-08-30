@@ -105,7 +105,7 @@
     ]
   },
   "oracle_repair": {
-    "status": "extended_validation_running",
+    "status": "extended_validation_complete_pending_user_review",
     "mode": "direct_grasp_from_current_state",
     "planner_for_closed_drawer": "screw_then_qpos",
     "planner_after_drawer_open": "shortest_joint_path",
@@ -116,8 +116,8 @@
     "validation_takeover_steps": [0, 80, 160, 220, 300],
     "target_accepted_videos_per_condition": 2,
     "handle_grasp_predicate": "bilateral drawer-link contact plus TCP-to-handle distance <= 0.075 m",
-    "validation_videos": "pending",
-    "validation_accepted_videos": "pending",
+    "validation_videos": 33,
+    "validation_accepted_videos": 30,
     "training_policy": "pause adaptive training until user reviews direct-oracle videos",
     "old_formal_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal",
     "old_formal_status": "diagnostic_only_not_reused_until_review"
