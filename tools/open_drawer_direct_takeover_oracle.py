@@ -101,7 +101,15 @@ def continue_episode(env: Any, planner: Any, *, seed: int | None = None) -> dict
     drawer_opened_before = _drawer_is_open(base)
     stages["drawer_opened_before_takeover"] = drawer_opened_before
     if not drawer_opened_before:
-        drawer_opened = _open_drawer_from_current_state(env, planner, stages)
+        # The validated screw path is retained only for the necessary handle
+        # interaction.  Once the drawer is open, all object motions use the
+        # shortest-joint-path mode to avoid an unnecessary orientation flip.
+        planner.planner_mode = "screw_then_qpos"
+        try:
+            drawer_opened = _open_drawer_from_current_state(env, planner, stages)
+        finally:
+            planner.planner_mode = "shortest_joint_path"
+        stages["handle_planner_mode"] = "screw_then_qpos"
     else:
         drawer_opened = True
         stages["direct_handle_pregrasp_completed"] = True
@@ -110,6 +118,8 @@ def continue_episode(env: Any, planner: Any, *, seed: int | None = None) -> dict
         stages["direct_handle_reach_steps"] = 0
         stages["direct_pull_completed"] = True
         stages["direct_pull_steps"] = 0
+        stages["handle_planner_mode"] = None
+    stages["object_planner_mode"] = "shortest_joint_path"
     stages["drawer_opened_after_takeover"] = bool(drawer_opened and _drawer_is_open(base))
     if not stages["drawer_opened_after_takeover"]:
         stages["success"] = False
