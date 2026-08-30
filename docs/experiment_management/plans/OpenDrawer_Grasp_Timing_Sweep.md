@@ -1,6 +1,6 @@
 # OpenDrawer Grasp-OOD Controlled Timing Sweep
 
-**状态：已授权，adaptive 单模型/anchor 训练与交替 20-OOD 评测已冻结；retry6 因 Ray socket 临时路径过长失败，retry7 的部分训练因并行调度切换保留为 diagnostic，retry8 因 collection-marker 路径预检错误保留为 diagnostic，retry9 因四作业共享内存风险保留为 diagnostic，retry10 正在按四卡并行协议恢复。**
+**状态：Oracle repair diagnostic 已完成，正在等待用户审核 direct-grasp 视频；retry10 的旧 Oracle adaptive training 已暂停且只作 diagnostic，未经审核不进入正式训练。**
 
 本 pipeline 只研究 OpenDrawerRetrievePlace 的 `grasp_ood` 条件：保持 handle、drawer、
 goal、robot、camera、prompt、norm、action contract 和 success predicate 不变，只把
@@ -179,7 +179,20 @@ timeline 分母、D-path 与 intervention-quality 指标，只有 reconciliation
 同时保留 `No takeover` policy-only baseline。anchor-level Pearson/Spearman 只作探索性
 描述；正式论点依赖 paired fixed-budget SR、专家动作成本和 late-vs-boundary 对照。
 
-## 8. Completion
+## 8. Direct-grasp Oracle repair validation
+
+旧 continuation 在 drawer 已打开时仍会执行固定的 handle retreat，再进入物体抓取，
+并且默认 planner 优先使用 screw path，容易造成不必要的抬升和姿态翻转。新增的
+`direct_grasp` 模式从当前 takeover 状态直接规划 object pre-grasp；只有 drawer 尚未
+打开时才执行必要的 handle opening。object/lift/transport 使用 shortest-joint-path，
+并在物体 closing axis 的正反两个候选中选择较短路径。
+
+修复后的 diagnostic root 为
+`open_drawer_grasp_timing_sweep_v1_direct_oracle_retry4`，六个 anchor 各有 3/3
+accepted success（18 条 accepted、24 条 raw videos）。这些视频只用于用户审核，
+不覆盖旧 formal collection，也不自动解锁 adaptive training。
+
+## 9. Completion
 
 只有以下内容全部存在才写入 `PIPELINE_COMPLETE`：
 
