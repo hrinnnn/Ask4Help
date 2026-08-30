@@ -221,6 +221,8 @@ adaptive training。
 `open_drawer_grasp_timing_sweep_v1_direct_oracle_formal_retry1/formal`，并先通过独立的
 denominator/evidence audit，再由 exact whole-episode selector 生成新的 `formal_budget`。
 旧 `/open_drawer_grasp_timing_sweep_v1_formal/formal` 只作 diagnostic，不进入新训练。
+本次 selector 已得到并冻结共同预算 `2413` 个 expert actions；六个 anchor 的 selected sum
+完全相同，规则为最大共同可达整轨迹和。
 
 训练使用每个 anchor 一个模型、共同 seed `9301`、最多四张实时核验为空闲的 GPU。每个模型至少
 训练 5000 步；每个 checkpoint 先做 20 条 Grasp-OOD 诊断评测，严格成功率 `<=40%` 时追加
