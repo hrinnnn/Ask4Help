@@ -5,8 +5,8 @@
   "owner_thread": "01a037ef-1a71-7ad3-9594-a7dcfe06ad7b",
   "owner_label": "codex-open-drawer-grasp-timing-sweep",
   "server": "zhaozhixuan@111.198.58.150:12001",
-  "current_stage": "direct_oracle_formal_collection",
-  "next_stage": "direct_oracle_budget_selection -> adaptive_training",
+  "current_stage": "direct_oracle_adaptive_training",
+  "next_stage": "adaptive_ood20_probe -> formal_100_ID_OOD_evaluation -> independent_reconciliation",
   "run_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1",
   "active_execution_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_direct_oracle_adaptive_retry1",
   "formal_collection_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal",
@@ -105,7 +105,7 @@
     ]
   },
   "oracle_repair": {
-    "status": "approved_for_formal_recollection",
+    "status": "formal_collection_complete_training_running",
     "mode": "direct_grasp_from_current_state",
     "planner_for_closed_drawer": "screw_then_qpos",
     "planner_after_drawer_open": "shortest_joint_path",

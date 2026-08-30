@@ -2,7 +2,7 @@
 
 **状态：用户已审核并批准修复后的 direct-grasp Oracle。现在用它重新收集六个正式 timing anchor
 （`0/50/80/120/160/220`）的 Grasp-OOD expert suffix；旧 Oracle formal 数据不复用。收集与
-共同预算审计完成后，按统一训练步数规则启动最多四卡的 adaptive training。**
+共同预算审计已完成，当前按统一训练步数规则运行最多四卡的 adaptive training。**
 
 本 pipeline 只研究 OpenDrawerRetrievePlace 的 `grasp_ood` 条件：保持 handle、drawer、
 goal、robot、camera、prompt、norm、action contract 和 success predicate 不变，只把
