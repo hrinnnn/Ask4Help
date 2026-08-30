@@ -58,14 +58,14 @@ def _open_drawer_from_current_state(env: Any, planner: Any, stages: dict[str, An
     reached, steps = _move_to_pose(
         env,
         planner,
-        handle_grasp * sapien.Pose([0.0, 0.0, -0.060]),
+        handle_grasp * sapien.Pose([0.0, 0.0, -0.075]),
         gripper=1.0,
-        position_tolerance=0.018,
+        position_tolerance=0.012,
     )
     stages["direct_handle_pregrasp_completed"] = reached
     stages["direct_handle_pregrasp_steps"] = steps
     reached, steps = _move_to_pose(
-        env, planner, handle_grasp, gripper=1.0, position_tolerance=0.018
+        env, planner, handle_grasp, gripper=1.0, position_tolerance=0.012
     )
     stages["direct_handle_reach_completed"] = stages["direct_handle_pregrasp_completed"] and reached
     stages["direct_handle_reach_steps"] = steps
@@ -73,7 +73,7 @@ def _open_drawer_from_current_state(env: Any, planner: Any, stages: dict[str, An
         stages["direct_pull_completed"] = False
         stages["direct_pull_steps"] = 0
         return False
-    _hold_gripper(env, gripper=-1.0, steps=8)
+    _hold_gripper(env, gripper=-1.0, steps=14)
     tcp = base.agent.tcp.pose.sp
     pull_target = sapien.Pose(tcp.p + np.asarray([-0.37, 0.0, 0.0]), tcp.q)
     moved, steps = _move_to_pose(
