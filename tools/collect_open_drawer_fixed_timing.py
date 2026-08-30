@@ -47,7 +47,10 @@ from toolkits.lerobot.collect_maniskill_pick_single_ycb_airplane_lerobot import 
 )
 from toolkits.lerobot.validate_open_drawer_retrieve_place_oracle import (  # noqa: E402
     PandaPosePlannerClient,
-    continue_episode,
+    continue_episode as legacy_continue_episode,
+)
+from tools.open_drawer_direct_takeover_oracle import (  # noqa: E402
+    continue_episode as direct_continue_episode,
 )
 from tools.evaluate_open_drawer_id_pi05 import _model_obs  # noqa: E402
 from tools.maniskill_pi05_vfd_online_awbc import _load_model  # noqa: E402
@@ -206,6 +209,7 @@ def collect_one(
     takeover_step: int,
     execute_horizon: int,
     max_episode_steps: int,
+    oracle_mode: str,
 ) -> dict[str, Any]:
     low = np.asarray(env.action_space.low, dtype=np.float32).reshape(-1)
     high = np.asarray(env.action_space.high, dtype=np.float32).reshape(-1)
@@ -259,6 +263,7 @@ def collect_one(
             break
 
     actual_takeover_step = len(prefix_actions)
+    prefix_phase = _phase(task_states[-1])
     if actual_takeover_step != takeover_step or terminated or truncated or task_states[-1]["success"]:
         return {
             "seed": seed,
@@ -267,7 +272,7 @@ def collect_one(
             "accepted": False,
             "reason": "policy_terminated_before_scheduled_takeover",
             "success": bool(task_states[-1]["success"]),
-            "prefix_phase": _phase(task_states[-1]),
+            "prefix_phase": prefix_phase,
             "metadata": metadata,
             "prefix_actions": prefix_actions,
             "prefix_records": prefix_records,
@@ -284,7 +289,8 @@ def collect_one(
         delta_bounds=_joint_delta_arm_bounds(env),
     )
     try:
-        expert_result = continue_episode(proxy, planner, seed=seed)
+        oracle_fn = direct_continue_episode if oracle_mode == "direct_grasp" else legacy_continue_episode
+        expert_result = oracle_fn(proxy, planner, seed=seed)
     except Exception as exc:
         return {
             "seed": seed,
@@ -293,7 +299,7 @@ def collect_one(
             "accepted": False,
             "reason": "expert_continuation_exception",
             "success": False,
-            "prefix_phase": _phase(task_states[-1]),
+            "prefix_phase": prefix_phase,
             "metadata": metadata,
             "expert_error": repr(exc),
             "prefix_actions": prefix_actions,
@@ -314,7 +320,8 @@ def collect_one(
         "accepted": bool(success and expert_actions),
         "reason": "accepted" if success and expert_actions else "expert_continuation_failed",
         "success": success,
-        "prefix_phase": _phase(task_states[-1]),
+        "oracle_mode": oracle_mode,
+        "prefix_phase": prefix_phase,
         "metadata": metadata,
         "expert_result": expert_result,
         "prefix_actions": prefix_actions,
@@ -341,6 +348,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-episode-steps", type=int, default=400)
     parser.add_argument("--image-size", type=int, default=384)
     parser.add_argument("--sim-backend", choices=("physx_cpu", "gpu"), default="physx_cpu")
+    parser.add_argument(
+        "--oracle-mode",
+        choices=("legacy", "direct_grasp"),
+        default="legacy",
+        help="legacy full continuation or current-state direct-grasp continuation",
+    )
     return parser.parse_args()
 
 
@@ -378,6 +391,7 @@ def main() -> None:
                 takeover_step=args.takeover_step,
                 execute_horizon=args.execute_horizon,
                 max_episode_steps=args.max_episode_steps,
+                oracle_mode=args.oracle_mode,
             )
             attempt_dir = args.output_root / "raw_attempts" / f"attempt_{attempt:06d}_seed_{seed:06d}"
             attempt_dir.mkdir(parents=True, exist_ok=True)
@@ -420,6 +434,7 @@ def main() -> None:
                 "accepted": bool(result.get("accepted", False)),
                 "success": bool(result.get("success", False)),
                 "reason": result.get("reason"),
+                "oracle_mode": args.oracle_mode,
                 "expert_action_steps": len(result.get("expert_actions", [])),
                 "video": result.get("video"),
                 "evidence_dir": str(attempt_dir),
@@ -495,6 +510,7 @@ def main() -> None:
         "raw_attempt_manifest": str(args.output_root / "raw_attempts.jsonl"),
         "dataset": str(args.output_root / "lerobot_dataset"),
         "status": "complete" if len(accepted_rows) >= args.target else "incomplete_unrecoverable_candidate",
+        "oracle_mode": args.oracle_mode,
     }
     (args.output_root / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
     if len(accepted_rows) < args.target:
