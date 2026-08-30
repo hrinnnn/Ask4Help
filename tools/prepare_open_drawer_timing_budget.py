@@ -28,6 +28,15 @@ def exact_subset(lengths: list[int], budget: int) -> list[int] | None:
     return None
 
 
+def reachable_sums(lengths: list[int]) -> set[int]:
+    """Return whole-episode sums reachable without slicing or padding."""
+
+    reachable = {0}
+    for length in lengths:
+        reachable |= {total + int(length) for total in tuple(reachable)}
+    return reachable
+
+
 def copy_dataset(source: Path, output: Path, selected: list[int], budget: int) -> None:
     if output.exists():
         raise FileExistsError(f"refusing to overwrite {output}")
@@ -81,7 +90,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--condition", action="append", type=parse_condition, required=True)
-    parser.add_argument("--budget", type=int)
+    parser.add_argument(
+        "--budget",
+        type=str,
+        help="integer exact budget, or auto_max_common for the largest common reachable sum",
+    )
     args = parser.parse_args()
     conditions = dict(args.condition)
     if args.output_root.exists() and any(args.output_root.iterdir()):
@@ -95,7 +108,16 @@ def main() -> None:
             raise ValueError(f"invalid episode lengths for {name}: {source}")
         lengths[name] = values
         totals[name] = sum(values)
-    budget = int(args.budget) if args.budget is not None else min(totals.values())
+    if args.budget == "auto_max_common":
+        common = set.intersection(*(reachable_sums(lengths[name]) for name in conditions))
+        common.discard(0)
+        if not common:
+            raise RuntimeError("no positive common whole-episode budget is reachable")
+        budget = max(common)
+        budget_selection_rule = "maximum_common_reachable_whole_episode_sum"
+    else:
+        budget = int(args.budget) if args.budget is not None else min(totals.values())
+        budget_selection_rule = "explicit_or_minimum_source_total"
     if budget <= 0 or budget > min(totals.values()):
         raise ValueError(f"budget {budget} exceeds a source total: {totals}")
     selected: dict[str, list[int]] = {}
@@ -116,6 +138,7 @@ def main() -> None:
         "selected_expert_actions": actual,
         "selected_source_episode_indices": selected,
         "source_datasets": {name: str(path.resolve()) for name, path in conditions.items()},
+        "budget_selection_rule": budget_selection_rule,
     }
     (args.output_root / "budget_manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     (args.output_root / "BUDGET_AUDIT_PASS").write_text("all timing anchors selected exact whole-episode budget\n", encoding="utf-8")
