@@ -127,6 +127,9 @@
     "formal_collection_target_accepted_per_anchor": 30,
     "formal_collection_max_attempts_per_anchor": 80,
     "formal_collection_seed_start": 78300,
+    "direct_oracle_source_commit": "99b8ba8",
+    "formal_collection_controller_commit": "cd2ab31",
+    "adaptive_total_controller_commit": "51cecb5",
     "formal_budget_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_direct_oracle_formal_retry1/formal_budget",
     "adaptive_training_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_direct_oracle_adaptive_retry1",
     "adaptive_runtime_scratch": {
