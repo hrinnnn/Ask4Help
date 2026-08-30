@@ -1,8 +1,8 @@
 # OpenDrawer Grasp-OOD Controlled Timing Sweep
 
-**状态：Oracle repair 的 extended validation 已完成，等待用户审核视频；它覆盖 `grasp_ood`、`handle_ood`、`goal_ood` 的
-`t=0/80/160/220/300`，并显式验证“已抓住把手时从当前姿态继续拉”。retry10 的旧 Oracle adaptive
-training 已暂停且只作 diagnostic，未经用户审核不进入正式训练。**
+**状态：用户已审核并批准修复后的 direct-grasp Oracle。现在用它重新收集六个正式 timing anchor
+（`0/50/80/120/160/220`）的 Grasp-OOD expert suffix；旧 Oracle formal 数据不复用。收集与
+共同预算审计完成后，按统一训练步数规则启动最多四卡的 adaptive training。**
 
 本 pipeline 只研究 OpenDrawerRetrievePlace 的 `grasp_ood` 条件：保持 handle、drawer、
 goal、robot、camera、prompt、norm、action contract 和 success predicate 不变，只把
@@ -104,14 +104,17 @@ pose-only 结果并单独报告 contact/progress auxiliary channel，不调整 p
 
 ## 7. Matched-budget training and evaluation
 
-正式阶段每个 anchor：
+正式阶段每个 anchor（本轮重新收集，Oracle 为 `direct_grasp`）：
 
 - 30 accepted Grasp-OOD suffixes，完整 episode only；
-- 六个 anchor 的共同专家动作预算冻结为 `5006`，由完整 episode length 的最大共同可达
-  exact sum 决定，不根据 SR 或 D-path 结果调整；
+- 六个 anchor 的共同专家动作预算重新由新 Oracle 数据的完整 episode length 计算最大共同可达
+  exact sum，并在训练前冻结；不复用旧 Oracle 的 `5006`，也不根据 SR 或 D-path 结果调整；
 - 与固定 128-ID dataset 组合，source-balanced `1:1`；
-- 在所有 anchor 之间选择同一 exact whole-episode expert-action budget；
-- 从同一 immutable checkpoint 独立训练 3 个 seeds，2500 update steps；
+- 在所有 anchor 之间选择同一 exact whole-episode expert-action budget；所有 checkpoint 使用
+  同一套新 Oracle budget-selected 数据；
+- 每个 anchor 只训练一个模型，全部使用共同 seed `9301`；每个模型至少训练 `5000` 步，
+  每次 Grasp-OOD20 严格成功率 `<=40%` 时追加 `2500` 步；首个超过 `40%` 的累计步数冻结
+  并用于所有 anchor；
 - 使用冻结 ID 与 Grasp-OOD seeds，各 100 episodes 评测；
 - 主 endpoint 为 strict OpenDrawer success，辅助报告 drawer-opened、grasp、lift、
   in-target rates。
@@ -209,6 +212,20 @@ handle pregrasp/reach，也不会先抬升把手。这个几何门控用于排�
 每个条件均达到 2 条 accepted。每个条件单独保存 summary、raw attempts、task-state timeline、
 actions/states 与视频；不改变 formal 分母或训练协议。用户审核这些视频后，才决定是否解锁
 adaptive training。
+
+### 8.2 正式 expert 重收集与训练切换
+
+用户已批准将 `direct_grasp` Oracle 作为正式 expert。正式重收集使用同一个 ID checkpoint、同一
+组 Grasp-OOD policy-prefix seed 和原冻结 anchor `{0,50,80,120,160,220}`；每个 anchor 目标
+30 条成功 continuation，最多 80 条 raw attempts。输出写入新的
+`open_drawer_grasp_timing_sweep_v1_direct_oracle_formal_retry1/formal`，并先通过独立的
+denominator/evidence audit，再由 exact whole-episode selector 生成新的 `formal_budget`。
+旧 `/open_drawer_grasp_timing_sweep_v1_formal/formal` 只作 diagnostic，不进入新训练。
+
+训练使用每个 anchor 一个模型、共同 seed `9301`、最多四张实时核验为空闲的 GPU。每个模型至少
+训练 5000 步；每个 checkpoint 先做 20 条 Grasp-OOD 诊断评测，严格成功率 `<=40%` 时追加
+2500 步，首个 `>40%` 的累计步数冻结，并让所有 anchor 使用同一冻结步数。训练、OOD20、后续
+100-ID/100-Grasp-OOD evaluation 继续保持交替和独立产物审计。
 
 ## 9. Completion
 
