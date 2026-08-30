@@ -60,7 +60,8 @@ fi
 [[ -f "$BUDGET_ROOT/BUDGET_AUDIT_PASS" ]] || fail exact_budget_selection "budget audit marker missing"
 
 write_state budget_audit running "new direct Oracle budget root=$BUDGET_ROOT"
-"$PY" - "$BUDGET_ROOT" "$FORMAL_ROOT" <<'PY' || exit_code=$?
+set +e
+"$PY" - "$BUDGET_ROOT" "$FORMAL_ROOT" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -79,7 +80,9 @@ for anchor in (0, 50, 80, 120, 160, 220):
         raise SystemExit(f"non-direct summary in anchor_{anchor}")
 print(json.dumps({"common_budget": next(iter(selected.values())), "rule": manifest["budget_selection_rule"]}))
 PY
-[[ "${exit_code:-0}" -eq 0 ]] || fail budget_audit "budget_manifest_audit_failed"
+budget_audit_rc=$?
+set -e
+[[ "$budget_audit_rc" -eq 0 ]] || fail budget_audit "budget_manifest_audit_failed"
 
 if [[ ! -f "$RUN/ADAPTIVE_TIMING_TRAINING_COMPLETE" ]]; then
   write_state adaptive_training running "one model per anchor; up to four audited idle GPUs"
