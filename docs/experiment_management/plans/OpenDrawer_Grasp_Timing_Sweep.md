@@ -1,6 +1,8 @@
 # OpenDrawer Grasp-OOD Controlled Timing Sweep
 
-**状态：Oracle repair diagnostic 已完成，正在等待用户审核 direct-grasp 视频；retry10 的旧 Oracle adaptive training 已暂停且只作 diagnostic，未经审核不进入正式训练。**
+**状态：Oracle repair 的 extended validation 正在运行；它覆盖 `grasp_ood`、`handle_ood`、`goal_ood` 的
+`t=0/80/160/220/300`，并显式验证“已抓住把手时从当前姿态继续拉”。retry10 的旧 Oracle adaptive
+training 已暂停且只作 diagnostic，未经用户审核不进入正式训练。**
 
 本 pipeline 只研究 OpenDrawerRetrievePlace 的 `grasp_ood` 条件：保持 handle、drawer、
 goal、robot、camera、prompt、norm、action contract 和 success predicate 不变，只把
@@ -191,6 +193,21 @@ timeline 分母、D-path 与 intervention-quality 指标，只有 reconciliation
 `open_drawer_grasp_timing_sweep_v1_direct_oracle_retry4`，六个 anchor 各有 3/3
 accepted success（18 条 accepted、24 条 raw videos）。这些视频只用于用户审核，
 不覆盖旧 formal collection，也不自动解锁 adaptive training。
+
+### 8.1 已抓住把手的继续拉动分支与扩展验证
+
+当 takeover 时抽屉尚未达到开启阈值，但双指已经同时接触 `drawer_link` 且 TCP 到当前黄色把手
+位置的距离不超过 `0.075\,m`，Oracle 将记录
+`handle_grasped_before_takeover=true`，保持闭合夹爪并从当前 TCP 直接规划拉动；它不会重新执行
+handle pregrasp/reach，也不会先抬升把手。这个几何门控用于排除抽屉前板的偶然接触。该分支已在
+现场仿真状态中验证：继续拉动后抽屉 qpos 从约 `0` 到 `-0.363`，TCP 的 z 变化约 `0.006\,m`，
+且 `direct_handle_pregrasp_steps=0`。
+
+为检查 Oracle 不依赖单一 Grasp-OOD 分布，新增 diagnostic video sweep 覆盖三个受控 OOD split
+（`grasp_ood`、`handle_ood`、`goal_ood`）和五个 takeover step（`0,80,160,220,300`），每个条件
+目标接受 2 条成功 continuation，最多 6 条 raw attempts。每个条件单独保存 summary、raw attempts、
+task-state timeline、actions/states 与视频；accepted 不足只标记该条件的 diagnostic failure，
+不改变 formal 分母或训练协议。用户审核这些视频后，才决定是否解锁 adaptive training。
 
 ## 9. Completion
 
