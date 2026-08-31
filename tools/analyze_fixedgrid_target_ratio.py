@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Target-supervision ratio on existing StackCube / Airplane timing corpora.
 
-Axes are from the paired same-reset nominal stable grasp, NOT unrecorded object
-quaternions. Translation uses the actually recorded current object centre.
+Axes are from the observed stable grasp, NOT unrecorded object quaternions.
+Translation uses the actually recorded current object centre. The paired-nominal
+axis mode is retained explicitly as a diagnostic alternative.
 """
 import argparse,json
 from pathlib import Path
@@ -53,7 +54,7 @@ def compare(query,ref,phase):
     return dict(indices=list(range(a,b)),mapping=(mapping+c).tolist(),distance=cost[np.arange(len(mapping)),mapping].tolist(),contact=(qc==rc[mapping]).tolist())
 
 
-def analyze_task(task,manifest,root,fk):
+def analyze_task(task,manifest,root,fk,frame_mode):
     episodes=[];fk_errors=[]
     for step,condition in manifest['conditions'].items():
         for entry in json.loads(Path(condition['episodes_file']).read_text()):
@@ -69,12 +70,13 @@ def analyze_task(task,manifest,root,fk):
                 raw_task_states=arrays['task_states'],actions=arrays['actions']))
     nominal={e['seed']:e for e in episodes if e['step']==0}
     for e in episodes:
-        base=nominal[e['seed']];j=base['blocks']['close'][1]-1
+        base=nominal[e['seed']] if frame_mode=='paired_nominal' else e
+        j=base['blocks']['close'][1]-1
         axes=base['world_rotation'][j]
         rotation=Rotation.from_matrix(axes.T@e['world_rotation'])
         e['pose']=dict(position=(e['world_position']-e['object_position'])@axes,
                        quaternion=rotation.as_quat()[:,[3,0,1,2]],width=e['width'])
-        e['frame_nominal_seed']=e['seed'];e['frame_nominal_step']=j
+        e['frame_seed']=e['seed'];e['frame_step']=j;e['frame_source_step']=base['step']
     refs=[e for e in nominal.values() if e['seed']%5<3]
     cal=[e for e in nominal.values() if e['seed']%5==3]
     checks=[e for e in nominal.values() if e['seed']%5==4]
@@ -115,7 +117,7 @@ def analyze_task(task,manifest,root,fk):
             compatible_anchors=valid,Q=valid/e['n'],blocks=e['blocks'],phase_stats=stats,thresholds=limits,
             reference_seed=r['seed'],reference_mapping=mapping,distance=distance,labels=labels,
             arrays=e['entry']['arrays'],video=e['entry']['meta']['video'],grasp_evidence=e['evidence'],
-            frame_nominal_seed=e['frame_nominal_seed'],frame_nominal_step=e['frame_nominal_step'])
+            grasp_frame_seed=e['frame_seed'],grasp_frame_step=e['frame_step'],grasp_frame_source_step=e['frame_source_step'])
     rows=[score(e) for e in episodes]
     summary={}
     for step in manifest['anchors']:
@@ -130,7 +132,7 @@ def analyze_task(task,manifest,root,fk):
         current=rows if q==.925 else [score(e,q) for e in episodes if e['entry']['selected']]
         sensitivity.append(dict(q=q,values={str(step):sum(r['compatible_anchors'] for r in current if r['step']==step and r['selected'])/manifest['budget'] for step in manifest['anchors']}))
     result=dict(protocol=dict(task=task,target='approach/alignment and closing to stable object grasp; lift/transport/release excluded',
-        frame='current object-centred translation; axes from same-reset nominal stable TCP grasp; NOT measured object-body quaternion',
+        frame_mode=frame_mode,frame='current object-centred translation; axes from observed stable TCP grasp; NOT measured object-body quaternion',
         frame_reason='source task-state logs do not contain per-frame object rotations; do not substitute terminal metadata',
         source=manifest['root'],budget=manifest['budget'],q=.925,units=dict(position_m=.02,angle_deg=15,gripper_mm=10),minimum_radius=MIN_RADIUS,
         reference_seeds=[e['seed'] for e in refs],calibration_seeds=[e['seed'] for e in cal],check_seeds=[e['seed'] for e in checks],
@@ -147,10 +149,12 @@ def analyze_task(task,manifest,root,fk):
     return result
 
 
-def main(root):
+def main(root,frame_mode):
     manifest=json.loads((root/'inputs/manifest.json').read_text())
     urdf=Path('artifacts/open_drawer_suffix_d_20260831/inputs/panda_v2.urdf');fk=PandaFK(urdf)
-    result={task:analyze_task(task,m,root,fk) for task,m in manifest.items()}
+    result={task:analyze_task(task,m,root,fk,frame_mode) for task,m in manifest.items()}
+    if (root/'analysis.json').exists() and not (root/'analysis_paired_nominal_v1.json').exists():
+        (root/'analysis_paired_nominal_v1.json').write_text((root/'analysis.json').read_text())
     (root/'analysis.json').write_text(json.dumps(result,indent=2,allow_nan=False))
     fig,axes=plt.subplots(1,2,figsize=(12,4.5),constrained_layout=True)
     for ax,(task,r) in zip(axes,result.items()):
@@ -162,4 +166,6 @@ def main(root):
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);main(p.parse_args().root)
+    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True)
+    p.add_argument('--frame-mode',choices=['paired_nominal','own_grasp'],default='own_grasp')
+    args=p.parse_args();main(args.root,args.frame_mode)
