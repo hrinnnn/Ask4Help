@@ -10,6 +10,18 @@ from render_open_drawer_ed_audit import download,frames
 COLORS={'non_target':'#b8bec5','target_compatible':'#24986c','target_mismatch':'#d95648','policy_prefix':'#427fb0'}
 
 
+def compile_videos(root,audit):
+    outputs=[]
+    for task in ['stackcube','airplane']:
+        clips=[v for v in audit if v['task']==task]
+        listing=''.join("file 'file:"+str(Path(v['output']).resolve())+"'\n" for v in clips)
+        target=root/'videos'/f'{task}_all_timings.mp4'
+        subprocess.run(['ffmpeg','-v','error','-y','-protocol_whitelist','file,pipe','-f','concat','-safe','0','-i','pipe:0',
+                        '-c','copy','-movflags','+faststart',str(target)],input=listing.encode(),check=True)
+        outputs.append(dict(task=task,output=str(target),frames=sum(v['frames'] for v in clips),clips=[v['output'] for v in clips]))
+    (root/'compilations.json').write_text(json.dumps(outputs,indent=2))
+
+
 def main(root):
     data=json.loads((root/'analysis.json').read_text());out=root/'videos';out.mkdir(exist_ok=True);sources=root/'source_videos';sources.mkdir(exist_ok=True)
     font=ImageFont.truetype('/System/Library/Fonts/Menlo.ttc',18);small=ImageFont.truetype('/System/Library/Fonts/Menlo.ttc',13)
@@ -63,6 +75,7 @@ def main(root):
             audit.append(dict(task=task,step=step,seed=seed,output=str(target),frames=last-first,fps=fps,source=meta,first_absolute_step=first))
             print('VIDEO_COMPLETE',task,step,seed,flush=True)
     (root/'video_audit.json').write_text(json.dumps(audit,indent=2))
+    compile_videos(root,audit)
 
 
 if __name__=='__main__':
