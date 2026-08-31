@@ -50,8 +50,8 @@ def main(root):
         denominator=sum(r['expert_anchors'] for r in selected);numerator=sum(r['compatible_anchors'] for r in selected)
         assert denominator==2413 and numerator==value['training_budget']['compatible_anchors']
     video_count=0
-    if (root/'video_audit.json').exists():
-        for v in json.loads((root/'video_audit.json').read_text()):
+    for video_manifest in root.glob('video_audit*.json'):
+        for v in json.loads(video_manifest.read_text()):
             info=json.loads(subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=nb_frames','-of','json',v['output']]))['streams'][0]
             assert int(info['nb_frames'])==v['frames'];video_count+=1
     out=dict(status='PASS_DIAGNOSTIC',attempts=262,accepted=180,per_group_training_denominator=2413,
