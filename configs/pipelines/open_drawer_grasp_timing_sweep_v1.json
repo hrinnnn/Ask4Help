@@ -5,8 +5,8 @@
   "owner_thread": "01a037ef-1a71-7ad3-9594-a7dcfe06ad7b",
   "owner_label": "codex-open-drawer-grasp-timing-sweep",
   "server": "zhaozhixuan@111.198.58.150:12001",
-  "current_stage": "direct_oracle_adaptive_training",
-  "next_stage": "adaptive_ood20_probe -> formal_100_ID_OOD_evaluation -> independent_reconciliation",
+  "current_stage": "direct_oracle_fixed5000_transition",
+  "next_stage": "stop pilot continuation at safe boundary -> audit fixed5000 anchors -> resume anchors 80/120/160/220 to cumulative 5000 -> formal_100_ID_OOD_evaluation -> independent_reconciliation",
   "run_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1",
   "active_execution_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_direct_oracle_adaptive_retry1",
   "formal_collection_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_formal/formal",
@@ -28,13 +28,23 @@
   },
   "training_parallelism": {
     "max_concurrent_jobs": 2,
-    "authorized_max_cards": 4,
+    "authorized_max_cards": 2,
     "gpu_pool": [0, 1, 3, 4, 6, 7],
     "probe_reserved_gpu_candidates": [2, 5],
     "cpu_sets": {"0": "0-19", "1": "20-39", "2": "40-59", "3": "60-79", "4": "80-99", "5": "100-119", "6": "120-139", "7": "140-159"},
     "ray_object_store_per_job_gb": 200,
     "scheduler": "audited_idle_gpu_lock",
-    "schedule": "up to two concurrent jobs acquire the first actually idle GPU from the pool; never use a GPU with another process; max two is retained until a four-job /dev/shm audit passes"
+    "schedule": "current leadership cap is two concurrent jobs/cards on the 5090; acquire only actually idle GPUs, never use a GPU with another process, and do not refill beyond two"
+  },
+  "resource_cap_decision": {
+    "server": "zhaozhixuan@111.198.58.150:12001",
+    "max_cards": 2,
+    "decision_recorded": "2026-08-31 leadership directive",
+    "action": "pause two lower-progress anchors after a complete periodic checkpoint and retain two cards for the higher-progress anchors",
+    "retained_anchors": [0, 50],
+    "paused_anchors": [80, 120],
+    "pause_is_engineering": true,
+    "scientific_variables_unchanged": true
   },
   "diagnostic_ood20_probe": {
     "split": "grasp_ood",
@@ -57,10 +67,10 @@
     "decision_recorded": "2026-08-29 user decision: evaluate a newly completed checkpoint first; do not rush the next checkpoint training"
   },
   "adaptive_training_protocol": {
-    "enabled": true,
+    "enabled": false,
     "minimum_training_steps": 5000,
-    "step_increment": 2500,
-    "pilot_model": "anchor_0/seed_9301",
+    "step_increment": 0,
+    "pilot_model": "anchor_0/seed_9301 (reported at 5000; no continuation under fixed override)",
     "models_per_anchor": 1,
     "training_seed_policy": "one shared frozen seed across anchors",
     "training_seed": 9301,
@@ -68,22 +78,40 @@
     "probe_split": "grasp_ood",
     "probe_episodes": 20,
     "strict_success_rate_threshold": 0.4,
-    "continue_if_rate_at_or_below_threshold": true,
-    "freeze_step_count_after_first_rate_above_threshold": true,
+    "continue_if_rate_at_or_below_threshold": false,
+    "freeze_step_count_after_first_rate_above_threshold": false,
     "all_subsequent_models_use_frozen_steps": true,
-    "order": "train_checkpoint -> audited_20_ood_probe -> next_training_checkpoint",
+    "order": "train_cumulative_5000 -> audited_20_ood_probe -> next_anchor",
+    "superseded_by": "fixed_5000_override_20260901",
     "parallel_initial_training": {
       "enabled": true,
-      "max_concurrent_models": 4,
+      "max_concurrent_models": 2,
       "initial_target_steps": 5000,
       "ray_object_store_memory_per_job_gib": 100,
       "shared_memory_capacity_gib": 504,
-      "scheduling_note": "all six anchors may be queued concurrently up to four audited idle GPUs; pilot anchor 0 still determines frozen_steps"
+      "scheduling_note": "current leadership cap permits at most two audited idle GPUs; fixed cumulative 5000 steps for every anchor"
     },
     "old_2500_step_root": "retry5 diagnostic only; never mixed into formal comparison",
     "active_root": "/data/zhaozhixuan/Ask4Help-open-drawer/results/open_drawer_grasp_timing_sweep_v1_retry10_adaptive",
     "controller": "tools/run_open_drawer_adaptive_parallel_controller.py",
-    "decision_recorded": "2026-08-30 user decision: train at least 5k; continue below/equal 40%; freeze the first passing step count for later checkpoints"
+    "recovery_controller": "tools/run_open_drawer_direct_oracle_adaptive_recovery_controller.py",
+    "shell_sleep_watchdog": "tools/watch_open_drawer_adaptive_shell_sleep.sh",
+    "recovery_shell_supervisor": "tools/watch_open_drawer_adaptive_recovery_restart.sh",
+    "recovery_policy": "adopt retained anchor_0/anchor_50 processes after the two-GPU cap pause; preserve any lower-step checkpoint root and resume only at the next canonical cumulative step",
+    "decision_recorded": "2026-08-30 adaptive rule retained as history; superseded for the formal comparison by the user fixed-5000 decision on 2026-09-01"
+  },
+  "fixed_5000_override": {
+    "enabled": true,
+    "decision_recorded": "2026-09-01 user decision",
+    "training_steps": 5000,
+    "cumulative_steps": true,
+    "all_anchors_same_step_count": true,
+    "pilot_anchor_0_ood20": {"steps": 5000, "successes": 5, "episodes": 20, "strict_success_rate": 0.25},
+    "anchor_50_ood20": {"steps": 5000, "successes": 15, "episodes": 20, "strict_success_rate": 0.75},
+    "formal_scope": "six one-model-per-anchor comparisons at cumulative global_step_5000",
+    "remaining_anchors": [80, 120, 160, 220],
+    "exclude_continuations": [7500, 10000],
+    "reason": "hold expert-action budget and optimization exposure constant so downstream differences reflect takeover timing"
   },
   "adaptive_formal_evaluation": {
     "enabled": true,
@@ -205,7 +233,7 @@
       "budget_selection_rule": "maximum common reachable whole-episode exact sum over new direct-Oracle episode lengths, frozen before training",
       "training_seeds": [9301],
       "training_steps": 5000,
-      "training_step_policy": "minimum 5000; add 2500 while strict Grasp-OOD20 SR <= 0.40; freeze first cumulative step count with SR > 0.40 for every anchor",
+      "training_step_policy": "fixed cumulative 5000 for every anchor under user override dated 2026-09-01; no +2500 continuation enters the formal comparison",
       "evaluation_episodes_per_split": 100,
       "evaluation_id_seed_start": 78500,
       "evaluation_ood_seed_start": 78600

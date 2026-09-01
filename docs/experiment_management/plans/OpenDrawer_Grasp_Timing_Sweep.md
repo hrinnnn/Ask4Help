@@ -2,7 +2,8 @@
 
 **状态：用户已审核并批准修复后的 direct-grasp Oracle。现在用它重新收集六个正式 timing anchor
 （`0/50/80/120/160/220`）的 Grasp-OOD expert suffix；旧 Oracle formal 数据不复用。收集与
-共同预算审计已完成，当前按统一训练步数规则运行最多四卡的 adaptive training。**
+共同预算审计已完成；用户于 2026-09-01 明确将正式比较固定为每个 anchor 累计训练 5000 步，
+受领导要求最多使用两张 5090 GPU。**
 
 本 pipeline 只研究 OpenDrawerRetrievePlace 的 `grasp_ood` 条件：保持 handle、drawer、
 goal、robot、camera、prompt、norm、action contract 和 success predicate 不变，只把
@@ -34,9 +35,20 @@ Grasp-OOD 的纯 policy rollout 应能够完成开抽屉前缀，但在抓取阶
 - pi0.5 base：`/data/zhaozhixuan/Ask4Help-open-drawer/results/model_cache/pi05_base_pytorch_v1`
 - runtime：`/data/zhaozhixuan/Ask4Help-airplane-5090/RLinf/.venv/bin/python`；planner 使用
   `/data/zhaozhixuan/simplerenv_ms3/env/bin/python`；训练控制器在每个 job 启动前实时审计并锁定
-  实际空闲 GPU（训练池避让预留给 OOD20 的 GPU2/5），最多同时运行两个 world-size-1 job（每个 Ray 实例对象存储 200 GB；在 504 GB
-  `/dev/shm` 通过四-job 审计前保持两-job上限）。用户授权的最多四卡只作为安全上限，绝不占用有其他
+  实际空闲 GPU（训练池避让预留给 OOD20 的 GPU2/5）。当前领导要求 5090 最多使用两张实际空闲卡，绝不占用有其他
   进程的 GPU；CPU sets 按 GPU 固定为 `0--19,20--39,...,140--159`。所有 seed、anchor、预算和训练步数保持不变。
+
+资源上限调整后，原四卡并行总控已停止，但 anchor 0/50 的训练子进程在完整周期边界前继续运行。
+当前由 `tools/run_open_drawer_direct_oracle_adaptive_recovery_controller.py` 作为远端持久化恢复总控，
+先接管并审计这两个既有进程，再对每个完整 checkpoint 执行独立 Grasp-OOD20 探针；稳定阶段使用
+`sleep 1800`，阶段边界或资源等待使用 `sleep 900`，不重复启动已有训练，也不改动暂停的
+anchor 80/120 周期 checkpoint。另有独立 shell watchdog `tools/watch_open_drawer_adaptive_shell_sleep.sh`
+实际执行字面 `sleep 900`/`sleep 1800`，只记录 controller/PID/marker 健康，不参与阶段决策。
+
+2026-08-31 晚间原 retained 进程在 `global_step_5000` 前退出；未发现 OOM/NaN/traceback，
+因此保留为 engineering interruption，不能写入完成标记。恢复 retry2 已从 anchor 0 的
+`global_step_4000` 与 anchor 50 的 `global_step_3500` 继续到共同 `5000`，并在启动后通过
+resume 参数、seed、数据集和 GPU 映射审计；后续仍由同一总控推进，不重新从 base checkpoint 开始。
 
 ## 3. 现有 OOD evidence
 
@@ -224,10 +236,30 @@ denominator/evidence audit，再由 exact whole-episode selector 生成新的 `f
 本次 selector 已得到并冻结共同预算 `2413` 个 expert actions；六个 anchor 的 selected sum
 完全相同，规则为最大共同可达整轨迹和。
 
-训练使用每个 anchor 一个模型、共同 seed `9301`、最多四张实时核验为空闲的 GPU。每个模型至少
-训练 5000 步；每个 checkpoint 先做 20 条 Grasp-OOD 诊断评测，严格成功率 `<=40%` 时追加
-2500 步，首个 `>40%` 的累计步数冻结，并让所有 anchor 使用同一冻结步数。训练、OOD20、后续
-100-ID/100-Grasp-OOD evaluation 继续保持交替和独立产物审计。
+训练使用每个 anchor 一个模型、共同 seed `9301`、最多两张实时核验为空闲的 GPU。用户于
+2026-09-01 覆盖此前 adaptive continuation，正式比较固定使用每个 anchor 累计 `5000` 步；
+anchor 0 和 anchor 50 采用已完成的 5000-step timing checkpoint，anchor 80/120/160/220
+从可用 partial checkpoint 续训到累计 5000 步。20 条 Grasp-OOD 评测保留为诊断审计，不再
+以 `<=40%` 触发正式比较中的 +2500 continuation；后续 100-ID/100-Grasp-OOD evaluation
+仍保持交替和独立产物审计。
+
+专家数据的匹配含义是：六个 anchor 使用同一个 direct-grasp expert/Oracle、同一个 ID base
+policy、同一共同 seed 和同一冻结的 `2413` expert-action exact whole-episode budget；不同
+anchor 的 suffix 轨迹内容因 takeover 时刻不同而不同，不能表述为逐条相同的轨迹。
+
+### 2026-09-01：fixed-5000 用户覆盖
+
+用户确认正式结果只比较六个累计 `global_step_5000` 的 anchor 模型。anchor 0 使用其
+5000-step OOD20 `5/20=25%`，anchor 50 使用其 5000-step OOD20 `15/20=75%`；两者均为
+观测结果而非统一达标门槛。此前已启动的 anchor 0 `7500→10000` continuation 不进入正式
+比较，应在保留其 checkpoint/日志的前提下安全停止；其余四个 anchor 只训练到累计 5000。
+
+2026-08-31 晚间 retry1 的两个 retained 进程在 `global_step_5000` 前退出；未发现 OOM、NaN 或
+traceback，因此该状态只作为 engineering interruption，不能写入完成标记。恢复 retry2 已从
+anchor 0 的 `global_step_4000` 与 anchor 50 的 `global_step_3500` 继续到共同 `5000`，并通过
+resume 参数、seed、数据集和 GPU 映射审计；不重新从 base checkpoint 开始。持久 shell supervisor
+`tools/watch_open_drawer_adaptive_recovery_restart.sh` 只在 controller 失败且没有存活训练 PID
+时用实际 `sleep 900` 延迟重试，完成标记出现后退出。
 
 第一次 direct-Oracle adaptive 启动在 Ray 初始化时因 scratch 路径仍导致 AF\_UNIX socket 超过
 107 字节而退出；该日志保留为 engineering diagnostic。重试只把运行时 scratch 缩短为
