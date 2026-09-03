@@ -45,13 +45,16 @@ for row in rows:
  try:
   env=gym.make(env_id,num_envs=1,obs_mode='none',control_mode='pd_joint_delta_pos',reward_mode='sparse',render_mode=None,
    sim_backend='physx_cpu',render_backend='none',sim_config={'sim_freq':100,'control_freq':10},max_episode_steps=1000,**kw)
+  print('CPU_ENV_CREATED',task,file=sys.stderr,flush=True)
   base=env.unwrapped;env.reset(seed=row['seed']);recorded=[];obj=base.cubeA if task=='stackcube' else base.obj
+  print('CPU_RESET_COMPLETE',task,file=sys.stderr,flush=True)
   def snapshot():
    return dict(qpos=base.agent.robot.get_qpos().reshape(-1).cpu().numpy().copy().tolist(),object_p=obj.pose.p.reshape(-1).cpu().numpy().copy().tolist(),
     object_q=obj.pose.q.reshape(-1).cpu().numpy().copy().tolist(),grasped=bool(base.agent.is_grasping(obj)))
   recorded.append(snapshot())
   for a in row['actions']:
    env.step(torch.as_tensor(a,dtype=torch.float32).reshape(1,-1));recorded.append(snapshot())
+  print('CPU_REPLAY_STEPS_COMPLETE',task,file=sys.stderr,flush=True)
   q=np.array([r['qpos'] for r in recorded]);expected=np.array(row['qpos']);start=row['start'];error=np.max(np.abs(q[start:start+len(expected)]-expected),axis=1)
   result=dict(task=task,method=row['method'],seed=row['seed'],status='PASS_QPOS_REPLAY_ONLY' if error.max()<1e-4 else 'REPLAY_DRIFT',
    frames=len(recorded),max_qpos_error=float(error.max()),first_bad_offset=int(np.flatnonzero(error>=1e-4)[0]) if np.any(error>=1e-4) else None,

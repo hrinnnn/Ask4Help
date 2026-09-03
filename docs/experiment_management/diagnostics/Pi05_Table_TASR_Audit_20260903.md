@@ -42,6 +42,8 @@ H20已有runtime路径`/root/.venvs/xvla-h20/bin/python`实际解析到`/opt/con
 
 第一次探针的Python输入序列化`inf`问题已修复后重试；当前阻塞是上面的环境初始化退出。没有重训、没有占新GPU、没有停止既有进程。
 
+新增分阶段日志的独立`cpu_localization_retry`仍退出255：有`CPU_REPLAY_START`而无`CPU_ENV_CREATED`，确认退出位于`gym.make`返回之前，不是在数值一致性核对阶段。日志提示Vulkan ICD未找到；尚未确认这是否为唯一根因。
+
 资源现场：5090所有卡有工作；H20两卡仅有PID276925（32天、CPU0.0、GPU上下文338/328MiB），未停止或复用。已向用户询问是否允许在其中一卡使用少量显存验证回放。获准后先确认render/device与原环境协议，再用原qpos/动作验证；若不一致，禁止批量伪重建和TASR填表。
 
 当前交付是**SR纠错和输入就绪，不是TASR完成**。校对LaTeX为 `artifacts/pi05_table_tasr_20260903/active_learning_results_verified_pending_tasr.tex`，所有尚未验证的TASR仍为`--`。
