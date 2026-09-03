@@ -105,7 +105,7 @@ release_gpu() {
 }
 
 checkpoint_for_anchor() {
-  local anchor=$1 frozen=$2 marker="$RUN/training/anchor_${anchor}/seed_${TRAIN_SEED}/steps_${frozen}/SEGMENT_COMPLETE"
+  local anchor=$1 frozen_steps=$2 marker="$RUN/training/anchor_${anchor}/seed_${TRAIN_SEED}/steps_${frozen_steps}/SEGMENT_COMPLETE"
   [[ -f "$marker" ]] || return 1
   "$PY" - "$marker" <<'PY'
 import re, sys
