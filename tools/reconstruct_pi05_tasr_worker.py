@@ -56,7 +56,11 @@ def main(args):
     object_p=vec(obj.pose.p),object_q=vec(obj.pose.q),grasped=bool(base.agent.is_grasping(obj)),success=bool(info['success'])))
   snap();initial=base.get_state_dict() if task=='airplane' and row['expert_start']==0 else None
   for t,a in enumerate(row['actions']):
-   if task=='airplane' and t==row['expert_start']:base.set_state_dict(initial if initial is not None else base.get_state_dict())
+   if task=='airplane' and t==row['expert_start']:
+    if args.candidate_history:
+     from replay_airplane_candidate_history import restore_candidate_history
+     restore_candidate_history(env,row)
+    else:base.set_state_dict(initial if initial is not None else base.get_state_dict())
    env.step(torch.tensor(a,dtype=torch.float32).reshape(1,-1));snap()
   data={k:np.asarray([s[k] for s in snapshots]) for k in snapshots[0]};expected=np.asarray(row['qpos']);start=row['expert_start']
   error=np.max(np.abs(data['qpos'][start:start+len(expected)]-expected),axis=1)
@@ -79,5 +83,5 @@ def main(args):
  (args.output/f'reconciliation_shard_{args.shard}.json').write_text(json.dumps(reports,indent=2));save_state('REPLAY_FINISHED')
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--shard',type=int,default=0);p.add_argument('--shards',type=int,default=1);p.add_argument('--limit-per-group',type=int);p.add_argument('--warmup-replays',type=int,default=0);p.add_argument('--native-observation',action='store_true')
+ p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--shard',type=int,default=0);p.add_argument('--shards',type=int,default=1);p.add_argument('--limit-per-group',type=int);p.add_argument('--warmup-replays',type=int,default=0);p.add_argument('--native-observation',action='store_true');p.add_argument('--candidate-history',action='store_true')
  main(p.parse_args())
