@@ -37,7 +37,16 @@ def main(args):
   env_id=getattr(module,f'{prefix}_{split}_ENV_ID')
   env=gym.make(env_id,num_envs=1,robot_uids='panda_wristcam',obs_mode='none',control_mode='pd_joint_delta_pos',reward_mode='sparse',
    render_mode=None,sim_backend='physx_cpu',render_backend='gpu',sim_config={'sim_freq':100,'control_freq':10},max_episode_steps=1000)
-  base=env.unwrapped;env.reset(seed=row['seed']);obj=base.cubeA if task=='stackcube' else base.obj
+  base=env.unwrapped
+  # The historical StackCube full-suffix materializer retried identical actions
+  # up to eight times because contact outcomes were not bitwise deterministic.
+  # Warmups reconstruct that reset history, never alter actions or seeds.
+  for warmup in range(args.warmup_replays):
+   env.reset(seed=row['seed'])
+   for t,a in enumerate(row['actions']):
+    if task=='airplane' and t==row['expert_start']:base.set_state_dict(base.get_state_dict())
+    env.step(torch.tensor(a,dtype=torch.float32).reshape(1,-1))
+  env.reset(seed=row['seed']);obj=base.cubeA if task=='stackcube' else base.obj
   snapshots=[]
   def snap():
    def vec(x):return x.reshape(-1).detach().cpu().numpy().copy()
@@ -54,7 +63,7 @@ def main(args):
   report.update(status='PASS' if float(error.max())<1e-4 else 'REPLAY_DRIFT',max_qpos_error=float(error.max()),
    first_bad_offset=int(np.flatnonzero(error>=1e-4)[0]) if np.any(error>=1e-4) else None,
    final_success=bool(data['success'][-1]),array_file=str(npzpath),state_rows=len(snapshots),original_action_count=len(row['actions']),
-   per_joint_max_error=np.max(np.abs(data['qpos'][start:start+len(expected)]-expected),axis=0).tolist())
+   per_joint_max_error=np.max(np.abs(data['qpos'][start:start+len(expected)]-expected),axis=0).tolist(),warmup_replays=args.warmup_replays)
   pose_key='cube_a_pose' if task=='stackcube' else 'object_pose';pose_index=-1 if task=='airplane' else 0
   if pose_key in row['metadata']:
    original=row['metadata'][pose_key];pe=float(np.max(np.abs(data['object_p'][pose_index]-original['p'])))
@@ -69,5 +78,5 @@ def main(args):
  (args.output/f'reconciliation_shard_{args.shard}.json').write_text(json.dumps(reports,indent=2));save_state('REPLAY_FINISHED')
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--shard',type=int,default=0);p.add_argument('--shards',type=int,default=1);p.add_argument('--limit-per-group',type=int)
+ p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--shard',type=int,default=0);p.add_argument('--shards',type=int,default=1);p.add_argument('--limit-per-group',type=int);p.add_argument('--warmup-replays',type=int,default=0)
  main(p.parse_args())
