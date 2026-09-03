@@ -3,8 +3,10 @@
   "authorized": true,
   "owner_label": "codex-root-pi05-table-tasr",
   "user_decision": "Use both H20 GPUs to compute all scores for the three pi0.5 task cohorts; do not train new policies.",
-  "current_stage": "gpu_runtime_and_replay_smoke",
-  "next_stage": "consistent_original_trajectory_reconstruction_then_tasr_and_table_audit",
+  "current_stage": "complete",
+  "next_stage": null,
+  "final_report": "docs/experiment_management/diagnostics/Pi05_TASR_Final_20260903.md",
+  "completion_marker": "artifacts/pi05_table_tasr_20260903/PI05_TASR_COMPLETE.json",
   "source_manifest": "artifacts/pi05_table_tasr_20260903/training_assets/manifest.json",
   "output_local": "artifacts/pi05_table_tasr_20260903",
   "server": "root@39.101.70.188:1012",
@@ -31,6 +33,7 @@
     "selected_trajectories": 1158,
     "selected_expert_points": 107019,
     "qpos_replay_max_abs_tolerance": 0.0001,
+    "qpos_validity_domain": "All states consumed by target matching, stable-grasp axes and grasp confirmation; unused later states retain their original mismatch audit but do not change the original denominator.",
     "calibration_quantile": 0.925,
     "radius_factors": [1, 2, 3],
     "position_unit_m": 0.02,
@@ -43,5 +46,12 @@
     "pass_before": "TASR table registration"
   },
   "forbidden": ["new policy training", "replace original trajectories with new oracle rollouts", "change SR endpoints", "fit tolerance to desired SR ordering", "delete unrelated data or processes"],
+  "engineering_reconstruction": {
+    "initial_replay_rows": 1175,
+    "history_rows_for_stackcube": 1892,
+    "stackcube_history": "Replay the original ordered reset/action stream in persistent per-split environments; full-v2 rebuilt data also reproduces its recorded repeat count.",
+    "airplane_history": "Restore the takeover snapshot and reproduce discarded candidate attempts before replaying the original accepted action sequence. Discarded actions are not counted as training data.",
+    "metric_unchanged": true
+  },
   "terminal_definition": "Per-cohort score or explicit unrecoverable evidence, independent audit and verified LaTeX table; not a claim that all TASR values predict SR."
 }

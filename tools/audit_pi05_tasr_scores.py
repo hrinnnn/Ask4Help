@@ -12,12 +12,19 @@ def main(root,replay,tasks):
   for r in rows:
    q=np.load(r['arrays'])['qpos'];start=r['expert_start'];n=len(q);e=r['blocks']['close'][1]
    state=np.load(r.get('replay_array',replay/task/r['method']/f"episode_{r['source_episode_index']:06d}.npz"))
+   stop=min(n,e+1);replay_error=float(np.max(abs(q[:stop]-state['qpos'][start:start+stop])))
+   assert replay_error<1e-4
+   assert abs(replay_error-r['target_replay_max_error'])<1e-10
    position,rotation=fk.pose(q);position+=np.array([-.615,0,0]);axes=rotation[e-1]
    key=(r['method'],r['seed'],r['split']);poses[key]=((position-state['object_p'][start:start+n])@axes,axes.T@rotation,q[:,-2:].sum(axis=1));contacts[key]=state['grasped'][start:start+n]
   maxerror=0;points=0
   for r in rows:
    key=(r['method'],r['seed'],r['split']);rk=('offline_oracle',r['reference_seed'],'ood');p,R,w=poses[key];rp,rR,rw=poses[rk]
    assert r['seed']!=r['reference_seed']
+   for f in ['1','2','3']:
+    assert len(r['labels'][f])==r['expert_points']
+    for i,label in enumerate(r['labels'][f]):
+     if not any(a<=i<b for a,b in r['blocks'].values()):assert label=='non_target'
    for phase,(a,b) in r['blocks'].items():
     if a==b:continue
     j=np.array(r['reference_mapping'][a:b]);assert np.all(np.diff(j)>=0) and np.all(np.diff(j)<=5)
