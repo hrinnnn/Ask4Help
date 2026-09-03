@@ -44,7 +44,7 @@ for row in rows:
  print('CPU_REPLAY_START',task,row['method'],row['seed'],file=sys.stderr,flush=True)
  try:
   env=gym.make(env_id,num_envs=1,obs_mode='none',control_mode='pd_joint_delta_pos',reward_mode='sparse',render_mode=None,
-   sim_backend='physx_cpu',render_backend='none',sim_config={'sim_freq':100,'control_freq':10},max_episode_steps=1000,**kw)
+   sim_backend='physx_cpu',render_backend=render_backend,sim_config={'sim_freq':100,'control_freq':10},max_episode_steps=1000,**kw)
   print('CPU_ENV_CREATED',task,file=sys.stderr,flush=True)
   base=env.unwrapped;env.reset(seed=row['seed']);recorded=[];obj=base.cubeA if task=='stackcube' else base.obj
   print('CPU_RESET_COMPLETE',task,file=sys.stderr,flush=True)
@@ -52,7 +52,11 @@ for row in rows:
    return dict(qpos=base.agent.robot.get_qpos().reshape(-1).cpu().numpy().copy().tolist(),object_p=obj.pose.p.reshape(-1).cpu().numpy().copy().tolist(),
     object_q=obj.pose.q.reshape(-1).cpu().numpy().copy().tolist(),grasped=bool(base.agent.is_grasping(obj)))
   recorded.append(snapshot())
-  for a in row['actions']:
+  for t,a in enumerate(row['actions']):
+   if task=='airplane' and t==row['start']:
+    # Original _plan_and_execute_expert restores its snapshot even for the
+    # first candidate. Preserve that physics/contact-cache reset operation.
+    base.set_state_dict(base.get_state_dict())
    env.step(torch.as_tensor(a,dtype=torch.float32).reshape(1,-1));recorded.append(snapshot())
   print('CPU_REPLAY_STEPS_COMPLETE',task,file=sys.stderr,flush=True)
   q=np.array([r['qpos'] for r in recorded]);expected=np.array(row['qpos']);start=row['start'];error=np.max(np.abs(q[start:start+len(expected)]-expected),axis=1)
@@ -65,7 +69,7 @@ for row in rows:
 print(json.dumps(out))
 '''
 
-def main(root):
+def main(root,gpu,backend):
  root.mkdir(parents=True,exist_ok=True)
  h='/mnt/data/ask4help/results/';y='/data/zhaozhixuan/Ask4Help-airplane-5090/results/object_variation_pick_single_ycb_v1/'
  requests=[('5090',[dict(task='object',method='offline_oracle',collection=y+'collections_v1/offline_oracle',dataset=y+'datasets/offline_oracle_v1'),
@@ -79,9 +83,12 @@ def main(root):
   rows.extend(json.loads(gzip.decompress(r.stdout)))
  (root/'replay_probe_inputs.json').write_text(json.dumps(rows,indent=2))
  sources={task:Path('RLinf/rlinf/envs/maniskill/'+file).read_text() for task,file in [('object','pick_single_ycb_object_variation.py'),('airplane','pick_single_ycb_airplane_variants.py')]}
- script='import json\nrows=json.loads('+repr(json.dumps(rows))+')\nsources='+repr(sources)+'\n'+REPLAY
+ script='import json\nrows=json.loads('+repr(json.dumps(rows))+')\nsources='+repr(sources)+'\nrender_backend='+repr(backend)+'\n'+REPLAY
+ scratch='/tmp/pi05_tasr_reconstruction_v1'
+ subprocess.run(['ssh','-p','1012','root@39.101.70.188',f'mkdir -p {scratch}/cache {scratch}/tmp'],check=True)
+ env=f"CUDA_VISIBLE_DEVICES='{gpu}' OMP_NUM_THREADS=2 PYTHONDONTWRITEBYTECODE=1 TMPDIR={scratch}/tmp XDG_CACHE_HOME={scratch}/cache VK_ICD_FILENAMES=/opt/conda/envs/robo-dopamine/lib/python3.10/site-packages/sapien/vulkan_library/nvidia_icd.json"
  r=subprocess.run(['ssh','-o','ConnectTimeout=12','-o','BatchMode=yes','-p','1012','root@39.101.70.188',
-  "env CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=2 /root/.venvs/xvla-h20/bin/python -"],input=script.encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+  f"env {env} /root/.venvs/xvla-h20/bin/python -"],input=script.encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
  (root/'replay_probe.stdout').write_bytes(r.stdout);(root/'replay_probe.stderr').write_bytes(r.stderr)
  print(r.stderr.decode(errors='replace')[-12000:]);print('REMOTE_EXIT',r.returncode)
  if r.returncode==0:
@@ -89,4 +96,4 @@ def main(root):
   result=json.loads(r.stdout.decode().splitlines()[-1]);(root/'replay_probe_results.json').write_text(json.dumps(result,indent=2))
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);main(p.parse_args().root)
+ p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--gpu',default='');p.add_argument('--render-backend',default='none');a=p.parse_args();main(a.root,a.gpu,a.render_backend)

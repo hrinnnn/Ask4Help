@@ -1,0 +1,47 @@
+{
+  "pipeline_id": "pi05_tasr_reconstruction_v1",
+  "authorized": true,
+  "owner_label": "codex-root-pi05-table-tasr",
+  "user_decision": "Use both H20 GPUs to compute all scores for the three pi0.5 task cohorts; do not train new policies.",
+  "current_stage": "gpu_runtime_and_replay_smoke",
+  "next_stage": "consistent_original_trajectory_reconstruction_then_tasr_and_table_audit",
+  "source_manifest": "artifacts/pi05_table_tasr_20260903/training_assets/manifest.json",
+  "output_local": "artifacts/pi05_table_tasr_20260903",
+  "server": "root@39.101.70.188:1012",
+  "output_remote": "/mnt/data/ask4help/results/pi05_tasr_reconstruction_v1",
+  "scratch_remote": "/tmp/pi05_tasr_reconstruction_v1",
+  "runtime": "/root/.venvs/xvla-h20/bin/python",
+  "placement_preflight": {
+    "selected_server": "H20",
+    "gpu_names": ["NVIDIA H20", "NVIDIA H20"],
+    "authorized_gpus": [0, 1],
+    "existing_process_to_preserve": 276925,
+    "existing_gpu_memory_mib": [348, 338],
+    "cpu_threads_per_worker": 2,
+    "memory_available_gib": 249,
+    "root_disk_full": true,
+    "scratch_free_gib": 14,
+    "persistent_storage": "OSS mount /mnt/data",
+    "selected_reason": "Original StackCube/Plane inputs, YCB assets, sufficient authorized compute, scratch and persistent outputs available; only small numeric YCB inputs need transfer.",
+    "rejected_alternatives": ["5090: all cards have workloads; no need to contend or transfer large assets."]
+  },
+  "scientific_frozen": {
+    "tasks": ["legacy StackCube", "Grab Plane", "PickSingleYCB Object"],
+    "models": "existing pi0.5 only",
+    "selected_trajectories": 1158,
+    "selected_expert_points": 107019,
+    "qpos_replay_max_abs_tolerance": 0.0001,
+    "calibration_quantile": 0.925,
+    "radius_factors": [1, 2, 3],
+    "position_unit_m": 0.02,
+    "orientation_unit_degrees": 15,
+    "gripper_unit_m": 0.01
+  },
+  "execution_audit": {
+    "required": ["raw-action versus actual trained parquet equality", "original qpos replay agreement", "reference and contact evidence", "exact training denominators", "no relabeling Deep-kNN as PCA", "separate original task-specific success endpoints"],
+    "failure_marker": "RECONSTRUCTION_MISMATCH_OR_RUNTIME_FAILURE",
+    "pass_before": "TASR table registration"
+  },
+  "forbidden": ["new policy training", "replace original trajectories with new oracle rollouts", "change SR endpoints", "fit tolerance to desired SR ordering", "delete unrelated data or processes"],
+  "terminal_definition": "Per-cohort score or explicit unrecoverable evidence, independent audit and verified LaTeX table; not a claim that all TASR values predict SR."
+}
