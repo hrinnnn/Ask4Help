@@ -19,35 +19,47 @@ def main(args):
    if r['split']=='ood' and r['selected'] and counts.get(key,0)<args.limit_per_group:chosen.append(r);counts[key]=counts.get(key,0)+1
   rows=chosen
  rows=[r for i,r in enumerate(rows) if i%args.shards==args.shard]
- args.output.mkdir(parents=True,exist_ok=True);started=time.time();reports=[]
+ args.output.mkdir(parents=True,exist_ok=True);started=time.time();reports=[];env_pool={}
  state_path=args.output/f'pipeline_state_shard_{args.shard}.json'
  def save_state(stage,last=None):
   state=dict(stage=stage,pid=os.getpid(),shard=args.shard,shards=args.shards,total=len(rows),done=len(reports),passed=sum(r['status']=='PASS' for r in reports),
-   failed=sum(r['status']!='PASS' for r in reports),elapsed_seconds=time.time()-started,last=last)
+   failed=sum(r['status'] not in ['PASS','HISTORY_ONLY'] for r in reports),elapsed_seconds=time.time()-started,last=last)
   tmp=state_path.with_suffix('.tmp');tmp.write_text(json.dumps(state,indent=2));tmp.replace(state_path)
  save_state('RUNNING')
  for row in rows:
   task=row['task'];method=row['method'];index=row['source_episode_index'];folder=args.output/task/method;folder.mkdir(parents=True,exist_ok=True)
   jsonpath=folder/f'episode_{index:06d}.json';npzpath=folder/f'episode_{index:06d}.npz'
-  if jsonpath.exists() and npzpath.exists():
+  if jsonpath.exists() and npzpath.exists() and not args.reuse_env:
    old=json.loads(jsonpath.read_text())
    if old['status']=='PASS':reports.append(old);continue
   module=modules[task];split=row['split'].upper()
   prefix={'object':'PICK_SINGLE_YCB_OBJECT','airplane':'PICK_SINGLE_YCB_AIRPLANE','stackcube':'STACK_CUBE'}[task]
   env_id=getattr(module,f'{prefix}_{split}_ENV_ID')
-  env=gym.make(env_id,num_envs=1,robot_uids='panda_wristcam',obs_mode='rgb' if args.native_observation else 'none',control_mode='pd_joint_delta_pos',reward_mode='sparse',
-   render_mode=None,sim_backend='physx_cpu',render_backend='gpu',sim_config={'sim_freq':100,'control_freq':10},max_episode_steps=1000,
-   sensor_configs={'width':384 if task=='stackcube' else 128,'height':384 if task=='stackcube' else 128})
+  def make(identifier):
+   return gym.make(identifier,num_envs=1,robot_uids='panda_wristcam',obs_mode='rgb' if args.native_observation else 'none',control_mode='pd_joint_delta_pos',reward_mode='sparse',
+    render_mode=None,sim_backend='physx_cpu',render_backend='gpu',sim_config={'sim_freq':100,'control_freq':10},max_episode_steps=1000,
+    sensor_configs={'width':384 if task=='stackcube' else 128,'height':384 if task=='stackcube' else 128})
+  if args.reuse_env:
+   if (task,method,'ID') not in env_pool:
+    for dom in ['ID','OOD']:env_pool[task,method,dom]=make(getattr(module,f'{prefix}_{dom}_ENV_ID'))
+   env=env_pool[task,method,split]
+  else:env=make(env_id)
   base=env.unwrapped
   # The historical StackCube full-suffix materializer retried identical actions
   # up to eight times because contact outcomes were not bitwise deterministic.
   # Warmups reconstruct that reset history, never alter actions or seeds.
-  for warmup in range(args.warmup_replays):
+  for warmup in range(row.get('recorded_warmups',args.warmup_replays)):
    env.reset(seed=row['seed'])
    for t,a in enumerate(row['actions']):
     if task=='airplane' and t==row['expert_start']:base.set_state_dict(base.get_state_dict())
     env.step(torch.tensor(a,dtype=torch.float32).reshape(1,-1))
   env.reset(seed=row['seed']);obj=base.cubeA if task=='stackcube' else base.obj
+  if row.get('history_only'):
+   for a in row['actions']:env.step(torch.tensor(a,dtype=torch.float32).reshape(1,-1))
+   record=dict(status='HISTORY_ONLY',task=task,method=method,seed=row['seed']);reports.append(record)
+   if len(reports)%25==0:save_state('RUNNING',record)
+   if not args.reuse_env:env.close()
+   continue
   snapshots=[]
   def snap():
    def vec(x):return x.reshape(-1).detach().cpu().numpy().copy()
@@ -78,10 +90,12 @@ def main(args):
   if not report['final_success']:report['status']='REPLAY_SUCCESS_MISMATCH'
   # The saved trace of a mismatch is diagnostic only, never an eligible score input.
   buffer=io.BytesIO();np.savez_compressed(buffer,**data);npzpath.write_bytes(buffer.getvalue())
-  jsonpath.write_text(json.dumps(report,indent=2));reports.append(report);env.close()
+  jsonpath.write_text(json.dumps(report,indent=2));reports.append(report)
+  if not args.reuse_env:env.close()
   save_state('RUNNING',report);print(json.dumps({k:v for k,v in report.items() if k not in ['per_joint_max_error','array_file']}),flush=True)
  (args.output/f'reconciliation_shard_{args.shard}.json').write_text(json.dumps(reports,indent=2));save_state('REPLAY_FINISHED')
+ for env in env_pool.values():env.close()
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--shard',type=int,default=0);p.add_argument('--shards',type=int,default=1);p.add_argument('--limit-per-group',type=int);p.add_argument('--warmup-replays',type=int,default=0);p.add_argument('--native-observation',action='store_true');p.add_argument('--candidate-history',action='store_true')
+ p=argparse.ArgumentParser();p.add_argument('--input',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--shard',type=int,default=0);p.add_argument('--shards',type=int,default=1);p.add_argument('--limit-per-group',type=int);p.add_argument('--warmup-replays',type=int,default=0);p.add_argument('--native-observation',action='store_true');p.add_argument('--candidate-history',action='store_true');p.add_argument('--reuse-env',action='store_true')
  main(p.parse_args())
