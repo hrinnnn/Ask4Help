@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Deterministic action replay; reconstruct missing states only after auditing qpos."""
-import argparse,gzip,json,os,time,types,sys
+import argparse,gzip,io,json,os,time,types,sys
 from pathlib import Path
 import numpy as np
 
@@ -55,8 +55,16 @@ def main(args):
    first_bad_offset=int(np.flatnonzero(error>=1e-4)[0]) if np.any(error>=1e-4) else None,
    final_success=bool(data['success'][-1]),array_file=str(npzpath),state_rows=len(snapshots),original_action_count=len(row['actions']),
    per_joint_max_error=np.max(np.abs(data['qpos'][start:start+len(expected)]-expected),axis=0).tolist())
+  pose_key='cube_a_pose' if task=='stackcube' else 'object_pose';pose_index=-1 if task=='airplane' else 0
+  if pose_key in row['metadata']:
+   original=row['metadata'][pose_key];pe=float(np.max(np.abs(data['object_p'][pose_index]-original['p'])))
+   qe=min(float(np.max(np.abs(data['object_q'][pose_index]-original['q']))),float(np.max(np.abs(data['object_q'][pose_index]+original['q']))))
+   report.update(object_checkpoint_position_error=pe,object_checkpoint_quaternion_error=qe,object_checkpoint='terminal' if pose_index==-1 else 'reset')
+   if pe>=1e-4 or qe>=1e-4:report['status']='OBJECT_CHECKPOINT_MISMATCH'
+  if not report['final_success']:report['status']='REPLAY_SUCCESS_MISMATCH'
   # The saved trace of a mismatch is diagnostic only, never an eligible score input.
-  np.savez_compressed(npzpath,**data);jsonpath.write_text(json.dumps(report,indent=2));reports.append(report);env.close()
+  buffer=io.BytesIO();np.savez_compressed(buffer,**data);npzpath.write_bytes(buffer.getvalue())
+  jsonpath.write_text(json.dumps(report,indent=2));reports.append(report);env.close()
   save_state('RUNNING',report);print(json.dumps({k:v for k,v in report.items() if k not in ['per_joint_max_error','array_file']}),flush=True)
  (args.output/f'reconciliation_shard_{args.shard}.json').write_text(json.dumps(reports,indent=2));save_state('REPLAY_FINISHED')
 
