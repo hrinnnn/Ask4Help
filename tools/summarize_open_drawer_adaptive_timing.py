@@ -22,6 +22,7 @@ import numpy as np
 
 
 ANCHORS_DEFAULT = (0, 50, 80, 120, 160, 220)
+FIXED_FORMAL_BUDGET = 2413
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -325,7 +326,10 @@ def main() -> None:
     errors: list[str] = []
     if not (args.root / "ADAPTIVE_TIMING_TRAINING_COMPLETE").is_file():
         errors.append("missing ADAPTIVE_TIMING_TRAINING_COMPLETE")
-    if not (args.formal_root / "TIMING_COLLECTION_COMPLETE").is_file():
+    collection_marker = args.formal_root / "TIMING_COLLECTION_COMPLETE"
+    if not collection_marker.is_file():
+        collection_marker = args.formal_root.parent / "TIMING_COLLECTION_COMPLETE"
+    if not collection_marker.is_file():
         errors.append("missing TIMING_COLLECTION_COMPLETE")
     if not (args.formal_root / "AUDIT_PASS").is_file():
         errors.append("missing formal AUDIT_PASS")
@@ -338,8 +342,15 @@ def main() -> None:
     else:
         budget = read_json(budget_path)
         selected = budget.get("selected_expert_actions", {})
-        if any(int(selected.get(f"anchor_{anchor}", -1)) != 5006 for anchor in anchors):
-            errors.append("formal budget does not match frozen 5006 action budget")
+        common_budget = budget.get("common_expert_action_budget")
+        if common_budget != FIXED_FORMAL_BUDGET:
+            errors.append(
+                f"formal budget does not match frozen {FIXED_FORMAL_BUDGET} action budget: {common_budget}"
+            )
+        if any(int(selected.get(f"anchor_{anchor}", -1)) != FIXED_FORMAL_BUDGET for anchor in anchors):
+            errors.append(
+                f"selected expert-action budgets do not match frozen {FIXED_FORMAL_BUDGET} action budget"
+            )
 
     frozen_payload = read_json(args.root / "adaptive_steps.json") if (args.root / "adaptive_steps.json").is_file() else {}
     frozen_steps = frozen_payload.get("frozen_steps")
@@ -392,9 +403,9 @@ def main() -> None:
             "models_per_anchor": 1,
             "minimum_steps": 5000,
             "frozen_steps": frozen_steps,
-            "ood20_rule": "continue at +2500 while strict rate <= 0.40; freeze first rate > 0.40",
+            "ood20_rule": "diagnostic audit only; fixed cumulative 5000-step comparison under user override",
             "formal_episodes_per_split": args.episodes,
-            "formal_budget_actions": 5006,
+            "formal_budget_actions": FIXED_FORMAL_BUDGET,
         },
         "budget_manifest": budget,
         "checkpoints": checkpoint_rows,
