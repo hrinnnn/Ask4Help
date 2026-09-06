@@ -1,0 +1,21 @@
+{
+ "pipeline_id":"model_aware_timing_probe_v1",
+ "authorized":true,
+ "owner":"codex-root-model-aware-timing",
+ "scope":"Research and isolated actual-model probe; no policy checkpoint training or live gate changes",
+ "current_stage":"preparing_actual_model_probe",
+ "next_stage":"small_finite_gradient_probe_then_sampled_cohort_analysis",
+ "server":"root@39.101.70.188:1012",
+ "model":"X-VLA StackCube ID base",
+ "checkpoint":"/root/xvla_stage2_inputs_priority/ckpt-7500",
+ "source":"/root/X-VLA-stackpyramid-clean",
+ "runtime":"/root/.venvs/xvla-h20/bin/python",
+ "output_remote":"/mnt/data/ask4help/results/model_aware_timing_probe_v1",
+ "scratch":"/tmp/model_aware_timing_probe_v1",
+ "output_local":"artifacts/model_aware_timing_20260906",
+ "placement_preflight":{"gpus":[0,1],"gpu_memory_used_mib":[348,338],"preserve_pid":276925,"checkpoint_size_gb":3.3,"root_full":true,"tmp_free_gb":14,"memory_available_gb":249,"expected_output_gb":1,"decision":"H20 already holds immutable task checkpoint, exact dataset manifests, native runtime; 5090 is occupied"},
+ "data":{"task":"StackCube Stage2 target OOD","cohorts":["immediate","post_grasp","post_lift","failure_recovery","internal_pca","diffdagger"],"samples_per_cohort":128,"ood_reference_episodes":20,"ood_probe_episodes":20,"samples_per_reference_split":96,"id_replay_probe_samples":96,"sampling_seed":260906,"heldout_seed_rule":"70 immediate nominal seeds not included in any of the six actual training selections; first20 reference, next20 probe","tail":"retain sampled real observation, repeat last action only as storage padding and mask invalid targets"},
+ "objective":{"loss":"original X-VLA noisy-action reconstruction MSE x100; only8 actual action dimensions, masked real timesteps","time_samples":[0.25,0.75],"update_probe":"last domain0 action decoder only, cached features, float32 arithmetic; not full-network retraining","model_dependence":"actual checkpoint outputs and gradients; no manual timing labels"},
+ "execution_audit":{"checks":["checkpoint config provenance","actual selected dataset equality","reference/probe seeds disjoint from all selected collections","RGB interpretation follows old training decoder","real timestep loss masking","gradient finite-difference/virtual-update verification"],"failure_marker":"PROBE_FAILED","pass_before":"scientific interpretation"},
+ "terminal_definition":"Completed isolated probe or documented irreducible limit, literature-grounded design report and next experiment; no claim of universally predicting SR"
+}
