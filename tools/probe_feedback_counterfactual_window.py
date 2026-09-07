@@ -1,5 +1,5 @@
 """Fresh-seed evaluation-only takeover branches; no feedback enters a gate."""
-import argparse,json,sys,time
+import argparse,io,json,sys,time
 from pathlib import Path
 import numpy as np
 p=argparse.ArgumentParser();p.add_argument('--out',type=Path,required=True);args=p.parse_args();args.out.mkdir(exist_ok=True,parents=True)
@@ -13,6 +13,8 @@ def build():return gym.make(stack_cube_env_id('stage2_ood'),num_envs=1,robot_uid
 def snap(env,obs):
  return dict(qpos=obs['agent']['qpos'].cpu().numpy().reshape(-1).copy(),tcp=env.unwrapped.agent.tcp.pose.p.cpu().numpy().reshape(-1).copy(),image=obs['sensor_data']['base_camera']['rgb'].cpu().numpy().copy(),wrist=obs['sensor_data']['hand_camera']['rgb'].cpu().numpy().copy())
 def raw(s):return dict(agent={'qpos':torch.tensor(s['qpos']).reshape(1,-1)},sensor_data={'base_camera':{'rgb':torch.tensor(s['image'])},'hand_camera':{'rgb':torch.tensor(s['wrist'])}})
+def save_npz(path,**arrays):
+    stream=io.BytesIO();np.savez_compressed(stream,**arrays);path.write_bytes(stream.getvalue())
 for seed in range(944000,944005):
  env=build();obs,_=env.reset(seed=seed);meta=stack_cube_reset_metadata(env,split='stage2_ood');actions=[];states=[snap(env,obs)];done=False
  while len(actions)<100 and not done:
@@ -21,7 +23,7 @@ for seed in range(944000,944005):
    action=np.clip(action,-1,1).astype(np.float32);obs,_,term,trunc,info=env.step(torch.tensor(action,device=env.unwrapped.device).reshape(1,-1));actions.append(action);states.append(snap(env,obs));done=bool(term) or bool(trunc) or bool(info['success'])
    if done:break
  env.close();base=args.out/f'seed_{seed}';base.mkdir(exist_ok=True)
- np.savez_compressed(base/'policy_prefix.npz',actions=np.array(actions),qpos=np.array([s['qpos'] for s in states]),tcp=np.array([s['tcp'] for s in states]))
+ save_npz(base/'policy_prefix.npz',actions=np.array(actions),qpos=np.array([s['qpos'] for s in states]),tcp=np.array([s['tcp'] for s in states]))
  for t in [0,10,20,30,40,60,80]:
   if t>len(actions):continue
   env=build();obs,_=env.reset(seed=seed)
@@ -50,6 +52,6 @@ for seed in range(944000,944005):
   from PIL import Image
   folder=base/f'takeover_{t}';folder.mkdir(exist_ok=True)
   for label,index in [('takeover',0),('expert5',min(5,len(expert))),('terminal',len(expert))]:Image.fromarray(np.concatenate([es[index]['image'][0],es[index]['wrist'][0]],axis=1)).save(folder/(label+'.png'))
-  np.savez_compressed(folder/'expert.npz',actions=np.array(expert),qpos=np.array([s['qpos'] for s in es]),tcp=np.array([s['tcp'] for s in es]))
+  save_npz(folder/'expert.npz',actions=np.array(expert),qpos=np.array([s['qpos'] for s in es]),tcp=np.array([s['tcp'] for s in es]))
   r=dict(seed=seed,takeover=t,success=success,expert_actions=len(expert),initial_free5_error=e,motion_undo=u,reset=meta);rows.append(r);(folder/'result.json').write_text(json.dumps(r,indent=2));(args.out/'summary.json').write_text(json.dumps(dict(rows=rows,scope='Evaluation-only35branches over5fresh seeds; not SFT, no expert warmstart into adaptive gates'),indent=2));print(seed,t,success,len(expert),flush=True);env.close()
 (args.out/'COUNTERFACTUAL_COMPLETE.json').write_text(json.dumps(dict(rows=len(rows),seeds=5)))
