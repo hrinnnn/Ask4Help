@@ -11,6 +11,7 @@ for offset in grid['seed_offsets']:
   root=args.root/f'seed_{offset}'/variant['name'];summary=json.loads((root/'summary.json').read_text());records=summary['rows'];assert len(records)==grid.get('episodes',20)
   cal=json.loads(Path(records[0]['feedback_config']['calibration_path']).read_text());radius=cal['radius']*variant.get('radius',1);center=np.array(cal['center']);scale=cal['scale'];memory=[];committed=0;neutral=set()
   for r in records:
+   deadline=None
    a=np.load(root/f'episode_{r["episode"]:03d}/trace.npz');features=a['policy_query_features'];scores=a['policy_query_scores'];assert len(r['queries'])==len(scores)
    assert len(a['actions'])==r['total_actions']==r['expert_actions']+r['policy_steps'];assert len(a['qpos'])==len(a['actions'])+1
    for x,score,q in zip(features,scores,r['queries']):
@@ -31,6 +32,10 @@ for offset in grid['seed_offsets']:
       lower=max([m[1] for m in near if not m[2]],default=-np.inf);upper=min([m[1] for m in near if m[2]],default=np.inf)
       if np.isfinite(upper):upper=np.nextafter(upper,-np.inf)
       if lower<=upper:threshold=float(np.clip(cal['tau0'],lower,upper))
+    if variant.get('arm')!='fixed' and variant.get('max_wait_blocks') is not None:
+     if deadline is not None and q['step']>=deadline:threshold=min(threshold,float(np.nextafter(score,-np.inf)))
+     elif deadline is None and score>cal['tau0'] and not score>threshold:deadline=q['step']+5*variant['max_wait_blocks']
+     assert q['wait_deadline']==deadline
     assert np.isclose(q['threshold'],threshold,rtol=1e-12,atol=1e-12),(variant['name'],q,threshold)
     assert q['stop']==bool(score>q['threshold'])
    f=r['feedback']

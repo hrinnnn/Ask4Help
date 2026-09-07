@@ -15,6 +15,7 @@ for offset in grid['seed_offsets']:
    state.update(stage='partial_needs_engineering_review',current=key);save();sys.exit(2)
   directory.mkdir(parents=True,exist_ok=True)
   cmd=['taskset','-c',args.cpu,sys.executable,str(args.code/'tools/probe_expert_feedback_closedloop.py'),'--arm',v.get('arm','adaptive_prefix'),'--output',str(directory),'--episodes',str(grid.get('episodes',20)),'--seed-offset',str(offset),'--calibration',str(args.code/v['calibration']),'--pca','/mnt/data/ask4help/results/expert_feedback_pca_probe_v1/original_pca_bridge.npz','--feedback-rule',v.get('rule','original'),'--radius-multiplier',str(v.get('radius',1)),'--feedback-strength',str(v.get('strength',.5)),'--min-support-episodes',str(v.get('min_support',2))]
+  if v.get('max_wait_blocks') is not None:cmd+=['--max-feedback-wait-blocks',str(v['max_wait_blocks'])]
   env=dict(os.environ,CUDA_VISIBLE_DEVICES=args.gpu,OMP_NUM_THREADS='4',OPENBLAS_NUM_THREADS='4',MKL_NUM_THREADS='4')
   log=args.root/(key.replace('/','_')+'.log')
   with log.open('w') as f:

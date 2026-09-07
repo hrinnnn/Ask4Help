@@ -34,13 +34,19 @@ def main(args):
   env=gym.make(stack_cube_env_id(split),num_envs=1,robot_uids='panda_wristcam',obs_mode='rgb',control_mode='pd_joint_delta_pos',reward_mode='sparse',render_mode='rgb_array',sim_backend='physx_cpu',render_backend='gpu',
    sim_config={'sim_freq':100,'control_freq':10},sensor_configs={'width':384,'height':384},max_episode_steps=400)
   obs,_=env.reset(seed=seed);reset=stack_cube_reset_metadata(env,split=split);records=[snapshot(env,obs)];actions=[];queries=[];prefix=[];takeover=None;success=False;oracle=None;expert_steps=0
+  wait_deadline=None
   while not success and len(actions)<(150 if takeover is None else takeover+150):
    if takeover is None:
     prediction,feature,inputs,encoding=policy.predict(obs,instruction,seed=seed*1000+len(actions),steps=10)
     score=float(((feature.cuda().float()-mean)@basis).norm().item());z=feature.numpy().reshape(-1)
     proposed=gate.query(z,score);decision=score>cal['tau0'] if args.arm=='fixed' else proposed['stop']
+    if args.arm!='fixed' and args.max_feedback_wait_blocks is not None:
+     if wait_deadline is not None and len(actions)>=wait_deadline:
+      proposed['threshold']=min(proposed['threshold'],float(np.nextafter(score,-np.inf)));proposed['reason']='observed_wait_budget_exhausted';decision=True
+     elif wait_deadline is None and score>cal['tau0'] and not decision:wait_deadline=len(actions)+5*args.max_feedback_wait_blocks
     query=dict(step=len(actions),score=score,threshold=cal['tau0'] if args.arm=='fixed' else proposed['threshold'],stop=decision,baseline_stop=score>cal['tau0'],reason=proposed['reason'],memory_episodes=len(gate.memory_episodes),neighbors=proposed['neighbors'])
     query.update({k:proposed[k] for k in ['support_episodes','vote'] if k in proposed})
+    query['wait_deadline']=wait_deadline
     queries.append(query);prefix.append(dict(feature=z,score=score,step=len(actions)))
     if decision:
      takeover=len(actions);oracle=StackCubePrivilegedChunkOracle(chunk_size=5);oracle.initialize_from_state(env)
@@ -87,7 +93,7 @@ def main(args):
   writer.release();(directory/'video.mp4').write_bytes(temporary.read_bytes())
   row=dict(arm=args.arm,episode=episode,seed=seed,split=split,success=success,takeover=takeover,policy_steps=takeover if takeover is not None else len(actions),expert_actions=expert_steps,total_actions=len(actions),
    cumulative_expert_actions=cost,feedback=feedback,motion_undo=u,queries=queries,reset_metadata=reset,memory_size=len(gate.memory),video=str(directory/'video.mp4'))
-  row['feedback_config']=dict(rule=args.feedback_rule,radius_multiplier=args.radius_multiplier,strength=args.feedback_strength,min_support=args.min_support_episodes,q_loss=cal['q_loss'],calibration_path=str(args.calibration))
+  row['feedback_config']=dict(rule=args.feedback_rule,radius_multiplier=args.radius_multiplier,strength=args.feedback_strength,min_support=args.min_support_episodes,q_loss=cal['q_loss'],calibration_path=str(args.calibration),max_feedback_wait_blocks=args.max_feedback_wait_blocks)
   (directory/'result.json').write_text(json.dumps(row,indent=2));rows.append(row);(args.output/'progress.json').write_text(json.dumps(dict(pid=os.getpid(),episodes=len(rows),total=args.episodes,expert_actions=cost,elapsed=time.time()-started,last={k:v for k,v in row.items() if k not in ['queries','reset_metadata']}),indent=2))
   print('EPISODE',args.arm,episode,split,'success',success,'takeover',takeover,'expert',expert_steps,'feedback',feedback,flush=True);env.close()
  summary=dict(status='CLOSED_LOOP_COLLECTION_PILOT_COMPLETE',arm=args.arm,episodes=len(rows),requested=args.episodes,expert_actions=cost,elapsed=time.time()-started,rows=rows,
@@ -97,4 +103,5 @@ def main(args):
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--arm',choices=['fixed','adaptive_current','adaptive_prefix'],required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--calibration',type=Path,required=True);p.add_argument('--pca',type=Path,required=True);p.add_argument('--episodes',type=int,default=20);p.add_argument('--seed-offset',type=int,default=0)
  p.add_argument('--feedback-rule',choices=['original','hard','soft','kernel'],default='original');p.add_argument('--radius-multiplier',type=float,default=2.);p.add_argument('--feedback-strength',type=float,default=.5);p.add_argument('--min-support-episodes',type=int,default=2)
+ p.add_argument('--max-feedback-wait-blocks',type=int,default=None)
  main(p.parse_args())
