@@ -77,7 +77,7 @@ def main(args):
   buf=io.BytesIO();np.savez_compressed(buf,**arrays);(directory/'trace.npz').write_bytes(buf.getvalue())
   # Encode on local disk, then stream to OSS; frames are before each action.
   height,width=records[0]['image'].shape[:2]
-  temporary=Path('/tmp/expert_feedback_pca_probe_v1')/f'{args.arm}_{episode:03d}.mp4';writer=cv2.VideoWriter(str(temporary),cv2.VideoWriter_fourcc(*'mp4v'),10,(2*width,height))
+  temporary=Path('/tmp/expert_feedback_pca_probe_v1')/f'{args.seed_offset}_{args.arm}_{episode:03d}.mp4';writer=cv2.VideoWriter(str(temporary),cv2.VideoWriter_fourcc(*'mp4v'),10,(2*width,height))
   assert writer.isOpened()
   for r in records[:-1]:writer.write(np.concatenate([r['image'],r['wrist']],axis=1)[:,:,::-1])
   writer.release();(directory/'video.mp4').write_bytes(temporary.read_bytes())
