@@ -20,5 +20,9 @@ class FlexibleTests(unittest.TestCase):
  def test_conflict_and_far_fallback(self):
   g=self.gate();g.memory=[dict(episode=str(i),z=np.zeros(2),score=3.,request=i==0) for i in range(2)]
   self.assertEqual(g.query(np.zeros(2),2.9)['reason'],'conflict');self.assertEqual(g.query(np.ones(2)*8,2.9)['reason'],'no_support')
+ def test_kernel_current_gap_is_neutral(self):
+  g=self.gate();g.rule='kernel'
+  for e in ['a','b']:g.add_takeover_prefix_credit(e,np.array([[0.,3.1]]),np.array([3.1]),np.array([5]),np.ones(3)*2,np.ones(3))
+  self.assertEqual(g.query(np.array([0.,3.1]),2.9)['threshold'],3.)
 
 if __name__=='__main__':unittest.main()

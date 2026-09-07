@@ -1,0 +1,7 @@
+{
+ "seed_offsets":[300,400],"episodes":20,
+ "variants":[
+  {"name":"kernel_max_r2","rule":"kernel","radius":2,"strength":0.5,"calibration":"artifacts/expert_feedback_overnight_20260907/calibration_episode_max_95.json"},
+  {"name":"kernel_max_r4","rule":"kernel","radius":4,"strength":0.5,"calibration":"artifacts/expert_feedback_overnight_20260907/calibration_episode_max_95.json"}
+ ]
+}

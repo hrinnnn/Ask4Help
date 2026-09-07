@@ -5,10 +5,11 @@ from collections import Counter
 import numpy as np
 p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--grid',type=Path,required=True);args=p.parse_args();grid=json.loads(args.grid.read_text());rows=[]
 for offset in grid['seed_offsets']:
- fixed=None
+ fixed_path=args.root.parent/'development'/f'seed_{offset}'/'fixed/summary.json'
+ fixed=json.loads(fixed_path.read_text())['rows'] if fixed_path.exists() else None
  for variant in grid['variants']:
   root=args.root/f'seed_{offset}'/variant['name'];summary=json.loads((root/'summary.json').read_text());records=summary['rows'];assert len(records)==grid.get('episodes',20)
-  cal=json.loads(Path(records[0]['feedback_config']['calibration_path']).read_text());radius=cal['radius']*variant.get('radius',1);center=np.array(cal['center']);scale=cal['scale'];memory=[];committed=0
+  cal=json.loads(Path(records[0]['feedback_config']['calibration_path']).read_text());radius=cal['radius']*variant.get('radius',1);center=np.array(cal['center']);scale=cal['scale'];memory=[];committed=0;neutral=set()
   for r in records:
    a=np.load(root/f'episode_{r["episode"]:03d}/trace.npz');features=a['policy_query_features'];scores=a['policy_query_scores'];assert len(r['queries'])==len(scores)
    assert len(a['actions'])==r['total_actions']==r['expert_actions']+r['policy_steps'];assert len(a['qpos'])==len(a['actions'])+1
@@ -16,13 +17,16 @@ for offset in grid['seed_offsets']:
     assert q['memory_episodes']==committed
     z=(x-center)/scale;near=[m for m in memory if np.linalg.norm(m[0]-z)<=radius];threshold=cal['tau0'];rule=variant.get('rule','original')
     if variant.get('arm')!='fixed' and near:
-     if rule=='soft':
+     if rule in ['soft','kernel']:
       by={}
-      for mz,ms,my,me in near:by.setdefault(me,[]).append((math.exp(-.5*(np.linalg.norm(mz-z)/radius)**2),1 if my else -1))
+      for mz,ms,my,me in near:by.setdefault(me,[]).append((math.exp(-.5*(np.linalg.norm(mz-z)/radius)**2),0 if me in neutral else (1 if my else -1)))
       n=len(by)
       if n>=variant.get('min_support',2):
-       vote=np.mean([sum(w*y for w,y in b)/sum(w for w,y in b) for b in by.values()])
-       if abs(vote)>=.25:threshold=cal['tau0']*math.exp(-variant.get('strength',.5)*(n/(n+2))*vote)
+       values=[sum(w*y for w,y in b)/sum(w for w,y in b) for b in by.values()];effective=n
+       if rule=='kernel':
+        weights=np.array([max(w for w,y in b) for b in by.values()]);vote=np.average(values,weights=weights);effective=float(weights.sum())
+       else:vote=np.mean(values)
+       if abs(vote)>=.25:threshold=cal['tau0']*math.exp(-variant.get('strength',.5)*(effective/(effective+2))*vote)
      else:
       lower=max([m[1] for m in near if not m[2]],default=-np.inf);upper=min([m[1] for m in near if m[2]],default=np.inf)
       if np.isfinite(upper):upper=np.nextafter(upper,-np.inf)
@@ -33,6 +37,7 @@ for offset in grid['seed_offsets']:
    if f and variant.get('arm')!='fixed':
     if f.get('credit_step') is not None:
      ix=next(i for i,q in enumerate(r['queries']) if q['step']==f['credit_step']);memory.append(((features[ix]-center)/scale,float(scores[ix]),f['request'],r['episode']))
+     if variant.get('rule')=='kernel' and f['reason']=='current_supervision_gap_no_claim_of_lateness':neutral.add(r['episode'])
     committed+=1
   if variant.get('arm')=='fixed':fixed=records
   if fixed:

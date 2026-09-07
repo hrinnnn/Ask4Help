@@ -96,5 +96,5 @@ def main(args):
 
 if __name__=='__main__':
  p=argparse.ArgumentParser();p.add_argument('--arm',choices=['fixed','adaptive_current','adaptive_prefix'],required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--calibration',type=Path,required=True);p.add_argument('--pca',type=Path,required=True);p.add_argument('--episodes',type=int,default=20);p.add_argument('--seed-offset',type=int,default=0)
- p.add_argument('--feedback-rule',choices=['original','hard','soft'],default='original');p.add_argument('--radius-multiplier',type=float,default=2.);p.add_argument('--feedback-strength',type=float,default=.5);p.add_argument('--min-support-episodes',type=int,default=2)
+ p.add_argument('--feedback-rule',choices=['original','hard','soft','kernel'],default='original');p.add_argument('--radius-multiplier',type=float,default=2.);p.add_argument('--feedback-strength',type=float,default=.5);p.add_argument('--min-support-episodes',type=int,default=2)
  main(p.parse_args())

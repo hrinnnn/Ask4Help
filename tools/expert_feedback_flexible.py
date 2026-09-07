@@ -13,11 +13,13 @@ class FlexibleFeedbackPCA(ExpertFeedbackPCA):
   for r in self.memory:
    distance=np.linalg.norm(r['z']-z)
    if distance<=self.radius:
-    weight=np.exp(-.5*(distance/self.radius)**2);bucket=by_episode.setdefault(r['episode'],[]);bucket.append((weight,1. if r['request'] else -1.))
+    weight=np.exp(-.5*(distance/self.radius)**2);bucket=by_episode.setdefault(r['episode'],[]);bucket.append((weight,r.get('direction',1. if r['request'] else -1.)))
   count=len(by_episode);threshold=self.tau0;vote=0.;reason='no_support' if count==0 else 'insufficient_episode_support'
   if count>=self.min_episodes:
    values=[sum(w*y for w,y in b)/sum(w for w,y in b) for b in by_episode.values()]
-   vote=float(np.mean(values));confidence=count/(count+2.)
+   if self.rule=='kernel':
+    weights=np.array([max(w for w,y in b) for b in by_episode.values()]);vote=float(np.average(values,weights=weights));effective=float(weights.sum());confidence=effective/(effective+2.)
+   else:vote=float(np.mean(values));confidence=count/(count+2.)
    if abs(vote)>=.25:threshold=float(self.tau0*np.exp(-self.strength*confidence*vote));reason='supported'
    else:reason='conflict'
   return dict(threshold=threshold,stop=self.stopped(score,threshold),baseline_stop=self.stopped(score,self.tau0),reason=reason,neighbors=sum(len(v) for v in by_episode.values()),support_episodes=count,vote=vote,
@@ -30,4 +32,6 @@ class FlexibleFeedbackPCA(ExpertFeedbackPCA):
    if episode_id in self.memory_episodes:raise ValueError('duplicate episode')
    self.memory.append(dict(episode=episode_id,offset=int(prefix_steps[-1]),z=self.normalize(prefix_features[-1]),score=float(prefix_scores[-1]),request=False));self.memory_episodes.add(episode_id)
    return dict(reason='censored_observed_low_error_block_wait',event=None,credit_step=int(prefix_steps[-1]),request=False)
-  return super().add_takeover_prefix_credit(episode_id,prefix_features,prefix_scores,prefix_steps,expert_loss,expert_valid,regression,regression_bound,progress_supported)
+  result=super().add_takeover_prefix_credit(episode_id,prefix_features,prefix_scores,prefix_steps,expert_loss,expert_valid,regression,regression_bound,progress_supported)
+  if self.rule=='kernel' and result['reason']=='current_supervision_gap_no_claim_of_lateness':self.memory[-1]['direction']=0.
+  return result
