@@ -17,8 +17,8 @@ def main(args):
  rows=[];cost=0;instruction='stack the red cube on the green cube'
  def snapshot(env,obs):
   def cpu(v):return v.detach().cpu().numpy().copy()
-  return dict(qpos=cpu(obs['agent']['qpos']).reshape(-1),image=cpu(obs['sensor_data']['base_camera']['rgb']).reshape(128,128,3),
-   wrist=cpu(obs['sensor_data']['hand_camera']['rgb']).reshape(128,128,3),tcp=cpu(env.unwrapped.agent.tcp.pose.p).reshape(3))
+  return dict(qpos=cpu(obs['agent']['qpos']).reshape(-1),image=cpu(obs['sensor_data']['base_camera']['rgb'])[0],
+   wrist=cpu(obs['sensor_data']['hand_camera']['rgb'])[0],tcp=cpu(env.unwrapped.agent.tcp.pose.p).reshape(3))
  def raw(r):return dict(agent={'qpos':torch.from_numpy(r['qpos']).reshape(1,-1)},sensor_data={'base_camera':{'rgb':torch.from_numpy(r['image']).unsqueeze(0)},'hand_camera':{'rgb':torch.from_numpy(r['wrist']).unsqueeze(0)}})
  def observed_undo(records,tg):
   if tg<5 or tg+5>=len(records):return None
@@ -29,7 +29,7 @@ def main(args):
   if cost>=3000:break
   split='id' if episode%2==0 else 'stage2_ood';seed=(930700 if split=='id' else 940700)+episode//2
   env=gym.make(stack_cube_env_id(split),num_envs=1,robot_uids='panda_wristcam',obs_mode='rgb',control_mode='pd_joint_delta_pos',reward_mode='sparse',render_mode='rgb_array',sim_backend='physx_cpu',render_backend='gpu',
-   sim_config={'sim_freq':100,'control_freq':10},sensor_configs={'width':128,'height':128},max_episode_steps=400)
+   sim_config={'sim_freq':100,'control_freq':10},sensor_configs={'width':384,'height':384},max_episode_steps=400)
   obs,_=env.reset(seed=seed);reset=stack_cube_reset_metadata(env,split=split);records=[snapshot(env,obs)];actions=[];queries=[];prefix=[];takeover=None;success=False;oracle=None;expert_steps=0
   while not success and len(actions)<(150 if takeover is None else takeover+150):
    if takeover is None:
@@ -76,7 +76,8 @@ def main(args):
   if takeover is not None and expert_steps>=10:arrays['expert_feedback_loss']=losses
   buf=io.BytesIO();np.savez_compressed(buf,**arrays);(directory/'trace.npz').write_bytes(buf.getvalue())
   # Encode on local disk, then stream to OSS; frames are before each action.
-  temporary=Path('/tmp/expert_feedback_pca_probe_v1')/f'{args.arm}_{episode:03d}.mp4';writer=cv2.VideoWriter(str(temporary),cv2.VideoWriter_fourcc(*'mp4v'),10,(256,128))
+  height,width=records[0]['image'].shape[:2]
+  temporary=Path('/tmp/expert_feedback_pca_probe_v1')/f'{args.arm}_{episode:03d}.mp4';writer=cv2.VideoWriter(str(temporary),cv2.VideoWriter_fourcc(*'mp4v'),10,(2*width,height))
   assert writer.isOpened()
   for r in records[:-1]:writer.write(np.concatenate([r['image'],r['wrist']],axis=1)[:,:,::-1])
   writer.release();(directory/'video.mp4').write_bytes(temporary.read_bytes())

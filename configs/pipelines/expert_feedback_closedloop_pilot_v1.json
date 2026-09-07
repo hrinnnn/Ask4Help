@@ -19,6 +19,8 @@
  "id_seeds":"930700..930709",
  "ood_seeds":"940700..940709",
  "execute_horizon":5,
+ "sensor_resolution":[384,384],
+ "invalid_smoke":"smoke_fixed used128x128 unlike historical384x384 collector; preserved but excluded from comparisons. Use smoke_fixed384 then pilot384 roots.",
  "policy_episode_limit":150,
  "expert_remaining_limit":150,
  "total_expert_action_cap_per_arm":3000,
