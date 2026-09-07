@@ -1,0 +1,9 @@
+{
+ "selection_note":"Prespecified memory-length sensitivity: same bounded rules, own earlier data, one60episode stream. It is not three independent20episode streams. No OOD warmstart.",
+ "seed_offsets":[2000],"episodes":60,
+ "variants":[
+  {"name":"fixed","arm":"fixed","calibration":"artifacts/expert_feedback_overnight_20260907/calibration_point_95.json"},
+  {"name":"hard_max_r2_wait1","rule":"hard","radius":2,"max_wait_blocks":1,"calibration":"artifacts/expert_feedback_overnight_20260907/calibration_episode_max_95.json"},
+  {"name":"kernel_max_r2_wait1","rule":"kernel","radius":2,"strength":0.5,"max_wait_blocks":1,"calibration":"artifacts/expert_feedback_overnight_20260907/calibration_episode_max_95.json"}
+ ]
+}

@@ -1,0 +1,9 @@
+{
+ "selection_note":"Fixed after unbounded negative results; confirm both bounded mechanisms with unchanged q/radius/strength/wait1. No further tuning on offsets1400/1500/1600.",
+ "seed_offsets":[1400,1500,1600],"episodes":20,
+ "variants":[
+  {"name":"fixed","arm":"fixed","calibration":"artifacts/expert_feedback_overnight_20260907/calibration_point_95.json"},
+  {"name":"hard_max_r2_wait1","rule":"hard","radius":2,"max_wait_blocks":1,"calibration":"artifacts/expert_feedback_overnight_20260907/calibration_episode_max_95.json"},
+  {"name":"kernel_max_r2_wait1","rule":"kernel","radius":2,"strength":0.5,"max_wait_blocks":1,"calibration":"artifacts/expert_feedback_overnight_20260907/calibration_episode_max_95.json"}
+ ]
+}
