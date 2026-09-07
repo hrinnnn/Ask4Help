@@ -14,6 +14,9 @@ def main(args):
  register_stack_cube_splits();args.output.mkdir(parents=True,exist_ok=True);started=time.time()
  cal=json.loads(args.calibration.read_text());asset=np.load(args.pca);mean=torch.tensor(asset['mean'],device='cuda');basis=torch.tensor(asset['eigenvectors'][:,:512],device='cuda')
  gate=ExpertFeedbackPCA(cal['tau0'],np.array(cal['center']),cal['scale'],cal['radius'],cal['q_loss']);policy=XVLAAirplanePolicy(Path('/root/xvla_stage2_inputs_priority/ckpt-7500'),Path('/root/X-VLA-stackpyramid-clean'))
+ if args.feedback_rule!='original':
+  from expert_feedback_flexible import FlexibleFeedbackPCA
+  gate=FlexibleFeedbackPCA(cal['tau0'],np.array(cal['center']),cal['scale'],cal['radius'],cal['q_loss']).configure(rule=args.feedback_rule,radius_multiplier=args.radius_multiplier,strength=args.feedback_strength,min_episodes=args.min_support_episodes,censored_wait=True)
  rows=[];cost=0;instruction='stack the red cube on the green cube'
  def snapshot(env,obs):
   def cpu(v):return v.detach().cpu().numpy().copy()
@@ -37,6 +40,7 @@ def main(args):
     score=float(((feature.cuda().float()-mean)@basis).norm().item());z=feature.numpy().reshape(-1)
     proposed=gate.query(z,score);decision=score>cal['tau0'] if args.arm=='fixed' else proposed['stop']
     query=dict(step=len(actions),score=score,threshold=cal['tau0'] if args.arm=='fixed' else proposed['threshold'],stop=decision,baseline_stop=score>cal['tau0'],reason=proposed['reason'],memory_episodes=len(gate.memory_episodes),neighbors=proposed['neighbors'])
+    query.update({k:proposed[k] for k in ['support_episodes','vote'] if k in proposed})
     queries.append(query);prefix.append(dict(feature=z,score=score,step=len(actions)))
     if decision:
      takeover=len(actions);oracle=StackCubePrivilegedChunkOracle(chunk_size=5);oracle.initialize_from_state(env)
@@ -83,6 +87,7 @@ def main(args):
   writer.release();(directory/'video.mp4').write_bytes(temporary.read_bytes())
   row=dict(arm=args.arm,episode=episode,seed=seed,split=split,success=success,takeover=takeover,policy_steps=takeover if takeover is not None else len(actions),expert_actions=expert_steps,total_actions=len(actions),
    cumulative_expert_actions=cost,feedback=feedback,motion_undo=u,queries=queries,reset_metadata=reset,memory_size=len(gate.memory),video=str(directory/'video.mp4'))
+  row['feedback_config']=dict(rule=args.feedback_rule,radius_multiplier=args.radius_multiplier,strength=args.feedback_strength,min_support=args.min_support_episodes,q_loss=cal['q_loss'],calibration_path=str(args.calibration))
   (directory/'result.json').write_text(json.dumps(row,indent=2));rows.append(row);(args.output/'progress.json').write_text(json.dumps(dict(pid=os.getpid(),episodes=len(rows),total=args.episodes,expert_actions=cost,elapsed=time.time()-started,last={k:v for k,v in row.items() if k not in ['queries','reset_metadata']}),indent=2))
   print('EPISODE',args.arm,episode,split,'success',success,'takeover',takeover,'expert',expert_steps,'feedback',feedback,flush=True);env.close()
  summary=dict(status='CLOSED_LOOP_COLLECTION_PILOT_COMPLETE',arm=args.arm,episodes=len(rows),requested=args.episodes,expert_actions=cost,elapsed=time.time()-started,rows=rows,
@@ -90,4 +95,6 @@ def main(args):
  (args.output/'summary.json').write_text(json.dumps(summary,indent=2));(args.output/'PILOT_COMPLETE.json').write_text(json.dumps(dict(arm=args.arm,episodes=len(rows),expert_actions=cost)));print('PILOT_COMPLETE',args.arm,len(rows),flush=True)
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--arm',choices=['fixed','adaptive_current','adaptive_prefix'],required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--calibration',type=Path,required=True);p.add_argument('--pca',type=Path,required=True);p.add_argument('--episodes',type=int,default=20);p.add_argument('--seed-offset',type=int,default=0);main(p.parse_args())
+ p=argparse.ArgumentParser();p.add_argument('--arm',choices=['fixed','adaptive_current','adaptive_prefix'],required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--calibration',type=Path,required=True);p.add_argument('--pca',type=Path,required=True);p.add_argument('--episodes',type=int,default=20);p.add_argument('--seed-offset',type=int,default=0)
+ p.add_argument('--feedback-rule',choices=['original','hard','soft'],default='original');p.add_argument('--radius-multiplier',type=float,default=2.);p.add_argument('--feedback-strength',type=float,default=.5);p.add_argument('--min-support-episodes',type=int,default=2)
+ main(p.parse_args())

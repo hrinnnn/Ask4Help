@@ -1,0 +1,11 @@
+# Expert feedback overnight exploration
+
+User goal: explore a flexible, scientifically interpretable method that moves takeover toward expert novelty onset before substantial corrective behavior, then deliver a formal Method paragraph on2026-09-08 morning. Follow current active Goal; no SFT.
+
+1. Analyze cached matched2183 observations: native denoising vs freely generated action discrepancy, execution horizon1/5/10, mean vs closest sampled actions, point quantiles(.90,.95,.99) vs episode maxima(.90,.95). Preserve all candidates. Characterize early-boundary saturation, IDcheck flags, low-error prefix, censored windows. Do not use old invalid timing-SFT SR to select.
+2. Keep baseline PCA; compare hard feasible-interval local calibration with a soft correction of log threshold driven by episode-balanced nearby request/wait feedback. Try radius multipliers1/2/4 and bounded strength. Sparse support and all-request fixedgate trap are explicit hypotheses, not reasons to default all experiments to unchanged.
+3. New actual cold-start collection on development offsets300/400; retain exact model,384RGB,delta5,8action dimensions,original PCA and oracle. Expert behavior feedback uses freely generated actions. Report actual policy queries, threshold movements, request/wait changes, correction reversal, low-agreement prefix and expert action count. Assisted completion is separate from policy learning.
+4. Freeze a small shortlist after development; compare fixed gate on fresh offsets600/700/800. Do not retune these streams. Negative/unchanged outcomes remain in report. Alternative stable task assets can be evaluated if co-located and already validated, without a newbase training.
+5. Revisit meaning of preferred timing: a local balance between demonstrable policy-expert mismatch and undo/recovery burden, with uncertainty and censoring. Avoid equating denoising loss, expert path time-to-disagreement, autonomous time-to-error or post-update gain. Provide clear equations, implementable update and surrounding manuscript edits.
+
+Deliver to `outputs/expert_feedback_overnight_20260908/`: Method.tex, short insert.tex, candidate/results table and Chinese explanation. Active ledger/manifest and remote controller state are source of truth. Finish with PIPELINE_COMPLETE and pause this thread's night watchdog.
