@@ -1,0 +1,14 @@
+{
+  "status": "VIDEO_INVENTORY_PASS",
+  "videos": 1040,
+  "total_recorded_frames": 50535,
+  "stages": {
+    "development": 240,
+    "directional": 80,
+    "validation": 240,
+    "bounded_development": 120,
+    "bounded_validation": 180,
+    "longstream": 180
+  },
+  "scope": "ffprobe dimensions and declared frame counts match action lengths; representative RGB manually inspected, not full semantic labeling of every frame"
+}

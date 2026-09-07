@@ -1,0 +1,51 @@
+\paragraph{Implementation details.}
+For the reported frozen X-VLA probe we use $H=10$, $\Delta=5$, and $M=2$
+free action samples with ten denoising steps each. The comparison uses the
+first five generated actions after the usual action-space conversion and
+clipping, restricted to the eight active action dimensions. Multiplying
+both disagreement and its calibration threshold by a common constant
+does not change the feedback. Only anchors with complete ten-action expert
+targets supply disagreement feedback. Training retains valid tail anchors
+using temporal masks.
+
+Let $c$ and $s$ be the ID feature mean and global RMS deviation, and define
+$\widetilde z=(z^B-c)/s$. The local support radius is twice the ID 95th
+percentile of nearest-neighbor distances when neighbors from the same
+episode are excluded. We use
+\begin{equation}
+w_{ti}=\mathbf{1}[\|\widetilde z_t-\widetilde z_i\|_2\le\rho]
+\exp\!\left(-\frac{\|\widetilde z_t-\widetilde z_i\|_2^2}{2\rho^2}\right),
+\end{equation}
+with $\lambda=2$ and $\beta=0.5$. At least two source interventions must
+support a query, and the weighted mean signed direction must have magnitude
+at least $0.25$ before applying the adjustment. These rules were frozen
+before the corresponding fresh-seed evaluation.
+
+Translation and gripper reversal use $\sigma_p=0.02$ m and
+$\sigma_w=0.01$ m. Their aggregate reference is the ID 95th percentile,
+computed over eligible adjacent execution blocks. In the measured setting,
+the baseline PCA threshold is $1.70736$, the trajectory-maximum free-action
+reference is $11.88798$ under the implementation's $100\times$ scaling, and
+the reversal reference is $1.90046$. These values are model-specific and
+must be recalibrated when the policy or inference protocol changes.
+
+Let $t_s$ be the first query in an episode at which the baseline requests
+assistance but the feedback gate waits. If such a query occurs, the waiting
+deadline is $t_s+\Delta$. The final rule is
+\begin{equation}
+g_t=\mathbf{1}[s_{\mathrm{BPCA}}(o_t)>\gamma_t]
+\lor\mathbf{1}[t_s\text{ exists and }t\ge t_s+\Delta],
+\end{equation}
+evaluated only while the episode is active. After takeover the expert
+completes the episode subject to the same cost limit. Censored disagreement
+generates a wait cue only when at least five contiguous complete target
+windows have low disagreement. A reversal cue requires both complete
+motion blocks; at reset it is unavailable.
+
+The local regression formalizes the implemented directional-kernel variant.
+Other tested variants include hard threshold-interval projection and
+unbounded waiting; their outcomes remain separate. Adaptive thresholds
+need not retain the baseline false-alarm calibration. Our experiments
+record total executed expert actions, including unsuccessful interventions,
+separately from retained actions for subsequent training. Additional frozen
+inference for feedback is also a computation cost.

@@ -1,0 +1,108 @@
+% Insert after Online Expert Data Collection, before Policy Update.
+% This specifies the directional-kernel, bounded-wait variant tested overnight.
+% It does not attribute fixed-gate results to this adaptive method.
+\subsection{Expert-Feedback Timing Calibration}
+\label{sec:ef_timing_calibration}
+
+The ID-calibrated PCA gate provides an initial intervention rule. We refine
+its timing using the expert behavior observed after each takeover. Our target
+is a region where assistance begins to provide behavior that differs from
+the current policy, while requiring little reversal of preceding robot
+motion. Rather than assigning a fixed preferred timestep to a task, we use
+completed interventions to infer whether subsequent takeovers near a visited
+state should occur earlier, remain unchanged, or be postponed locally.
+The policy parameters, PCA subspace, and baseline threshold $\gamma_B$
+remain fixed throughout the collection round.
+
+\paragraph{Action disagreement and corrective motion.}
+For intervention $i$, let $t_i$ denote its onset and
+$\{(o_{i,k},a^*_{i,k})\}_{k=0}^{L_i-1}$ the expert suffix, with each
+observation recorded before its corresponding action. At these observations,
+we freely generate action chunks from the frozen policy and compare the
+first $\Delta$ actions, corresponding to one execution block:
+\begin{equation}
+e_{i,k}=\frac{1}{M\Delta d_a}
+\sum_{m=1}^{M}\sum_{h=0}^{\Delta-1}
+\|\widehat a^{(m)}_{\theta,h}(o_{i,k})-a^*_{i,k+h}\|_2^2.
+\label{eq:ef_disagreement}
+\end{equation}
+Here $d_a$ is the number of active action dimensions, and predictions and
+expert actions use the same execution scaling. Predictions are generated
+without conditioning on the expert action chunk. We calibrate $q_e$ as the
+95th percentile of trajectory-maximum disagreement on ID demonstrations,
+using the same inference protocol. The first crossing
+$k_i^*=\min\{k:e_{i,k}>q_e\}$ localizes the onset of elevated disagreement
+along the observed expert path. Complete target windows are required for
+this feedback; an unobserved crossing is treated as censored.
+
+We also measure how much the first expert execution block reverses the
+preceding policy block. Let $v_i^-,v_i^+$ be their actual end-effector
+displacements and $b_i^-,b_i^+$ their changes in gripper width. Define
+\begin{equation}
+R_i=\sqrt{
+ \left(\frac{[-\langle v_i^+,v_i^-\rangle/\|v_i^-\|_2]_+}{\sigma_p}\right)^2
+ +\left(\frac{[-\operatorname{sgn}(b_i^-)b_i^+]_+}{\sigma_w}\right)^2}.
+\label{eq:ef_reversal}
+\end{equation}
+A component is zero when its preceding motion has zero magnitude; the cue
+is unavailable without complete preceding and following blocks. Its reference
+$q_R$ is calibrated from adjacent blocks of successful ID demonstrations.
+Disagreement and reversal serve different roles: the former describes when
+the policy departs from observed expert behavior, while the latter provides
+evidence of initial corrective motion.
+
+\paragraph{Local timing feedback.}
+If $R_i>q_R$, we attach an earlier-takeover cue $y_i=+1$ to the preceding
+observed policy-query state. Otherwise, an initial low-disagreement prefix
+covering at least one execution block provides a postponement cue $y_i=-1$
+at the actual takeover state. This includes censored suffixes only when
+the required complete low-disagreement windows have been observed. When
+disagreement appears within the first block without excessive reversal, we
+store $y_i=0$ at the takeover state: assistance is already locally warranted,
+but the observation does not justify moving it earlier. Corrective-motion
+cues take precedence. Insufficient observations produce no cue.
+
+Each cue stores the original bridge feature $z_i^B$ of its attributed policy
+state. This implements a local preference for the operational region
+\begin{equation}
+\mathcal W_\theta(\tau)
+=\{t:k^*(t)<\Delta,\ R(t)\le q_R\},
+\label{eq:ef_preferred_region}
+\end{equation}
+where $k^*(t)$ and $R(t)$ describe the expert continuation from $t$.
+The algorithm observes only actual interventions, and transfers their
+feedback through feature similarity. It neither enumerates all such
+continuations nor assumes a unique preferred time.
+
+\paragraph{Regularized threshold adjustment.}
+At a subsequent query, let $w_{ti}$ be a Gaussian similarity weight between
+ID-normalized bridge features, truncated outside a calibrated radius. With
+one cue per intervention, we fit a local timing direction by
+\begin{equation}
+\widehat d_t
+=\arg\min_d\left\{\lambda d^2+
+\sum_{i\in\mathcal M}w_{ti}(d-y_i)^2\right\}
+=\frac{\sum_i w_{ti}y_i}{\lambda+\sum_i w_{ti}}.
+\label{eq:ef_local_direction}
+\end{equation}
+The zero-centered prior retains the baseline under weak support. We set
+$\widehat d_t=0$ when fewer than two interventions support the query or
+the absolute weighted mean direction is below $0.25$. The threshold is
+\begin{equation}
+\gamma_t=\gamma_B\exp(-\beta\widehat d_t).
+\label{eq:ef_local_threshold}
+\end{equation}
+Positive feedback lowers the threshold and negative feedback raises it;
+because $|\widehat d_t|\le1$, the adjustment is bounded. The gate evaluates
+$s_{\mathrm{BPCA}}(o_t)>\gamma_t$ before executing each action block.
+If feedback suppresses a baseline alarm, it authorizes at most one additional
+block; assistance is requested at the next query unless the episode has
+already terminated. This prevents repeated reuse of one local wait cue from
+causing indefinite postponement.
+
+Feedback is computed after the expert segment and committed before the next
+episode. Empty memory recovers the original PCA gate, and subsequent policy
+updates follow the same data-retention and fine-tuning procedure. No extra
+expert timing labels are requested. The preferred region describes our
+feedback objective; its relationship to learning efficiency is evaluated
+through downstream policy improvement under a specified expert budget.

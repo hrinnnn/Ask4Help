@@ -1,0 +1,32 @@
+\paragraph{Expert-Feedback Timing Calibration.}
+We refine the ID-calibrated PCA gate using the temporal content of completed
+expert interventions. At recorded expert observations, the frozen policy
+freely generates action chunks, which are compared with the expert's actions
+over the next execution block. The first disagreement above an ID-calibrated
+reference identifies where the observed supervision becomes unfamiliar to
+the policy. We additionally measure whether the expert's initial motion
+reverses the preceding robot motion beyond normal ID variation. These cues
+define a preference for takeover near the onset of expert-specific behavior,
+with little initial correction. Reversal supplies an earlier-takeover cue
+$y_i=+1$ at the preceding policy-query state; a sufficiently long
+low-disagreement prefix supplies a postponement cue $y_i=-1$ at the actual
+takeover state. Immediate disagreement without excessive reversal supplies
+$y_i=0$, indicating that assistance is already locally warranted.
+
+Using similarity weights $w_{ti}$ between the current bridge feature and
+previous feedback states, we fit a regularized local timing direction and
+adjust the threshold:
+\begin{equation}
+\widehat d_t=\frac{\sum_i w_{ti}y_i}{\lambda+\sum_i w_{ti}},
+\qquad
+\gamma_t=\gamma_B\exp(-\beta\widehat d_t).
+\end{equation}
+Insufficient or conflicting local support yields $\widehat d_t=0$.
+The gate requests assistance when
+$s_{\mathrm{BPCA}}(o_t)>\gamma_t$; a suppressed baseline alarm grants at most
+one additional execution block before takeover. Thus, feedback can move
+requests in either direction while limiting the duration justified by a
+wait cue. Memory is updated between episodes, while the policy and PCA
+reference remain fixed during collection. This procedure requires no
+additional expert timing annotations and uses naturally collected expert
+behavior to calibrate subsequent intervention decisions.

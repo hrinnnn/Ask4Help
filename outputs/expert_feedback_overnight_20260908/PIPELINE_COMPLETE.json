@@ -1,0 +1,10 @@
+{
+ "pipeline":"expert_feedback_overnight_v2",
+ "status":"RESEARCH_AND_METHOD_WRITEUP_COMPLETE",
+ "counts":{"offline_configurations":42,"new_collection_episodes":1040,"policy_queries":7667,"common_preference_segments":557,"fresh_counterfactual_branches":35,"video_inventory":1040,"video_frames":50535,"logic_tests":14},
+ "deliverables":["Method.tex","Short_Method_Insert.tex","Implementation_Notes.tex","denoising_vs_action_difference.tex","研究结论与论文衔接.md","完整实验表.md","all_experiment_results.json","completion_audit.json"],
+ "tex_validation":"Compiled IEEEtran+amsmath successfully; both pages visually inspected; no equation overflow. Font substitution in local QA runtime, final manuscript fonts unchanged.",
+ "scientific_outcome":"Executable expert-action timing calibration prototype and evidence completed. Bidirectional timing changes observed; no stable across-stream advantage and no post-SFT claim.",
+ "no_sft":true,
+ "source_branch":"codex/expert-feedback-night-v2"
+}

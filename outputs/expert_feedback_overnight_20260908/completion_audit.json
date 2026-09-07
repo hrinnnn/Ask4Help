@@ -1,0 +1,55 @@
+{
+  "status": "COMPLETE_LOCAL_EVIDENCE_RECONCILIATION_PASS",
+  "new_collection_episodes": 1040,
+  "stage_counts": {
+    "development": 240,
+    "directional": 80,
+    "validation": 240,
+    "bounded_development": 120,
+    "bounded_validation": 180,
+    "longstream": 180
+  },
+  "policy_queries": 7667,
+  "common_feedback_segments": {
+    "development": 151,
+    "validation": 131,
+    "bounded_development": 69,
+    "bounded_validation": 100,
+    "longstream": 106
+  },
+  "counterfactual_branches": 35,
+  "branch_cost_minima": {
+    "944000": {
+      "min_expert_actions": 11,
+      "best_sampled_times": [
+        40
+      ]
+    },
+    "944001": {
+      "min_expert_actions": 11,
+      "best_sampled_times": [
+        20
+      ]
+    },
+    "944002": {
+      "min_expert_actions": 11,
+      "best_sampled_times": [
+        30
+      ]
+    },
+    "944003": {
+      "min_expert_actions": 16,
+      "best_sampled_times": [
+        20,
+        40
+      ]
+    },
+    "944004": {
+      "min_expert_actions": 11,
+      "best_sampled_times": [
+        20
+      ]
+    }
+  },
+  "limitation": "No new SFT. Preferred-proxy checks are not independently annotated learning-optimal timing. Existing audit files cover scalar chronology; final recount also checks saved arrays and bounded waiting."
+}
