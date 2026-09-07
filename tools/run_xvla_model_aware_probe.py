@@ -40,7 +40,7 @@ def main(args):
  handle=head.register_forward_pre_hook(hook)
  transform=transforms.Compose([transforms.Resize((224,224),interpolation=InterpolationMode.BICUBIC),transforms.ToTensor(),transforms.Normalize((.485,.456,.406),(.229,.224,.225))])
  language=processor.encode_language(['stack the red cube on the green cube'])['input_ids'].cuda()
- cached=[];features=[];targets=[];masks=[];native_losses=[];native_step_losses=[]
+ cached=[];features=[];targets=[];masks=[];native_losses=[];native_step_losses=[];free_predictions=[]
  w=head.fc.weight[0].detach().float().reshape(head.input_size,head.output_size)[:,:8].cpu().numpy();b=head.bias.weight[0,:8].detach().float().cpu().numpy()
  example_saved=False
  for index,s in enumerate(samples):
@@ -68,15 +68,27 @@ def main(args):
     per_loss.append(float(step_error[:length].mean().cpu()));step_losses.append(step_error.cpu().numpy())
     h=capture['head_input'][0].cpu().numpy();per_noise.append(h)
    cached.append(np.stack(per_noise));targets.append(action);masks.append(mask);native_losses.append(per_loss);native_step_losses.append(step_losses)
+   if args.free_action_probe:
+    predictions=[]
+    for mc in range(2):
+     generator=torch.Generator(device='cuda');generator.manual_seed(270907+index*17+mc)
+     prior=torch.randn(target.shape,device='cuda',dtype=torch.bfloat16,generator=generator);generated=torch.zeros_like(prior)
+     for step in range(10,0,-1):
+      noise_t=step/10;pp,aa=model.action_space.preprocess(proprio,prior*noise_t+generated*(1-noise_t))
+      generated=model.transformer(domain_id=torch.zeros(1,device='cuda',dtype=torch.long),action_with_noise=aa,proprio=pp,t=torch.tensor([noise_t],device='cuda',dtype=torch.bfloat16),**enc)
+     predictions.append(model.action_space.postprocess(generated)[0].float().cpu().numpy())
+    free_predictions.append(predictions)
   if index%32==0:
    progress=dict(pid=os.getpid(),completed=index+1,total=len(samples),elapsed_seconds=time.time()-started,gpu_memory_gb=torch.cuda.max_memory_allocated()/1e9)
    (args.output/'progress.json').write_text(json.dumps(progress));print('PROGRESS',progress,flush=True)
  handle.remove()
  arrays=dict(head_features=np.asarray(cached),bridge_features=np.asarray(features),targets=np.asarray(targets),valid_mask=np.asarray(masks),native_loss_mc=np.asarray(native_losses),native_loss_per_action_mc=np.asarray(native_step_losses),head_weight=w,head_bias=b)
+ if args.free_action_probe:
+  arrays['free_predictions']=np.asarray(free_predictions);cfg['free_action_probe']=dict(samples=2,denoising_steps=10,expert_action_conditioning=False,seed_rule='270907+index*17+mc');(args.output/'contract.json').write_text(json.dumps(cfg,indent=2))
  assert all(np.isfinite(v).all() for v in arrays.values());buffer=io.BytesIO();np.savez_compressed(buffer,**arrays);(args.output/'head_probe_cache.npz').write_bytes(buffer.getvalue())
  final=dict(status='FEATURE_EXTRACTION_COMPLETE',samples=len(samples),head_features_shape=list(arrays['head_features'].shape),elapsed_seconds=time.time()-started,
   tail_samples=int(sum(not v.all() for v in masks)),finite=True,actual_model='X-VLA ckpt7500',scope='inference-only original checkpoint; future virtual update restricted to action decoder')
  (args.output/'FEATURE_EXTRACTION_COMPLETE.json').write_text(json.dumps(final,indent=2));print(final,flush=True)
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--spec',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--xvla-root',default='/root/X-VLA-stackpyramid-clean');p.add_argument('--checkpoint',default='/root/xvla_stage2_inputs_priority/ckpt-7500');p.add_argument('--smoke',action='store_true');main(p.parse_args())
+ p=argparse.ArgumentParser();p.add_argument('--spec',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--xvla-root',default='/root/X-VLA-stackpyramid-clean');p.add_argument('--checkpoint',default='/root/xvla_stage2_inputs_priority/ckpt-7500');p.add_argument('--smoke',action='store_true');p.add_argument('--free-action-probe',action='store_true');main(p.parse_args())
