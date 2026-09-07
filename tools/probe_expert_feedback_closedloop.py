@@ -27,7 +27,7 @@ def main(args):
   return float(np.hypot(back/.02,bg/.01))
  for episode in range(args.episodes):
   if cost>=3000:break
-  split='id' if episode%2==0 else 'stage2_ood';seed=(930700 if split=='id' else 940700)+episode//2
+  split='id' if episode%2==0 else 'stage2_ood';seed=(930700 if split=='id' else 940700)+episode//2+args.seed_offset
   env=gym.make(stack_cube_env_id(split),num_envs=1,robot_uids='panda_wristcam',obs_mode='rgb',control_mode='pd_joint_delta_pos',reward_mode='sparse',render_mode='rgb_array',sim_backend='physx_cpu',render_backend='gpu',
    sim_config={'sim_freq':100,'control_freq':10},sensor_configs={'width':384,'height':384},max_episode_steps=400)
   obs,_=env.reset(seed=seed);reset=stack_cube_reset_metadata(env,split=split);records=[snapshot(env,obs)];actions=[];queries=[];prefix=[];takeover=None;success=False;oracle=None;expert_steps=0
@@ -90,4 +90,4 @@ def main(args):
  (args.output/'summary.json').write_text(json.dumps(summary,indent=2));(args.output/'PILOT_COMPLETE.json').write_text(json.dumps(dict(arm=args.arm,episodes=len(rows),expert_actions=cost)));print('PILOT_COMPLETE',args.arm,len(rows),flush=True)
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--arm',choices=['fixed','adaptive_current','adaptive_prefix'],required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--calibration',type=Path,required=True);p.add_argument('--pca',type=Path,required=True);p.add_argument('--episodes',type=int,default=20);main(p.parse_args())
+ p=argparse.ArgumentParser();p.add_argument('--arm',choices=['fixed','adaptive_current','adaptive_prefix'],required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--calibration',type=Path,required=True);p.add_argument('--pca',type=Path,required=True);p.add_argument('--episodes',type=int,default=20);p.add_argument('--seed-offset',type=int,default=0);main(p.parse_args())

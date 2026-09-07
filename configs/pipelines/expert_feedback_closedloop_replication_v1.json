@@ -1,0 +1,21 @@
+{
+  "pipeline_id":"expert_feedback_closedloop_replication_v1",
+  "authorized":true,
+  "owner":"codex-root-feedback-lightweight",
+  "rationale":"User requested actual exploration and continue. First20-scene pilot has one changed OOD episode. Check two fresh ordered streams with unchanged rules; not a confirmatory downstream experiment.",
+  "base_protocol":"configs/pipelines/expert_feedback_closedloop_pilot_v1.json",
+  "current_stage":"two_fresh_streams",
+  "next_stage":"independent_artifact_audit_then_report",
+  "arms":["fixed","adaptive_prefix"],
+  "streams":[{"seed_offset":100,"gpu":0,"cpu_set":"0-3"},{"seed_offset":200,"gpu":1,"cpu_set":"4-7"}],
+  "episodes_per_arm_per_stream":20,
+  "total_new_episodes":80,
+  "server":"root@39.101.70.188:1012",
+  "run_root":"/mnt/data/ask4help/results/expert_feedback_closedloop_pilot_v1/replication384",
+  "controller":"tools/run_expert_feedback_pilot_controller.py",
+  "state":"each seed_offset_{100,200}/pipeline_state.json",
+  "frozen":["checkpoint7500","original PCA basis and tau0","free5 q_loss=1.8980316162109374","motion-undo q95=1.9004588285680322","ID-only local support calibration","H10 execute5","384 RGB","empty memory per stream/arm","150 policy + up to150 expert actions","3000 expert cap per arm"],
+  "forbidden":["SFT","tuning against old or new SR","prepopulated OOD feedback","changing original pilot results","touching PID276925 or unrelated workloads"],
+  "placement":"Same co-located H20 model/runtime/PCA/task assets; first60-episode collection completed. Both GPUs independently checked idle; /tmp scratch and persistent /mnt/data outputs remain viable.",
+  "completion":"80 per-episode records/videos and independent reconciliation plus exploratory report; collection marker alone is not completion"
+}
