@@ -1,0 +1,20 @@
+{
+ "pipeline_id":"expert_feedback_pca_probe_v1",
+ "authorized":true,
+ "owner":"codex-root-model-aware-timing",
+ "goal":"Expert-feedback local PCA thresholds without precollected OOD demonstrations or optimal timing labels",
+ "current_stage":"contiguous_actual_model_forward",
+ "next_stage":"feedback_support_conflict_prequential_audit_then_chinese_design_report",
+ "model_checkpoint":"/root/xvla_stage2_inputs_priority/ckpt-7500",
+ "runtime":"/root/.venvs/xvla-h20/bin/python",
+ "server":"root@39.101.70.188:1012",
+ "scratch":"/tmp/expert_feedback_pca_probe_v1",
+ "output":"/mnt/data/ask4help/results/expert_feedback_pca_probe_v1",
+ "local_output":"artifacts/expert_feedback_pca_20260907",
+ "asset_preflight":{"gpu":[0,1],"preserve_pid":276925,"gpu_memory_mib":[348,338],"scratch_available_gb":14,"system_root_full":true,"selection":"H20 has exact checkpoint, datasets, compatible runtime; 5090 occupied","expected_output_gb":1,"cpu_threads_per_worker":4},
+ "inputs":{"id_calibration_episodes":"100..119 from original ID expert training data","id_check_episodes":"120..127; not used to calibrate this feedback","experts":"first8 selected episodes in each of6 existing Stage2 method/timing collections, with every real observation and action chunk","no_precollected_ood_reference":true,"expert_paths_are_not_autonomous_replay":true},
+ "loss_protocol":{"native":"X-VLA clean-action reconstruction x100, average over real8 dimensions and valid timesteps","MC":2,"times":[0.25,0.75],"batch_size":1,"seed_rule":"260906+sample_index*17+MC_index, matching implemented extraction","feedback_uses_only_full_chunks":true,"H":10,"Delta":5},
+ "feedback_variants":["document first crossing with local feasible thresholds","episode-max ID calibration contrast","first-action error versus chunk-error localization diagnostic"],
+ "execution_audit":{"failure_marker":"FEEDBACK_PROBE_FAILED","required":["all episode offsets contiguous","ID/expert protocol identical","pointloss and threshold reduction documented","no same-episode feedback during queries","no future expert feedback during prequential replay","unchanged policy and PCA baseline"],"scope":"Frozen forward and offline prototype, no new SFT or deployed gate claims"},
+ "terminal_definition":"Mechanism specification and tested core, actual-model feedback feasibility evidence and bounded counterfactual claims, ablation plan; downstream improvement remains unverified until new collection/training evaluation"
+}
