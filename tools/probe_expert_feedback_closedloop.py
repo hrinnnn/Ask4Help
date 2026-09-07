@@ -66,9 +66,9 @@ def main(args):
       errs.append(float(((pred[0,:5,:8]-torch.tensor(teacher[i:i+5],device='cuda'))**2).mean().cpu())*100)
      losses[i]=np.mean(errs)
     if losses[i]>cal['q_loss']:break
-   if args.arm=='adaptive_prefix':
+   if args.arm.startswith('adaptive_'):
     feedback=gate.add_takeover_prefix_credit(f'{args.arm}:{episode}',np.array([p['feature'] for p in prefix]),np.array([p['score'] for p in prefix]),np.array([p['step'] for p in prefix]),losses,valid,
-     regression=u,regression_bound=1.9004588285680322,progress_supported=u is not None)
+     regression=u,regression_bound=1.9004588285680322,progress_supported=args.arm=='adaptive_prefix' and u is not None)
    else:feedback=dict(reason='fixed_gate_no_update',first_observed_high=next((i for i,v in enumerate(losses) if np.isfinite(v) and v>cal['q_loss']),None))
    feedback['forward_seconds']=time.time()-feedback_started
   directory=args.output/f'episode_{episode:03d}';directory.mkdir(exist_ok=True)
@@ -89,4 +89,4 @@ def main(args):
  (args.output/'summary.json').write_text(json.dumps(summary,indent=2));(args.output/'PILOT_COMPLETE.json').write_text(json.dumps(dict(arm=args.arm,episodes=len(rows),expert_actions=cost)));print('PILOT_COMPLETE',args.arm,len(rows),flush=True)
 
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--arm',choices=['fixed','adaptive_prefix'],required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--calibration',type=Path,required=True);p.add_argument('--pca',type=Path,required=True);p.add_argument('--episodes',type=int,default=20);main(p.parse_args())
+ p=argparse.ArgumentParser();p.add_argument('--arm',choices=['fixed','adaptive_current','adaptive_prefix'],required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--calibration',type=Path,required=True);p.add_argument('--pca',type=Path,required=True);p.add_argument('--episodes',type=int,default=20);main(p.parse_args())

@@ -13,7 +13,7 @@
  "pca":"/mnt/data/ask4help/results/expert_feedback_pca_probe_v1/original_pca_bridge.npz",
  "tau0":1.7073631286621094,
  "task":"StackCube Stage2 target OOD",
- "arms":["fixed","adaptive_prefix"],
+ "arms":["fixed","adaptive_current","adaptive_prefix"],
  "episodes_per_arm":20,
  "split_order":"strict ID/OOD alternation",
  "id_seeds":"930700..930709",

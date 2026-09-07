@@ -40,6 +40,9 @@ class FeedbackTests(unittest.TestCase):
   gate=ExpertFeedbackPCA(3.,np.zeros(2),1.,.3,1.,H=1,delta=5)
   result=gate.add_takeover_prefix_credit('gap',np.array([[0.,2.4],[2.,3.4]]),np.array([2.4,3.4]),np.array([10,15]),np.ones(8)*2,np.ones(8))
   self.assertEqual(result['credit_step'],15)
+  # If all request labels are recorded only where the original gate already
+  # fires, projecting tau0 cannot lower it: the current-only cold-start trap.
+  self.assertEqual(gate.query(np.array([2.,3.4]),3.4)['threshold'],3.)
  def test_long_low_loss_prefix_waits_at_true_takeover_state(self):
   gate=ExpertFeedbackPCA(3.,np.zeros(2),1.,.3,1.,H=1,delta=5)
   result=gate.add_takeover_prefix_credit('early',np.array([[2.,3.4]]),np.array([3.4]),np.array([15]),np.r_[np.zeros(6),2.,0.],np.ones(8))
