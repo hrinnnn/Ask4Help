@@ -1,0 +1,16 @@
+{
+  "purpose": "Independent unassisted post-SFT evaluation; never use these seeds for tuning or collection.",
+  "frozen_date": "2026-09-09",
+  "episodes_per_split": 100,
+  "inference_mode": "eval",
+  "execute_horizon": 5,
+  "tasks": {
+    "stackcube_legacy_ood": {"id_start": 9100000, "ood_start": 9101000, "primary_endpoint": "strict_success"},
+    "airplane_yaw_ood": {"id_start": 9110000, "ood_start": 9111000, "primary_endpoint": "ever_grasped"},
+    "open_drawer_grasp_ood": {"id_start": 9120000, "ood_start": 9121000, "primary_endpoint": "strict_success"},
+    "open_drawer_goal_ood": {"id_start": 9130000, "ood_start": 9131000, "primary_endpoint": "strict_success"}
+  },
+  "pairing": "Same task/split reset and policy-noise seeds across methods and training replicates.",
+  "termination": "Native strict task success, termination, or task horizon. Plane first grasp is an endpoint readout, not an early-stop condition.",
+  "training_admission": "This file reserves evaluation only. It does not authorize bypassing any training gate."
+}
