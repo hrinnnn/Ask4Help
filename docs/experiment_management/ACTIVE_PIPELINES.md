@@ -2,6 +2,8 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **模式协议修复，优先于以下旧状态**：旧OpenDrawer通用接口误用了Plane的train/SDE采样；原任务gated/fixed-timing/eval源码均为eval。旧50-ID仅10成功和32-demo动作误差保留为不同策略诊断，不再尝试直接补100。原VLM-only PCA和expert-only Goal nominal bank可保留；重新全量计算32 dense demos+50 policy的eval校准，双卡分片，新root `opendrawer_eval_ID_calibration_v4`。随后配对root为`opendrawer_stage_feedback_eval_v2`。原controllers1307826/1349662已终止失败，不重启；无任何OD on/off结果已被用于选择模式。
+- 训练工程接口已准备：native时间mask之外显式仅计算8维动作；pilot SFT数据导出v1因重复解压NPZ效率问题终止，源数据未变，修复后将在新目录重试。尚无SFT。自然composition/历史preliminary OD基座用于本次消融的例外已再次简明询问用户，未收到新决定。
 - **04:35后续**：v5 Grasp/Goal oracle smoke均完成并通过独立raw/reset/action审计，完成数分别3/4与4/4；Grasp t120的一条direct-grasp失败在修正planner后仍保留，不改专家来消除负例。Goal主相机遮挡后方tray，但wrist reset/terminal可见绿盘与最终蓝块，已人工查看。Goal nominal TASR bank（fresh1786000–29）worker1343725已完成至少19个raw/19成功，GPU1；只做评价参考，不进入gate。
 - 已写好stage controller：nominal bank→独立Goal metric calibration→ID gate audit→Grasp/Goal各20raw×2arms并行→各自TASR。种子1782000/1783000，原displacement_v1，均空记忆；不把新commitment候选偷偷并入OD。源码和运行记录使用GitHub部署分支，原正式工作分支HTTPS push仍不稳定。最终训练/SR仍未启动。
 - **04:21更新**：128-ID/22973-anchor/rank1000 native PCA已完成，controller1307826自动启动ID校准worker1336534（GPU0）。修复direct-oracle初始planner_mode与reset记录时点后，smoke v5/grasp worker1336653在GPU1。v3的t120 OOD失败仍属错误planner初始化的工程诊断，不计入gate比较；v4因发布确认失败在模型加载时停止。现用GitHub已核实同树部署commit25a7f0cc（API发布分支codex/pi05-feedback-deployment，等价本地79df1bbc），正式工作分支推送网络暂不稳定。

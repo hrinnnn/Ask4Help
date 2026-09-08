@@ -31,6 +31,11 @@ def audit(root):
     assert len(successful)==cal['qualifying_ID_policy_episodes'] and len(successful)>=20
     assert np.quantile(successful,.95,method='higher')==cal['baseline_threshold']
     assert np.quantile([d['max_error'] for d in demos],.95,method='higher')==cal['error_reference']
+    motion=root/'motion_calibration.json'
+    if motion.exists():
+        values=json.loads(motion.read_text())
+        assert np.isfinite(values).all() and min(values)>=0
+        assert np.quantile(values,.95,method='higher')==cal['reversal_reference']
     data=np.load(root/'gate_arrays.npz')
     assert data['mean'].shape==data['center'].shape==(2048,)
     assert data['basis'].shape==(2048,cal['principal_dim'])

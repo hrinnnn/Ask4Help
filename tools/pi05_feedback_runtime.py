@@ -23,6 +23,7 @@ SOURCE_ROOTS = {
 class Pi05FeedbackRuntime:
     def __init__(self, task, task_assets, source_root=None):
         self.task = task
+        self.inference_mode='eval' if task.startswith('open_drawer_') else 'train'
         self.assets = task_assets
         self.source = Path(source_root or SOURCE_ROOTS[task])
         sys.path[:0] = [str(self.source), str(self.source/'RLinf')]
@@ -60,7 +61,7 @@ class Pi05FeedbackRuntime:
     def provenance(self):
         def revision(path):
             return subprocess.check_output(['git','-C',str(path),'rev-parse','HEAD'],text=True).strip()
-        return {'task':self.task,'instruction':self.instruction,
+        return {'task':self.task,'instruction':self.instruction,'inference_mode':self.inference_mode,
                 'source_root':str(self.source),'source_commit':revision(self.source),
                 'rlinf_commit':revision(self.source/'RLinf'),
                 'python':sys.executable,'torch':self.torch.__version__,
@@ -99,7 +100,7 @@ class Pi05FeedbackRuntime:
         with isolated_python_numpy_rng(rng_seed), torch.random.fork_rng(devices=[torch.cuda.current_device()]):
             torch.manual_seed(int(rng_seed));torch.cuda.manual_seed_all(int(rng_seed))
             with torch.inference_mode():
-                actions, result=self.model.predict_action_batch(env_obs=self.observation(raw),mode='train')
+                actions, result=self.model.predict_action_batch(env_obs=self.observation(raw),mode=self.inference_mode)
         return actions.detach().float().cpu().numpy()[0],result['forward_inputs']['model_action']
 
     def bridge(self, raw, model_actions):

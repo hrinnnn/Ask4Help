@@ -144,6 +144,8 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
 def main(args):
     args.output.mkdir(parents=True,exist_ok=False);start=time.time()
     manifest=json.loads(args.manifest.read_text());cal=json.loads((args.calibration/'calibration.json').read_text())
+    if args.task.startswith('open_drawer_'):
+        assert cal['provenance'].get('inference_mode')=='eval','OpenDrawer requires original eval-mode calibration, not earlier generic SDE diagnostics'
     assert cal['task']==args.task or (
         cal['task'].startswith('open_drawer_') and args.task.startswith('open_drawer_')
         and manifest['task_assets'][cal['task']]['checkpoint']==manifest['task_assets'][args.task]['checkpoint']
