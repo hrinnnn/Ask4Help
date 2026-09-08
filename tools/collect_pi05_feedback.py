@@ -10,6 +10,7 @@ import numpy as np
 
 from pi05_feedback_runtime import Pi05FeedbackRuntime
 from pi05_timing_feedback import TimingFeedbackGate, action_block_error, corrective_motion, timing_cue, isolated_python_numpy_rng
+from pi05_timing_feedback import gripper_commitment_opening, commitment_timing_cue
 
 
 def jsonable(v):
@@ -55,7 +56,8 @@ def write_trace(directory, snapshots, actions, prefix, expert_all):
     writer.release();(directory/'trajectory.mp4').write_bytes(scratch.read_bytes());scratch.unlink()
 
 
-def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episode, force_step=None):
+def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episode, force_step=None,
+                    feedback_rule='displacement_v1',opening_reference=None):
     env=runtime.build_env(split);raw,info=env.reset(seed=seed)
     snapshots=[runtime.snapshot(env,raw)];actions=[];prefix=[];queries=[]
     metadata=runtime.reset_metadata(env,split=split);gate.begin_episode(episode)
@@ -95,13 +97,15 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
             actions.extend(result['actions']);snapshots.extend(result['snapshots'])
             expert_all=result;expert_report=result['report'];expert_report['attempt_lengths']=result['attempt_lengths']
             success=bool(result['report']['accepted'])
-    errors=[];reversal=None;cue=None;feedback_seconds=0.
+    errors=[];reversal=None;cue=None;feedback_seconds=0.;opening_score=0.
     expert_n=0 if takeover is None else len(actions)-takeover
     if takeover is not None:
         begin=time.time()
         if takeover>=5 and expert_n>=5:
             before,current,after=snapshots[takeover-5],snapshots[takeover],snapshots[takeover+5]
             reversal=corrective_motion(before['tcp'],current['tcp'],after['tcp'],before['qpos'][-2:].sum(),current['qpos'][-2:].sum(),after['qpos'][-2:].sum())
+            opening_score=gripper_commitment_opening(np.asarray(actions[takeover-5:takeover])[:,-1],
+                np.asarray(actions[takeover:takeover+5])[:,-1],current['qpos'][-2:].sum(),after['qpos'][-2:].sum())
         # A directional cue only needs to distinguish crossing within one
         # block versus a completely observed initial low-error block.
         for k in range(min(5,max(0,expert_n-4))):
@@ -112,8 +116,11 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
                 samples.append(runtime.clip(pred,env))
             errors.append(action_block_error(np.asarray(samples),target))
             if errors[-1]>calibration['error_reference']:break
-        cue=timing_cue(errors,calibration['error_reference'],reversal=reversal,
-                       reversal_reference=calibration['reversal_reference'],has_previous_query=len(prefix)>=2)
+        arguments=dict(reversal=reversal,reversal_reference=calibration['reversal_reference'],has_previous_query=len(prefix)>=2)
+        if feedback_rule=='commitment_v2':
+            cue=commitment_timing_cue(errors,calibration['error_reference'],opening_score=opening_score,
+                                      opening_reference=opening_reference,**arguments)
+        else:cue=timing_cue(errors,calibration['error_reference'],**arguments)
         if cue is not None:
             credit=prefix[-2] if cue['attribution']=='previous_query' else prefix[-1]
             cue={**cue,'credit_step':credit['step']}
@@ -127,6 +134,7 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
              'total_retained_path_actions':len(actions),'query_count':len(queries),'queries':queries,
              'reset':metadata,'feedback_errors':errors,'motion_reversal':reversal,'cue':cue,
              'feedback_seconds':feedback_seconds,'expert_report':planner_diagnostic(expert_report),
+             'feedback_rule':feedback_rule,'opening_score_m':opening_score,
              'forced_takeover_diagnostic':force_step is not None,
              'video_scope':'policy prefix plus final expert candidate; abandoned planner candidates counted separately'}
     return summary,snapshots,actions,prefix,expert_all
@@ -137,7 +145,14 @@ def main(args):
     manifest=json.loads(args.manifest.read_text());cal=json.loads((args.calibration/'calibration.json').read_text())
     assert cal['task']==args.task
     arrays=np.load(args.calibration/'gate_arrays.npz');mean=arrays['mean'];basis=arrays['basis']
-    cfg={**manifest['feedback'],'radius_multiplier':manifest['local_radius_multiplier']}
+    cfg={**manifest['feedback'],'radius_multiplier':manifest['local_radius_multiplier'],'rule':args.feedback_rule}
+    opening_reference=None
+    if args.feedback_rule=='commitment_v2':
+        if args.opening_calibration is None:raise ValueError('commitment_v2 requires its frozen ID opening calibration')
+        opening=json.loads(args.opening_calibration.read_text())
+        assert opening['ID_calibration']==str(args.calibration)
+        opening_reference=opening['opening_reference_m'];cfg['opening_reference_m']=opening_reference
+        cfg['opening_calibration']=str(args.opening_calibration)
     gate=TimingFeedbackGate(cal['baseline_threshold'],arrays['center'],cal['scale'],cal['radius']*cfg['radius_multiplier'],
                             regularization=cfg['lambda'],strength=cfg['beta'],min_support=cfg['minimum_interventions'],
                             min_vote=cfg['minimum_absolute_vote'],block=cfg['execution_block'],enabled=args.arm=='feedback')
@@ -146,7 +161,8 @@ def main(args):
     runtime.load_model();results=[];accepted=0
     for episode in range(args.episodes):
         split='id' if episode%2==0 else 'ood';seed=args.seed+episode//2
-        result,snapshots,actions,prefix,expert_all=collect_episode(runtime,gate,cal,mean,basis,seed,split,episode,args.force_takeover_step)
+        result,snapshots,actions,prefix,expert_all=collect_episode(runtime,gate,cal,mean,basis,seed,split,episode,args.force_takeover_step,
+                                                                args.feedback_rule,opening_reference)
         directory=args.output/f'episode_{episode:04d}';directory.mkdir()
         write_trace(directory,snapshots,actions,prefix,expert_all);write_json(directory/'result.json',result)
         accepted+=int(result['accepted']);results.append(result)
@@ -171,6 +187,8 @@ if __name__=='__main__':
     p.add_argument('--calibration',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--seed',type=int,required=True);p.add_argument('--episodes',type=int,default=20)
     p.add_argument('--accepted-target',type=int);p.add_argument('--force-takeover-step',type=int)
+    p.add_argument('--feedback-rule',choices=['displacement_v1','commitment_v2'],default='displacement_v1')
+    p.add_argument('--opening-calibration',type=Path)
     args=p.parse_args()
     try:main(args)
     except Exception as error:
