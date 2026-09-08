@@ -16,6 +16,9 @@ from pi05_timing_feedback import action_block_error, corrective_motion
 
 
 ASSETS = {
+ 'open_drawer_grasp_ood': {
+  'pca':'/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/bridge_reference.pt',
+  'cache':'/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/bridge_reference.pt'},
  'stackcube_legacy_ood': {
   'pca':'/mnt/data/ask4help/results/stackcube_vla_fail/internal_detector_matrix_v1/assets/internal_detector_assets.pt',
   'cache':'/mnt/data/ask4help/results/stackcube_vla_fail/multilayer_llmd_step7000_v1/assets/multilayer_feature_cache.pt'},
@@ -66,13 +69,13 @@ def main(args):
     progress('load_ID_reference')
     prior_asset=torch.load(ASSETS[args.task]['pca'],map_location='cpu',weights_only=False)
     cache=torch.load(ASSETS[args.task]['cache'],map_location='cpu',weights_only=False)
-    if args.task=='stackcube_legacy_ood':
+    if args.task!='airplane_yaw_ood':
         pca=prior_asset['detectors']['vlm_bridge_final_mean__pca_residual']['statistics']
         features=cache['layers']['vlm_bridge_final_mean'].float().reshape(-1,2048)
     else:
         pca=prior_asset['statistics']['bridge_pca_residual']
         features=cache['bridge'].float().reshape(-1,2048)
-    assert prior_asset['checkpoint']==assets['checkpoint']
+    assert prior_asset['checkpoint']==assets.get('reference_checkpoint',assets['checkpoint'])
     episode_ids=np.concatenate([np.repeat(e['episode_index'],e['length']) for e in episodes])
     assert len(episode_ids)==len(features)
     center=features.mean(0);scale=float(torch.sqrt(torch.mean(torch.sum((features-center)**2,dim=1))))
@@ -145,7 +148,7 @@ def main(args):
                 if args.task=='airplane_yaw_ood':ever_grasped|=bool(env.unwrapped.agent.is_grasping(env.unwrapped.obj))
                 if strict or bool(terminated) or bool(truncated):break
             if strict or bool(terminated) or bool(truncated):break
-        qualifies=strict if args.task=='stackcube_legacy_ood' else ever_grasped
+        qualifies=ever_grasped if args.task=='airplane_yaw_ood' else strict
         row={'episode':episode,'seed':seed,'strict_success':strict,'ever_grasped':ever_grasped,
              'calibration_success':qualifies,'steps':steps,'scores':scores,'maximum':max(scores)}
         if qualifies:success_maxima.append(max(scores))
@@ -160,7 +163,7 @@ def main(args):
             'scale':scale,'radius':radius,'principal_dim':int(pca['principal_dim']),
             'ID_demonstrations':len(selected),'qualifying_ID_policy_episodes':len(success_maxima),
             'policy_episodes':args.policy_episodes,'fixed_prior':'bridge only; action prior does not affect VLM prefix',
-            'calibration_success_rule':'strict' if args.task=='stackcube_legacy_ood' else 'ever_grasped',
+            'calibration_success_rule':'ever_grasped' if args.task=='airplane_yaw_ood' else 'strict',
             'provenance':runtime.provenance(),'reference_assets':ASSETS[args.task],
             'source_dataset':str(dataset),'array_file':'gate_arrays.npz'}
     (args.output/'calibration.json').write_text(json.dumps(result,indent=2))
