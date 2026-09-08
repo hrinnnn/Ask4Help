@@ -1,0 +1,11 @@
+# 40-episode采集的运行时恢复
+
+soft_support_v1两fixed进程在各自完成24条后，创建下一环境时报Vulkan实例初始化错误；两进程已退出。错误发生在下一episode的环境创建阶段，不是策略或专家执行失败，旧24条完整episode仍然保留。
+
+没有更换驱动、相机、任务、checkpoint、seed、阈值或成功定义。新collector将每个进程的新episode上限设为20，episode结束后做GC；恢复时引用旧数据目录、重建每条过去intervention的原始cue和credit feature，而非从空memory重新开始。新目录保留自己的provenance和续接位置；原错误与部分结果不覆盖。
+
+所有下游auditor、timing配对、TASR scorer和SFT exporter通过统一artifact_directory读取真实来源，不复制大RGB轨迹。没有把结构测试当作完整实验：20项core/support/resume/Ray测试通过后，还验收了真实恢复运行。
+
+当前真实证据：两个fixed控制均从24续至40并通过raw audit，新过程FD计数稳定为91。新soft feedback开始按20+20分片执行。底层Vulkan/对象生命周期原因仍保留为工程诊断，不声称已经证明是驱动版本不支持。
+
+同seed hard40补充控制的等待器也已运行；它复用完整fixed数据。三组比较会另求共同预算，保留每个二元pilot的原结果。

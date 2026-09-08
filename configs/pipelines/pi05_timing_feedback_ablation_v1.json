@@ -15,17 +15,23 @@
   },
   "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
   "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
-  "current_stage": "soft_support_render_lifecycle_recovery",
+  "current_stage": "chunked_soft_feedback_and_scheduled_hard_control",
   "render_recovery": {
-    "failed_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
-    "complete_fixed_prefixes":{"grasp":24,"goal":24},
-    "failure":"Both processes failed creating the next environment with vk::createInstanceUnique/ErrorIncompatibleDriver.",
-    "retry_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v2_chunked",
-    "max_new_episodes_per_process":20,
-    "policy":"Reference immutable completed episodes, reconstruct exact prior feedback memory, preserve old failure files; no new seeds or parameter changes.",
-    "tests":"20 core/support/Ray/resumption tests passed"
+    "failed_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
+    "complete_fixed_prefixes": {
+      "grasp": 24,
+      "goal": 24
+    },
+    "failure": "Both processes failed creating the next environment with vk::createInstanceUnique/ErrorIncompatibleDriver.",
+    "retry_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v2_chunked",
+    "max_new_episodes_per_process": 20,
+    "policy": "Reference immutable completed episodes, reconstruct exact prior feedback memory, preserve old failure files; no new seeds or parameter changes.",
+    "tests": "20 core/support/Ray/resumption tests passed",
+    "status": "both_fixed_controls_completed40_using_24_immutable_prior_episodes_and16_new",
+    "observed_open_fds": 91,
+    "feedback_started": true
   },
-  "next_stage": "new_seed_soft_support_pairs_then_TASR_and_training_admission",
+  "next_stage": "soft_timing_TASR_then_same_seed_hard40_three_arm_budget",
   "soft_support_candidate": {
     "status": "running_fresh_fixed_controls_then_soft_feedback",
     "plan": "docs/experiment_management/plans/Pi05_Feedback_Soft_Support_Candidate.md",
@@ -45,10 +51,18 @@
     "Grasp_seed": 1784000,
     "Goal_seed": 1785000,
     "raw_per_arm": 40,
-    "root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
+    "root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v2_chunked",
     "original_v1_results": "Both stages all actual timing unchanged; TASR_x3 Grasp60/325 and Goal203/708 unchanged",
     "interpretation": "Exploratory support-rule revision; no efficacy claim before fresh closed-loop results",
-    "hard40_control": "Registered before inspecting new soft feedback results; reuse same fixed40, collect hard_radius feedback on same fresh seeds to distinguish memory length from kernel support."
+    "hard40_control": "Registered before inspecting new soft feedback results; reuse same fixed40, collect hard_radius feedback on same fresh seeds to distinguish memory length from kernel support.",
+    "hard_control": {
+      "controller_pid": 1426109,
+      "source_commit": "98af1d4a",
+      "root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_hard40_control_v1",
+      "state": "waiting_soft_completion",
+      "same_fixed_data_reused": true,
+      "common_three_arm_budget": true
+    }
   },
   "OpenDrawer_mode_repair": {
     "mode": "eval",
@@ -279,13 +293,13 @@
     "output_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1"
   },
   "process": {
-    "controller_pid": 1409675,
+    "controller_pid": 1422325,
     "worker_pids": {
-      "grasp_fixed": 1409719,
-      "goal_fixed": 1409720
+      "grasp_feedback_chunk": 1429579,
+      "goal_feedback_chunk": 1429478
     },
-    "source_commit": "8ec60c40",
-    "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1/controller_state.json",
+    "source_commit": "949827ef",
+    "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v2_chunked/controller_state.json",
     "phase_marker": "TIMING_TASR_PILOTS_COMPLETE.json",
     "whole_pipeline_complete": false
   },

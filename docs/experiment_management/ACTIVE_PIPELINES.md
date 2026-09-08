@@ -2,6 +2,8 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **07:40恢复已推进**：新root `opendrawer_soft_support_v2_chunked` controller1422325，固定组两stage均补齐40并通过审计，原24条只引用、无覆盖。新16条过程中FD计数稳定91；不把底层原因夸称已完全解释。当前feedback首chunk workers1429579/1429478，最多每进程20新episode，后续从已完成记录恢复精确memory。source949827ef（本地07151958）。
+- 同40新seed原hard-radius对照已持久化等待：controller1426109，source98af1d4a，root `opendrawer_hard40_control_v1`。Soft完成后自动复用同fixed数据、收集hard feedback，最后重新求fixed/hard/soft三者共同整后缀预算，避免把不同二元预算下的TASR直接横比。正式SFT仍未启动，准入例外仍待用户确认。
 - **渲染生命周期恢复**：soft_support_v1两fixed worker均在已完成24条后，创建第25个环境时出现vk::createInstanceUnique/ErrorIncompatibleDriver并退出；没有soft反馈结果。保存原24条，恢复将采用每进程最多20个新episode、episode后GC、显式恢复过去cue记忆；新root `opendrawer_soft_support_v2_chunked`。旧原始episode只被引用，不复制/覆盖，不改变seed或算法。文件描述符计数会写入进度，以核实资源累积，尚不把它断言为驱动不支持Vulkan。
 - **首轮结果/下一候选**：eval-mode Grasp/Goal各20raw×2arms已完整通过timing/TASR审计；所有takeover不变，Grasp60/325=18.46%、Goal203/708=28.67%均不变。原支持条件覆盖分别仅1/1019、0/811 eligible queries。保留零结果；已按诊断冻结soft_mass候选，带宽不变、取消硬截断、保留2*exp(-.5)总权重下限。新seed1784000/1785000，各40raw/arm，独立新root `opendrawer_soft_support_v1`；未获得新结果前不声称改进。
 - **06时段当前执行**：正确eval校准已完整结束，32 demos/50 ID policies，33 strict成功，独立审计通过（gamma0.3362330496311188，q_e0.20073064610519734）。controller1368627已自动启动两个stage的真实paired20：Grasp controller1387638，Goal controller1387639；fixed均完成20，feedback workers1396060/1395890继续运行。实际state在 `opendrawer_stage_feedback_eval_v2`，旧SDE50不参与。
