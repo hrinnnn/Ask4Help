@@ -1,0 +1,61 @@
+"""Independent raw-array and chronology audit of completed feedback collection."""
+import argparse
+import json
+from pathlib import Path
+import numpy as np
+
+
+def audit(root):
+    summary=json.loads((root/'summary.json').read_text())
+    provenance=json.loads((root/'provenance.json').read_text())
+    cal_root=Path(provenance['calibration'])
+    cal=json.loads((cal_root/'calibration.json').read_text())
+    center=np.load(cal_root/'gate_arrays.npz')['center']
+    memory=[];report=[];total_cost=0;accepted=0
+    for i,row in enumerate(summary['rows']):
+        data=np.load(root/f'episode_{i:04d}'/'trace.npz')
+        assert row['episode']==i and row['split']==('id' if i%2==0 else 'ood')
+        n=len(data['actions']);assert len(data['main'])==len(data['wrist'])==len(data['qpos'])==n+1
+        assert np.isfinite(data['actions']).all() and data['actions'].shape[1:]==(8,)
+        assert data['main'].shape[1:]==data['wrist'].shape[1:]==(384,384,3)
+        assert n==row['total_retained_path_actions']
+        assert len(data['all_expert_actions'])==row['all_executed_expert_actions']
+        if row['takeover'] is not None:
+            suffix=data['actions'][row['takeover']:]
+            assert len(suffix)==row['expert_suffix_actions']
+            if len(suffix):assert np.array_equal(suffix,data['all_expert_actions'][-len(suffix):])
+        assert len(row['queries'])==len(data['query_features'])==len(data['query_steps'])
+        deadline=None
+        for j,q in enumerate(row['queries']):
+            z=(data['query_features'][j]-center)/cal['scale']
+            neighbors=[]
+            for ep,z_i,y in memory:
+                assert ep<i
+                dist=np.linalg.norm(z-z_i)
+                if dist<=cal['radius']:neighbors.append((np.exp(-.5*(dist/cal['radius'])**2),y))
+            direction=0.
+            cfg=provenance['feedback']
+            if provenance['arm']=='feedback' and len(neighbors)>=cfg['minimum_interventions']:
+                mass=sum(w for w,y in neighbors);weighted=sum(w*y for w,y in neighbors)
+                if abs(weighted/mass)>=cfg['minimum_absolute_vote']:direction=weighted/(cfg['lambda']+mass)
+            threshold=cal['baseline_threshold']*np.exp(-cfg['beta']*direction)
+            assert np.isclose(threshold,q['threshold'],rtol=1e-7)
+            if provenance['arm']=='feedback' and deadline is None and q['score']>cal['baseline_threshold'] and q['score']<=threshold:
+                deadline=q['step']+cfg['execution_block']
+            stop=q['score']>threshold or (deadline is not None and q['step']>=deadline)
+            assert bool(stop)==q['stop'] and q['deadline']==deadline
+            assert len(memory)==q['memory_episodes']
+        cue=row['cue']
+        if provenance['arm']=='feedback' and cue is not None:
+            idx=-2 if cue['attribution']=='previous_query' else -1
+            assert cue['credit_step']==int(data['query_steps'][idx])
+            memory.append((i,(data['query_features'][idx]-center)/cal['scale'],cue['direction']))
+        total_cost+=row['all_executed_expert_actions'];accepted+=int(row['accepted'])
+        report.append({'episode':i,'actions':n,'expert_cost':row['all_executed_expert_actions'],'status':'PASS'})
+    assert total_cost==summary['all_expert_actions'] and accepted==summary['accepted']
+    return {'status':'PASS','episodes':len(report),'all_expert_actions':total_cost,'accepted':accepted,'rows':report}
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);args=p.parse_args()
+    result=audit(args.root);(args.root/'INDEPENDENT_COLLECTION_AUDIT.json').write_text(json.dumps(result,indent=2));print(json.dumps({k:v for k,v in result.items() if k!='rows'}))

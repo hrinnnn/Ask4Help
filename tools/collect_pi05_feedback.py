@@ -1,0 +1,166 @@
+"""Real single-takeover pi0.5 fixed-vs-feedback expert data collection."""
+import argparse
+import io
+import json
+import os
+import time
+from pathlib import Path
+
+import numpy as np
+
+from pi05_feedback_runtime import Pi05FeedbackRuntime
+from pi05_timing_feedback import TimingFeedbackGate, action_block_error, corrective_motion, timing_cue, isolated_python_numpy_rng
+
+
+def jsonable(v):
+    if isinstance(v,np.ndarray):return v.tolist()
+    if isinstance(v,np.generic):return v.item()
+    if isinstance(v,dict):return {k:jsonable(x) for k,x in v.items()}
+    if isinstance(v,(tuple,list)):return [jsonable(x) for x in v]
+    return v
+
+
+def write_json(path, value):
+    path.write_text(json.dumps(jsonable(value),indent=2,allow_nan=False))
+
+
+def write_trace(directory, snapshots, actions, prefix, expert_all):
+    arrays={k:np.asarray([s[k] for s in snapshots]) for k in snapshots[0]}
+    arrays.update(actions=np.asarray(actions,dtype=np.float32).reshape(-1,8),
+                  query_features=np.asarray([q['feature'] for q in prefix]),
+                  query_steps=np.asarray([q['step'] for q in prefix]),
+                  all_expert_actions=np.asarray(expert_all.get('all_actions',[]),dtype=np.float32).reshape(-1,8))
+    for key in ['qpos','tcp','tcp_q','object_p','object_q','grasped']:
+        arrays['all_expert_'+key]=np.asarray([s[key] for s in expert_all.get('all_snapshots',[])])
+    buffer=io.BytesIO();np.savez_compressed(buffer,**arrays)
+    (directory/'trace.npz').write_bytes(buffer.getvalue())
+    import cv2
+    scratch=Path(os.environ.get('TMPDIR','/tmp'))/f'feedback_{os.getpid()}_{directory.name}.mp4'
+    h,w=snapshots[0]['main'].shape[:2]
+    writer=cv2.VideoWriter(str(scratch),cv2.VideoWriter_fourcc(*'mp4v'),10,(2*w,h))
+    if not writer.isOpened():raise RuntimeError('video writer unavailable')
+    for s in (snapshots[:-1] or snapshots[:1]):writer.write(np.concatenate([s['main'],s['wrist']],axis=1)[:,:,::-1])
+    writer.release();(directory/'trajectory.mp4').write_bytes(scratch.read_bytes());scratch.unlink()
+
+
+def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episode, force_step=None):
+    env=runtime.build_env(split);raw,info=env.reset(seed=seed)
+    snapshots=[runtime.snapshot(env,raw)];actions=[];prefix=[];queries=[]
+    metadata=runtime.reset_metadata(env,split=split);gate.begin_episode(episode)
+    takeover=None;success=False;ended=False;expert_all={};expert_report=None
+    while len(actions)<runtime.horizon and not ended:
+        step=len(actions);prediction,latent=runtime.predict(raw,seed*1000+step)
+        feature=runtime.bridge(raw,latent);v=feature-mean
+        score=float(np.linalg.norm(v-(v@basis)@basis.T))
+        decision=gate.query(feature,score,step)
+        trigger=decision['stop'] if force_step is None else step>=force_step
+        queries.append({'step':step,'score':score,**decision,'actual_trigger':bool(trigger),'memory_episodes':len(gate.memory)})
+        prefix.append({'step':step,'feature':feature})
+        if trigger:takeover=step;break
+        for action in runtime.clip(prediction[:5],env):
+            raw,_,terminated,truncated,info=env.step(runtime.torch.as_tensor(action,device=env.unwrapped.device).reshape(1,-1))
+            actions.append(action);snapshots.append(runtime.snapshot(env,raw))
+            success=bool(info['success']);ended=success or bool(terminated) or bool(truncated)
+            if ended:break
+    if takeover is not None:
+        if runtime.task=='stackcube_legacy_ood':
+            from rlinf.envs.maniskill.stack_cube_privileged_oracle import StackCubePrivilegedChunkOracle
+            oracle=StackCubePrivilegedChunkOracle(chunk_size=5);phases=[]
+            with isolated_python_numpy_rng(seed+600000):
+                while len(actions)<runtime.horizon and not ended:
+                    plan=oracle.plan(env)
+                    phases.append({'step':len(actions),'phase':plan.phase,'planning_succeeded':plan.planning_succeeded})
+                    for j in range(len(plan.actions)):
+                        action=runtime.clip(np.asarray(plan.action_at(raw['agent']['qpos'],j))[None],env)[0]
+                        raw,_,terminated,truncated,info=env.step(runtime.torch.as_tensor(action,device=env.unwrapped.device).reshape(1,-1))
+                        actions.append(action);snapshots.append(runtime.snapshot(env,raw))
+                        success=bool(info['success']);ended=success or bool(terminated) or bool(truncated)
+                        if ended:break
+            expert_all={'all_actions':actions[takeover:],'all_snapshots':snapshots[takeover+1:]}
+            expert_report={'phases':phases,'accepted':success,'attempt_lengths':[len(actions)-takeover]}
+        else:
+            result=runtime.airplane_expert(env,raw,seed)
+            actions.extend(result['actions']);snapshots.extend(result['snapshots'])
+            expert_all=result;expert_report=result['report'];expert_report['attempt_lengths']=result['attempt_lengths']
+            success=bool(result['report']['accepted'])
+    errors=[];reversal=None;cue=None;feedback_seconds=0.
+    expert_n=0 if takeover is None else len(actions)-takeover
+    if takeover is not None:
+        begin=time.time()
+        if takeover>=5 and expert_n>=5:
+            before,current,after=snapshots[takeover-5],snapshots[takeover],snapshots[takeover+5]
+            reversal=corrective_motion(before['tcp'],current['tcp'],after['tcp'],before['qpos'][-2:].sum(),current['qpos'][-2:].sum(),after['qpos'][-2:].sum())
+        # A directional cue only needs to distinguish crossing within one
+        # block versus a completely observed initial low-error block.
+        for k in range(min(5,max(0,expert_n-4))):
+            target=np.asarray(actions[takeover+k:takeover+k+5])
+            raw_expert=runtime.raw_snapshot(snapshots[takeover+k]);samples=[]
+            for m in range(2):
+                pred,_=runtime.predict(raw_expert,280009+seed*10+k*2+m)
+                samples.append(runtime.clip(pred,env))
+            errors.append(action_block_error(np.asarray(samples),target))
+            if errors[-1]>calibration['error_reference']:break
+        cue=timing_cue(errors,calibration['error_reference'],reversal=reversal,
+                       reversal_reference=calibration['reversal_reference'],has_previous_query=len(prefix)>=2)
+        if cue is not None:
+            credit=prefix[-2] if cue['attribution']=='previous_query' else prefix[-1]
+            cue={**cue,'credit_step':credit['step']}
+            gate.commit(cue,credit['feature'],completed_episode=episode)
+        feedback_seconds=time.time()-begin
+    ever_grasped=any(s['grasped'] for s in snapshots)
+    env.close()
+    summary={'episode':episode,'seed':seed,'split':split,'takeover':takeover,
+             'strict_success':success,'ever_grasped':ever_grasped,'accepted':bool(success and expert_n>0),
+             'expert_suffix_actions':expert_n,'all_executed_expert_actions':len(expert_all.get('all_actions',[])),
+             'total_retained_path_actions':len(actions),'query_count':len(queries),'queries':queries,
+             'reset':metadata,'feedback_errors':errors,'motion_reversal':reversal,'cue':cue,
+             'feedback_seconds':feedback_seconds,'expert_report':expert_report,
+             'forced_takeover_diagnostic':force_step is not None,
+             'video_scope':'policy prefix plus final expert candidate; abandoned planner candidates counted separately'}
+    return summary,snapshots,actions,prefix,expert_all
+
+
+def main(args):
+    args.output.mkdir(parents=True,exist_ok=False);start=time.time()
+    manifest=json.loads(args.manifest.read_text());cal=json.loads((args.calibration/'calibration.json').read_text())
+    assert cal['task']==args.task
+    arrays=np.load(args.calibration/'gate_arrays.npz');mean=arrays['mean'];basis=arrays['basis']
+    cfg=manifest['feedback']
+    gate=TimingFeedbackGate(cal['baseline_threshold'],arrays['center'],cal['scale'],cal['radius'],
+                            regularization=cfg['lambda'],strength=cfg['beta'],min_support=cfg['minimum_interventions'],
+                            min_vote=cfg['minimum_absolute_vote'],block=cfg['execution_block'],enabled=args.arm=='feedback')
+    runtime=Pi05FeedbackRuntime(args.task,manifest['task_assets'][args.task]);runtime.torch.set_num_threads(4)
+    write_json(args.output/'provenance.json',{'runtime':runtime.provenance(),'calibration':str(args.calibration),'arm':args.arm,'seed':args.seed,'episodes':args.episodes,'accepted_target':args.accepted_target,'feedback':cfg})
+    runtime.load_model();results=[];accepted=0
+    for episode in range(args.episodes):
+        split='id' if episode%2==0 else 'ood';seed=args.seed+episode//2
+        result,snapshots,actions,prefix,expert_all=collect_episode(runtime,gate,cal,mean,basis,seed,split,episode,args.force_takeover_step)
+        directory=args.output/f'episode_{episode:04d}';directory.mkdir()
+        write_trace(directory,snapshots,actions,prefix,expert_all);write_json(directory/'result.json',result)
+        accepted+=int(result['accepted']);results.append(result)
+        row={'pid':os.getpid(),'arm':args.arm,'task':args.task,'episodes':len(results),'accepted':accepted,
+             'elapsed':time.time()-start,'last_takeover':result['takeover'],'last_cue':result['cue'],
+             'all_expert_actions':sum(r['all_executed_expert_actions'] for r in results)}
+        write_json(args.output/'progress.json',row);print(json.dumps(row),flush=True)
+        if args.accepted_target is not None and accepted>=args.accepted_target:break
+    summary={'task':args.task,'arm':args.arm,'episodes':len(results),'accepted':accepted,
+             'accepted_ID':sum(r['accepted'] and r['split']=='id' for r in results),
+             'accepted_OOD':sum(r['accepted'] and r['split']=='ood' for r in results),
+             'all_expert_actions':sum(r['all_executed_expert_actions'] for r in results),
+             'successful_expert_actions':sum(r['expert_suffix_actions'] for r in results if r['accepted']),
+             'rows':results,'whole_pipeline_complete':False}
+    write_json(args.output/'summary.json',summary)
+    write_json(args.output/'COLLECTION_COMPLETE.json',{'episodes':len(results),'accepted':accepted,'target_reached':args.accepted_target is None or accepted>=args.accepted_target})
+
+
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--task',choices=['stackcube_legacy_ood','airplane_yaw_ood'],required=True)
+    p.add_argument('--arm',choices=['fixed','feedback'],required=True);p.add_argument('--manifest',type=Path,required=True)
+    p.add_argument('--calibration',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--seed',type=int,required=True);p.add_argument('--episodes',type=int,default=20)
+    p.add_argument('--accepted-target',type=int);p.add_argument('--force-takeover-step',type=int)
+    args=p.parse_args()
+    try:main(args)
+    except Exception as error:
+        if args.output.exists():write_json(args.output/'COLLECTION_FAILED.json',{'type':type(error).__name__,'message':str(error)})
+        raise

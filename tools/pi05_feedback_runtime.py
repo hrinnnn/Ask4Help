@@ -93,10 +93,51 @@ class Pi05FeedbackRuntime:
     @staticmethod
     def snapshot(env, raw):
         def array(v): return v.detach().cpu().numpy().copy()
+        base=env.unwrapped
+        obj=base.cubeA if hasattr(base,'cubeA') else base.obj
         return {'main':array(raw['sensor_data']['base_camera']['rgb'])[0],
                 'wrist':array(raw['sensor_data']['hand_camera']['rgb'])[0],
                 'qpos':array(raw['agent']['qpos'])[0],
-                'tcp':array(env.unwrapped.agent.tcp.pose.p)[0]}
+                'tcp':array(base.agent.tcp.pose.p)[0],
+                'tcp_q':array(base.agent.tcp.pose.q)[0],
+                'object_p':array(obj.pose.p)[0],
+                'object_q':array(obj.pose.q)[0],
+                'grasped':bool(base.agent.is_grasping(obj))}
+
+    def raw_snapshot(self, snapshot):
+        torch=self.torch
+        return {'agent':{'qpos':torch.as_tensor(snapshot['qpos']).reshape(1,-1)},
+                'sensor_data':{'base_camera':{'rgb':torch.as_tensor(snapshot['main']).unsqueeze(0)},
+                               'hand_camera':{'rgb':torch.as_tensor(snapshot['wrist']).unsqueeze(0)}}}
+
+    def airplane_expert(self, env, raw, seed):
+        """Use the original validated expert, recording every executed retry.
+
+        Only the final candidate is a continuous retained suffix. Failed
+        candidate attempts remain separate and contribute to total expert cost.
+        """
+        path=self.source/'tools/collect_pick_single_ycb_airplane_gated_dagger.py'
+        spec=importlib.util.spec_from_file_location('_feedback_legacy_airplane_collector',path)
+        collector=importlib.util.module_from_spec(spec);sys.modules[spec.name]=collector;spec.loader.exec_module(collector)
+        lower,upper=collector._joint_delta_arm_bounds(env)
+        actual_actions=[];actual_snapshots=[];original_step=env.step
+        def recorded_step(action,*args,**kwargs):
+            result=original_step(action,*args,**kwargs)
+            a=action.detach().cpu().numpy() if hasattr(action,'detach') else np.asarray(action)
+            actual_actions.append(a.astype(np.float32).reshape(-1).copy())
+            actual_snapshots.append(self.snapshot(env,result[0]))
+            return result
+        env.step=recorded_step
+        try:
+            with isolated_python_numpy_rng(seed):
+                _records,selected_actions,report=collector._plan_and_execute_expert(env,None,seed=seed,raw_obs=raw,lower=lower,upper=upper)
+        finally:env.step=original_step
+        lengths=[int(a.get('delta_servo_substeps',0)) for a in report['attempts']]
+        assert sum(lengths)==len(actual_actions)
+        n=len(selected_actions) if report['accepted'] else (lengths[-1] if lengths else 0)
+        return {'actions':actual_actions[-n:] if n else [],'snapshots':actual_snapshots[-n:] if n else [],
+                'all_actions':actual_actions,'all_snapshots':actual_snapshots,
+                'attempt_lengths':lengths,'report':report}
 
     @staticmethod
     def clip(actions, env):
