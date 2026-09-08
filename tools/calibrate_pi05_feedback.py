@@ -88,6 +88,16 @@ def main(args):
         v=feature-mean;return float(np.linalg.norm(v-(v@basis)@basis.T))
     progress('model_load',reference_observations=len(features),radius=radius,principal_dim=pca['principal_dim'])
     runtime.load_model()
+    check_env=runtime.build_env('id');check_obs,_=check_env.reset(seed=1730101)
+    snapshot=runtime.snapshot(check_env,check_obs)
+    relative=panda_tcp(snapshot['qpos'][None],urdf)[0]
+    root_pose=check_env.unwrapped.agent.robot.pose
+    base_p=root_pose.p.detach().cpu().numpy().reshape(3)
+    base_q=root_pose.q.detach().cpu().numpy().reshape(4)
+    predicted_tcp=Rotation.from_quat(base_q[[1,2,3,0]]).apply(relative)+base_p
+    fk_error=float(np.max(np.abs(predicted_tcp-snapshot['tcp'])))
+    if fk_error>1e-4:raise ValueError(f'ID motion FK mismatch: {fk_error}')
+    check_env.close();progress('FK_checked',maximum_error=fk_error)
     def raw_row(row):
         main=np.array(Image.open(io.BytesIO(row['image']['bytes'])).convert('RGB'))
         wrist=np.array(Image.open(io.BytesIO(row['wrist_image']['bytes'])).convert('RGB'))
