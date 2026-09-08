@@ -125,8 +125,8 @@ def main(args):
     manifest=json.loads(args.manifest.read_text());cal=json.loads((args.calibration/'calibration.json').read_text())
     assert cal['task']==args.task
     arrays=np.load(args.calibration/'gate_arrays.npz');mean=arrays['mean'];basis=arrays['basis']
-    cfg=manifest['feedback']
-    gate=TimingFeedbackGate(cal['baseline_threshold'],arrays['center'],cal['scale'],cal['radius'],
+    cfg={**manifest['feedback'],'radius_multiplier':manifest['local_radius_multiplier']}
+    gate=TimingFeedbackGate(cal['baseline_threshold'],arrays['center'],cal['scale'],cal['radius']*cfg['radius_multiplier'],
                             regularization=cfg['lambda'],strength=cfg['beta'],min_support=cfg['minimum_interventions'],
                             min_vote=cfg['minimum_absolute_vote'],block=cfg['execution_block'],enabled=args.arm=='feedback')
     runtime=Pi05FeedbackRuntime(args.task,manifest['task_assets'][args.task]);runtime.torch.set_num_threads(4)

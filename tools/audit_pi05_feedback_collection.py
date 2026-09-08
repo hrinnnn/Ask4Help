@@ -11,6 +11,7 @@ def audit(root):
     cal_root=Path(provenance['calibration'])
     cal=json.loads((cal_root/'calibration.json').read_text())
     center=np.load(cal_root/'gate_arrays.npz')['center']
+    cfg=provenance['feedback'];radius=cal['radius']*cfg['radius_multiplier']
     memory=[];report=[];total_cost=0;accepted=0
     for i,row in enumerate(summary['rows']):
         data=np.load(root/f'episode_{i:04d}'/'trace.npz')
@@ -32,9 +33,8 @@ def audit(root):
             for ep,z_i,y in memory:
                 assert ep<i
                 dist=np.linalg.norm(z-z_i)
-                if dist<=cal['radius']:neighbors.append((np.exp(-.5*(dist/cal['radius'])**2),y))
+                if dist<=radius:neighbors.append((np.exp(-.5*(dist/radius)**2),y))
             direction=0.
-            cfg=provenance['feedback']
             if provenance['arm']=='feedback' and len(neighbors)>=cfg['minimum_interventions']:
                 mass=sum(w for w,y in neighbors);weighted=sum(w*y for w,y in neighbors)
                 if abs(weighted/mass)>=cfg['minimum_absolute_vote']:direction=weighted/(cfg['lambda']+mass)
