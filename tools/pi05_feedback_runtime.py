@@ -152,7 +152,7 @@ class Pi05FeedbackRuntime:
         import toolkits.lerobot as package
         snapshot_path=Path(__file__).parent/'runtime_snapshots/opendrawer'
         if str(snapshot_path) not in package.__path__:
-            package.__path__.insert(0,str(snapshot_path))
+            package.__path__=[str(snapshot_path),*package.__path__]
         from toolkits.lerobot.validate_open_drawer_retrieve_place_oracle import PandaPosePlannerClient
         from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (
             _joint_delta_arm_bounds, _convert_solver_action_to_joint_delta)
