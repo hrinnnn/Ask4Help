@@ -2,6 +2,8 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- 当前真实阶段为`ID_calibration_running`：H20 controller1253424，SC worker1253425/GPU0/CPU0–3，Plane worker1253429/GPU1/CPU4–7；state=`/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/pipeline_state.json`。32-ID demo动作差异/纠正校准正在推进，随后各50独立ID policy；source`ab3a6aa6`已push/pull。下一阶段为真实expert接入、配对Timing/TASR数据、同预算后台SFT，阶段完成不结束Goal。
+
 - 用户追加授权：OpenDrawer不同OOD stage也可作为两项条件；先报真实Timing与TASR，再持久后台训练，最终仍补SR。新信息已写入manifest/plan。
 - 真实前向`runtime_smoke_v3_prior`已完成：SC与Plane分别ID/OOD同query配对动作差0，均10×8 actions与2048维Bridge，384×384双RGB，实际每split执行5动作。v1发现Python random未配对，v2发现prior扁平维度，修复后通过；这些是工程smoke，不是rollout SR。当前无smoke进程，下一步ID校准/真实专家采集接入，并盘点OpenDrawer。
 
