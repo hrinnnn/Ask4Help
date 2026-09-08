@@ -110,7 +110,7 @@ class Pi05FeedbackRuntime:
                 'sensor_data':{'base_camera':{'rgb':torch.as_tensor(snapshot['main']).unsqueeze(0)},
                                'hand_camera':{'rgb':torch.as_tensor(snapshot['wrist']).unsqueeze(0)}}}
 
-    def airplane_expert(self, env, raw, seed):
+    def airplane_expert(self, env, raw, seed, remaining_actions):
         """Use the original validated expert, recording every executed retry.
 
         Only the final candidate is a continuous retained suffix. Failed
@@ -121,17 +121,33 @@ class Pi05FeedbackRuntime:
         collector=importlib.util.module_from_spec(spec);sys.modules[spec.name]=collector;spec.loader.exec_module(collector)
         lower,upper=collector._joint_delta_arm_bounds(env)
         actual_actions=[];actual_snapshots=[];original_step=env.step
+        original_restore=env.unwrapped.set_state_dict;boundaries=[]
+        class EpisodeEndpoint(Exception):
+            def __init__(self,success,reason):self.success=success;self.reason=reason
+        def recorded_restore(state,*args,**kwargs):
+            boundaries.append(len(actual_actions))
+            return original_restore(state,*args,**kwargs)
         def recorded_step(action,*args,**kwargs):
             result=original_step(action,*args,**kwargs)
             a=action.detach().cpu().numpy() if hasattr(action,'detach') else np.asarray(action)
             actual_actions.append(a.astype(np.float32).reshape(-1).copy())
             actual_snapshots.append(self.snapshot(env,result[0]))
+            if bool(result[4]['success']):raise EpisodeEndpoint(True,'task_success')
+            if bool(result[2]) or bool(result[3]) or len(actual_actions)>=remaining_actions:
+                raise EpisodeEndpoint(False,'episode_horizon_or_termination')
             return result
-        env.step=recorded_step
+        env.step=recorded_step;env.unwrapped.set_state_dict=recorded_restore
         try:
             with isolated_python_numpy_rng(seed):
                 _records,selected_actions,report=collector._plan_and_execute_expert(env,None,seed=seed,raw_obs=raw,lower=lower,upper=upper)
-        finally:env.step=original_step
+        except EpisodeEndpoint as endpoint:
+            lengths=np.diff(boundaries+[len(actual_actions)]).tolist()
+            report={'accepted':endpoint.success,'termination_reason':endpoint.reason,
+                    'attempts':[{'candidate':collector.ORACLE_NECK_CANDIDATES[i][0],'delta_servo_substeps':n,
+                                 'outcome':'endpoint' if i==len(lengths)-1 else 'rejected_candidate'} for i,n in enumerate(lengths)]}
+            selected_actions=actual_actions[boundaries[-1]:] if endpoint.success else []
+        finally:
+            env.step=original_step;env.unwrapped.set_state_dict=original_restore
         lengths=[int(a.get('delta_servo_substeps',0)) for a in report['attempts']]
         assert sum(lengths)==len(actual_actions)
         n=len(selected_actions) if report['accepted'] else (lengths[-1] if lengths else 0)

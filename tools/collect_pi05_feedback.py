@@ -24,6 +24,18 @@ def write_json(path, value):
     path.write_text(json.dumps(jsonable(value),indent=2,allow_nan=False))
 
 
+def planner_diagnostic(value):
+    """Preserve a planner's explicit unreachable-distance sentinel as text.
+
+    This conversion is limited to planner diagnostics, never policy signals,
+    actions, feedback errors or outcome measurements.
+    """
+    if isinstance(value,(float,np.floating)) and not np.isfinite(value):return f'nonfinite:{value}'
+    if isinstance(value,dict):return {k:planner_diagnostic(v) for k,v in value.items()}
+    if isinstance(value,(list,tuple)):return [planner_diagnostic(v) for v in value]
+    return value
+
+
 def write_trace(directory, snapshots, actions, prefix, expert_all):
     arrays={k:np.asarray([s[k] for s in snapshots]) for k in snapshots[0]}
     arrays.update(actions=np.asarray(actions,dtype=np.float32).reshape(-1,8),
@@ -79,7 +91,7 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
             expert_all={'all_actions':actions[takeover:],'all_snapshots':snapshots[takeover+1:]}
             expert_report={'phases':phases,'accepted':success,'attempt_lengths':[len(actions)-takeover]}
         else:
-            result=runtime.airplane_expert(env,raw,seed)
+            result=runtime.airplane_expert(env,raw,seed,runtime.horizon-takeover)
             actions.extend(result['actions']);snapshots.extend(result['snapshots'])
             expert_all=result;expert_report=result['report'];expert_report['attempt_lengths']=result['attempt_lengths']
             success=bool(result['report']['accepted'])
@@ -114,7 +126,7 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
              'expert_suffix_actions':expert_n,'all_executed_expert_actions':len(expert_all.get('all_actions',[])),
              'total_retained_path_actions':len(actions),'query_count':len(queries),'queries':queries,
              'reset':metadata,'feedback_errors':errors,'motion_reversal':reversal,'cue':cue,
-             'feedback_seconds':feedback_seconds,'expert_report':expert_report,
+             'feedback_seconds':feedback_seconds,'expert_report':planner_diagnostic(expert_report),
              'forced_takeover_diagnostic':force_step is not None,
              'video_scope':'policy prefix plus final expert candidate; abandoned planner candidates counted separately'}
     return summary,snapshots,actions,prefix,expert_all

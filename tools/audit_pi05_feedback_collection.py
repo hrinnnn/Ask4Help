@@ -17,6 +17,9 @@ def audit(root):
         data=np.load(root/f'episode_{i:04d}'/'trace.npz')
         assert row['episode']==i and row['split']==('id' if i%2==0 else 'ood')
         n=len(data['actions']);assert len(data['main'])==len(data['wrist'])==len(data['qpos'])==n+1
+        horizon=100 if summary['task']=='stackcube_legacy_ood' else 250
+        assert n<=horizon,(i,'trajectory horizon exceeded',n,horizon)
+        if row['takeover'] is not None:assert row['takeover']+row['all_executed_expert_actions']<=horizon
         assert np.isfinite(data['actions']).all() and data['actions'].shape[1:]==(8,)
         assert data['main'].shape[1:]==data['wrist'].shape[1:]==(384,384,3)
         assert n==row['total_retained_path_actions']
