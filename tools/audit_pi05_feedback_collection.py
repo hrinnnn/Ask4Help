@@ -49,6 +49,22 @@ def audit(root):
             assert bool(stop)==q['stop'] and q['deadline']==deadline
             assert len(memory)==q['memory_episodes']
         cue=row['cue']
+        if cfg.get('rule')=='commitment_v2' and row['takeover'] is not None:
+            t=row['takeover'];opening=0.
+            if t>=5 and row['expert_suffix_actions']>=5:
+                width=data['qpos'][:,-2:].sum(1)
+                opening=max(0.,-float(data['actions'][t-5:t,-1].mean()))*max(0.,float(data['actions'][t:t+5,-1].mean()))*max(0.,float(width[t+5]-width[t]))
+            assert np.isclose(opening,row['opening_score_m'],atol=1e-7)
+            errors=row['feedback_errors'];has_previous=len(row['queries'])>=2
+            reversal=row['motion_reversal']
+            if has_previous and reversal is not None and reversal>cal['reversal_reference']:
+                expected_direction=1
+            elif has_previous and errors and errors[0]>cal['error_reference'] and opening>cfg['opening_reference_m']:
+                expected_direction=1
+            elif any(error>cal['error_reference'] for error in errors[:5]):expected_direction=0
+            elif len(errors)>=5:expected_direction=-1
+            else:expected_direction=None
+            assert (cue['direction'] if cue else None)==expected_direction
         if provenance['arm']=='feedback' and cue is not None:
             idx=-2 if cue['attribution']=='previous_query' else -1
             assert cue['credit_step']==int(data['query_steps'][idx])
