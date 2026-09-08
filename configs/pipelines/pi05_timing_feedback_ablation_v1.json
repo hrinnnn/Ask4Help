@@ -1,64 +1,410 @@
 {
   "pipeline_id": "pi05_timing_feedback_ablation_v1",
   "authorized": true,
-  "latest_user_decision": {"date":"2026-09-09","allow_multiple_OpenDrawer_OOD_stages_as_task_settings":true,"report_order":["actual_takeover_timing","TASR_on_collected_expert_data","post_SFT_success_rate"],"training_may_continue_in_background_after_timing_TASR_report":true,"final_goal_still_requires_training_and_SR":true,"note":"OpenDrawer stage alternatives are authorized candidates, not permission to overwrite older pipelines or fabricate results."},
+  "latest_user_decision": {
+    "date": "2026-09-09",
+    "allow_multiple_OpenDrawer_OOD_stages_as_task_settings": true,
+    "report_order": [
+      "actual_takeover_timing",
+      "TASR_on_collected_expert_data",
+      "post_SFT_success_rate"
+    ],
+    "training_may_continue_in_background_after_timing_TASR_report": true,
+    "final_goal_still_requires_training_and_SR": true,
+    "note": "OpenDrawer stage alternatives are authorized candidates, not permission to overwrite older pipelines or fabricate results."
+  },
   "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
   "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
-  "current_stage": "OpenDrawer_native_ID_reference_and_current_state_oracle",
+  "current_stage": "OpenDrawer_ID_calibration_and_repaired_oracle_smoke",
   "next_stage": "audit_OpenDrawer_ID_calibration_and_oracle_then_stage_paired_pilots",
   "current_execution_20260909": {
-    "source_base_commit":"2619c2e5",
-    "reference_controller_pid":1307826,
-    "reference_worker_pid":1315075,
-    "reference_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_native_reference_pipeline_v1",
-    "reference_state":"full_ID_reference",
-    "original_ID_restored":{"episodes":128,"anchors":22973,"full_restore_marker":"/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/FULL_ID_RESTORE_COMPLETE.json"},
-    "old_cached_reference_attempt":"opendrawer_ID_calibration_v1 failed maxdiff0.0625; not used",
-    "reference_repair":"same original128 ID demos and rank1000; fit/scoring both H20 native batch1; per-episode first-frame VLM-only vs postprediction bridge equivalence1e-6",
-    "oracle_scope":"original direct_grasp_from_current_state, unchanged source snapshot from5090; 400 total action cap; diagnostic reset/120-step ID/OOD continuation first",
-    "planned_oracle_GPU":"H20 GPU1 CPU4-7, preserves original PID276925; GPU0 belongs to native reference controller",
-    "SFT_started":false
+    "source_base_commit": "2619c2e5",
+    "reference_controller_pid": 1307826,
+    "reference_worker_pid": 1336534,
+    "reference_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_native_reference_pipeline_v1",
+    "reference_state": "native_ID_calibration",
+    "original_ID_restored": {
+      "episodes": 128,
+      "anchors": 22973,
+      "full_restore_marker": "/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/FULL_ID_RESTORE_COMPLETE.json"
+    },
+    "old_cached_reference_attempt": "opendrawer_ID_calibration_v1 failed maxdiff0.0625; not used",
+    "reference_repair": "same original128 ID demos and rank1000; fit/scoring both H20 native batch1; per-episode first-frame VLM-only vs postprediction bridge equivalence1e-6",
+    "oracle_scope": "original direct_grasp_from_current_state, unchanged source snapshot from5090; 400 total action cap; diagnostic reset/120-step ID/OOD continuation first",
+    "planned_oracle_GPU": "H20 GPU1 CPU4-7, preserves original PID276925; GPU0 belongs to native reference controller",
+    "SFT_started": false,
+    "oracle_worker_pid": 1336653,
+    "oracle_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_direct_oracle_smoke_v5/grasp",
+    "oracle_source": {
+      "local_commit": "79df1bbcf9d045af51ca26d2aaf8af5358bc103e",
+      "published_equivalent_tree_commit": "25a7f0cc83174c0f1a99a719b8a94e72814245c5",
+      "github_branch": "codex/pi05-feedback-deployment",
+      "note": "Git HTTPS push outage; local edits published through GitHub tree/commit API. Standard Git tree equality verified. v4 was stopped before using unconfirmed publication."
+    },
+    "native_reference_complete": {
+      "episodes": 128,
+      "anchors": 22973,
+      "principal_dim": 1000
+    }
   },
   "completed_pilots_20260909": {
-    "original_airplane_v1":{"root":"development_v2_horizon/airplane_yaw_ood","both_arms_raw":20,"takeover_changes":0,"budget":828,"TASR_x3":[0.12560386473429952,0.12560386473429952]},
-    "candidate_airplane_stream1772000":{"root":"commitment_candidate_v1/airplane/stream_1772000","both_arms_raw":20,"OOD_earlier_same_later":[6,2,0],"OOD_paired_median_shift":-35,"budget":1327,"TASR_x3":[0.15071590052750566,0.25998492840994725],"all_executed_expert_actions":[2247,2497]},
-    "candidate_airplane_stream1773000":{"root":"commitment_candidate_v1/airplane/stream_1773000","both_arms_raw":20,"OOD_earlier_same_later":[5,1,0],"OOD_paired_median_shift":-15,"budget":167,"TASR_x3":[0,0],"matched_OOD_points":[0,0],"interpretation":"ID-only common subset is uninformative about OOD TASR; not a replicated matched-budget efficacy gain","descriptive_unmatched_TASR_x3":[0.1394658753709199,0.2011111111111111],"all_executed_expert_actions":[1292,1430]}
+    "original_airplane_v1": {
+      "root": "development_v2_horizon/airplane_yaw_ood",
+      "both_arms_raw": 20,
+      "takeover_changes": 0,
+      "budget": 828,
+      "TASR_x3": [
+        0.12560386473429952,
+        0.12560386473429952
+      ]
+    },
+    "candidate_airplane_stream1772000": {
+      "root": "commitment_candidate_v1/airplane/stream_1772000",
+      "both_arms_raw": 20,
+      "OOD_earlier_same_later": [
+        6,
+        2,
+        0
+      ],
+      "OOD_paired_median_shift": -35,
+      "budget": 1327,
+      "TASR_x3": [
+        0.15071590052750566,
+        0.25998492840994725
+      ],
+      "all_executed_expert_actions": [
+        2247,
+        2497
+      ]
+    },
+    "candidate_airplane_stream1773000": {
+      "root": "commitment_candidate_v1/airplane/stream_1773000",
+      "both_arms_raw": 20,
+      "OOD_earlier_same_later": [
+        5,
+        1,
+        0
+      ],
+      "OOD_paired_median_shift": -15,
+      "budget": 167,
+      "TASR_x3": [
+        0,
+        0
+      ],
+      "matched_OOD_points": [
+        0,
+        0
+      ],
+      "interpretation": "ID-only common subset is uninformative about OOD TASR; not a replicated matched-budget efficacy gain",
+      "descriptive_unmatched_TASR_x3": [
+        0.1394658753709199,
+        0.2011111111111111
+      ],
+      "all_executed_expert_actions": [
+        1292,
+        1430
+      ]
+    }
   },
-  "task_progress": {"stackcube":{"status":"paired_pilot_TASR_complete","root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/development_v1/stackcube_legacy_ood","OOD_pairs":10,"earlier_takeovers":[[35,10],[40,20]],"matched_budget":296,"TASR_x3_fixed":0.41216216216216217,"TASR_x3_feedback":0.4155405405405405,"meaning":"one compatible point difference, not a strong efficacy claim"},"airplane":{"status":"horizon_repaired_pilot_running","controller_pid":1282003,"worker_pid":1285539,"root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/development_v2_horizon/airplane_yaw_ood","source_commit":"35f1e4e1","invalid_previous_root":"development_v1/airplane_yaw_ood","repair":"honor task termination/250 total action cap; keep planner infinite unreachable-distance diagnostic as explicit text"},"OpenDrawer":{"status":"weights_restored_and_Grasp_ID_OOD_RGB_forward_smoke_passed","weight_bytes":8526557492,"root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_runtime_smoke_v1/grasp","task_source_commit":"e0269103","pending":"ID demonstration/PCA assets, expert binding and stage-specific collection"}},
-  "training_admission": {"status":"no_SFT_started","stackcube_pilot_accepted_ID":3,"stackcube_pilot_accepted_OOD":9,"stackcube_pilot_OOD_fraction":0.75,"legacy_required_fraction":0.8,"user_override_requested":true,"user_override_received":false,"scope":"Hold StackCube training admission pending explicit natural-composition exception; continue authorized timing/TASR and other task diagnostics."},
-  "runtime_deployment": {"code_commit":"651372c3","local_worktree":"/Users/zhaozhixuan/Desktop/tsinghua_learning/Research/SEEN_workspace/Ask4Help_feedback_ablation","server_code":"/tmp/pi05_timing_feedback_ablation_v1/code","python":"/root/Ask4Help-online-awbc/RLinf/.venv/bin/python","task_source":{"stackcube_legacy_ood":{"root":"/root/Ask4Help-online-awbc-code","commit":"9a9f55c","rlinf_commit":"a2a68e73"},"airplane_yaw_ood":{"root":"/root/Ask4Help-pick-airplane-four-group","commit":"dc4c4c1","rlinf_commit":"116bcdd22"}},"submodule_policy":"Experiment code is pulled from GitHub; model/task imports explicitly use their existing version-pinned native runtime source roots rather than installing a new RLinf checkout.","GPU_to_CPU":{"0":"0-3","1":"4-7"},"preserve_pid":276925,"output_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1"},
-  "process": {"controller_pid":1282003,"worker_pids":{"airplane_feedback":1285539},"source_commit":"35f1e4e1","state_path":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/development_v2_horizon/airplane_yaw_ood/pipeline_state.json","log_root":"/tmp/pi05_timing_feedback_ablation_v1/logs/airplane_horizon_v2","phase_marker":"PAIRED_PILOT_COMPLETE.json","whole_pipeline_complete":false},
+  "task_progress": {
+    "stackcube": {
+      "status": "paired_pilot_TASR_complete",
+      "root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/development_v1/stackcube_legacy_ood",
+      "OOD_pairs": 10,
+      "earlier_takeovers": [
+        [
+          35,
+          10
+        ],
+        [
+          40,
+          20
+        ]
+      ],
+      "matched_budget": 296,
+      "TASR_x3_fixed": 0.41216216216216217,
+      "TASR_x3_feedback": 0.4155405405405405,
+      "meaning": "one compatible point difference, not a strong efficacy claim"
+    },
+    "airplane": {
+      "status": "original_v1_and_two_exploratory_candidate_streams_complete",
+      "report": "docs/experiment_management/diagnostics/Pi05_Feedback_Commitment_Two_Streams_20260909.md",
+      "post_SFT_SR": null
+    },
+    "OpenDrawer": {
+      "status": "full_ID_reference_complete_ID_calibration_and_repaired_oracle_smoke_running",
+      "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_native_reference_pipeline_v1/controller_state.json",
+      "collector_source": "25a7f0cc",
+      "new_gate_collection_started": false,
+      "post_SFT_SR": null
+    }
+  },
+  "training_admission": {
+    "status": "no_SFT_started",
+    "stackcube_pilot_accepted_ID": 3,
+    "stackcube_pilot_accepted_OOD": 9,
+    "stackcube_pilot_OOD_fraction": 0.75,
+    "legacy_required_fraction": 0.8,
+    "user_override_requested": true,
+    "user_override_received": false,
+    "scope": "Hold StackCube training admission pending explicit natural-composition exception; continue authorized timing/TASR and other task diagnostics."
+  },
+  "runtime_deployment": {
+    "code_commit": "651372c3",
+    "local_worktree": "/Users/zhaozhixuan/Desktop/tsinghua_learning/Research/SEEN_workspace/Ask4Help_feedback_ablation",
+    "server_code": "/tmp/pi05_timing_feedback_ablation_v1/code",
+    "python": "/root/Ask4Help-online-awbc/RLinf/.venv/bin/python",
+    "task_source": {
+      "stackcube_legacy_ood": {
+        "root": "/root/Ask4Help-online-awbc-code",
+        "commit": "9a9f55c",
+        "rlinf_commit": "a2a68e73"
+      },
+      "airplane_yaw_ood": {
+        "root": "/root/Ask4Help-pick-airplane-four-group",
+        "commit": "dc4c4c1",
+        "rlinf_commit": "116bcdd22"
+      }
+    },
+    "submodule_policy": "Experiment code is pulled from GitHub; model/task imports explicitly use their existing version-pinned native runtime source roots rather than installing a new RLinf checkout.",
+    "GPU_to_CPU": {
+      "0": "0-3",
+      "1": "4-7"
+    },
+    "preserve_pid": 276925,
+    "output_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1"
+  },
+  "process": {
+    "controller_pid": 1307826,
+    "worker_pids": {
+      "ID_calibration": 1336534,
+      "oracle_smoke": 1336653
+    },
+    "source_commit": "2619c2e5",
+    "oracle_source_commit": "25a7f0cc",
+    "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_native_reference_pipeline_v1/controller_state.json",
+    "phase_marker": "REFERENCE_CALIBRATION_COMPLETE.json",
+    "whole_pipeline_complete": false
+  },
   "plan": "docs/experiment_management/plans/Pi05_Timing_Feedback_Ablation.md",
   "method_source": "outputs/method_minimal_revision_20260908/完整修订稿.tex",
-  "primary_tasks": ["stackcube_legacy_ood", "airplane_yaw_ood"],
+  "primary_tasks": [
+    "stackcube_legacy_ood",
+    "airplane_yaw_ood"
+  ],
   "conditional_third_task": "open_drawer_goal_ood_requires_qualification_and_protocol_unlock",
-  "opendrawer_restore": {"purpose":"Enable the user-authorized OpenDrawer stage alternatives on available H20 without replacing its checkpoint or copying a 5090 environment","source_server":"zhaozhixuan@111.198.58.150:12001","source_weights":"/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000/actor/model_state_dict/full_weights.pt","expected_weight_bytes":8526557492,"source_norm":"/data/zhaozhixuan/Ask4Help-open-drawer/results/id_policy_training_v1/norm_stats_open_drawer_id_raw_v1/norm_stats.json","target_server":"root@39.101.70.188:1012","target_root":"/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909","status":"restore_preflight_complete_not_yet_model_runtime_qualified","storage":"source /sdd and destination OSS; no environment transfer or deletion","policy_qualification":"preliminary historical ID61/100, not silently promoted to an 80-percent-qualified base","remaining_after_weights":["task/oracle source consistency","ID data and PCA calibration assets","H20 forward/visual/oracle smoke","stage-specific timing and TASR qualification"]},
-  "arms": ["fixed_bridge_pca", "feedback_bridge_pca"],
-  "exploratory_commitment_candidate": {"status":"frozen_before_new_validation","plan":"docs/experiment_management/plans/Pi05_Feedback_Commitment_Candidate.md","source_commit":"2ee4e70c","rule":"commitment_v2","opening_reference_m":0.01,"ID_opening_calibration":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_candidate_v1/airplane_opening_ID_calibration.json","fresh_stream_seeds":[1772000,1773000],"episodes_per_arm_stream":20,"arms":["fixed","feedback"],"root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_candidate_v1/airplane","unchanged":["checkpoint","task_geometry","PCA","baseline_threshold","lambda","beta","radius","one_block_wait","success_predicate"],"interpretation":"Hypothesis from old development failure; do not mix with original v1 or claim benefit before fresh paired outcomes."},
-  "opendrawer_ID_restore": {"source_archive":"/data/zhaozhixuan/Ask4Help-open-drawer/results/pi05_feedback_asset_export_20260909/opendrawer_calibration_inputs.tar","expected_bytes":1735618560,"destination":"/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/opendrawer_calibration_inputs.tar","contains":"all 22973 original Bridge features/PCA plus exactly 32 original ID calibration demo parquet files and metadata","not_full_SFT_replay":true,"original_ID_episode_count":128},
-  "local_radius_multiplier": 2.0,
+  "opendrawer_restore": {
+    "purpose": "Enable the user-authorized OpenDrawer stage alternatives on available H20 without replacing its checkpoint or copying a 5090 environment",
+    "source_server": "zhaozhixuan@111.198.58.150:12001",
+    "source_weights": "/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000/actor/model_state_dict/full_weights.pt",
+    "expected_weight_bytes": 8526557492,
+    "source_norm": "/data/zhaozhixuan/Ask4Help-open-drawer/results/id_policy_training_v1/norm_stats_open_drawer_id_raw_v1/norm_stats.json",
+    "target_server": "root@39.101.70.188:1012",
+    "target_root": "/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909",
+    "status": "checkpoint_runtime_and_full_ID_restored_reference_refit_complete_calibration_pending",
+    "storage": "source /sdd and destination OSS; no environment transfer or deletion",
+    "policy_qualification": "preliminary historical ID61/100, not silently promoted to an 80-percent-qualified base",
+    "remaining_after_weights": [
+      "task/oracle source consistency",
+      "ID data and PCA calibration assets",
+      "H20 forward/visual/oracle smoke",
+      "stage-specific timing and TASR qualification"
+    ]
+  },
+  "arms": [
+    "fixed_bridge_pca",
+    "feedback_bridge_pca"
+  ],
+  "exploratory_commitment_candidate": {
+    "status": "frozen_before_new_validation",
+    "plan": "docs/experiment_management/plans/Pi05_Feedback_Commitment_Candidate.md",
+    "source_commit": "2ee4e70c",
+    "rule": "commitment_v2",
+    "opening_reference_m": 0.01,
+    "ID_opening_calibration": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_candidate_v1/airplane_opening_ID_calibration.json",
+    "fresh_stream_seeds": [
+      1772000,
+      1773000
+    ],
+    "episodes_per_arm_stream": 20,
+    "arms": [
+      "fixed",
+      "feedback"
+    ],
+    "root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_candidate_v1/airplane",
+    "unchanged": [
+      "checkpoint",
+      "task_geometry",
+      "PCA",
+      "baseline_threshold",
+      "lambda",
+      "beta",
+      "radius",
+      "one_block_wait",
+      "success_predicate"
+    ],
+    "interpretation": "Hypothesis from old development failure; do not mix with original v1 or claim benefit before fresh paired outcomes."
+  },
+  "opendrawer_ID_restore": {
+    "source_archive": "/data/zhaozhixuan/Ask4Help-open-drawer/results/pi05_feedback_asset_export_20260909/opendrawer_calibration_inputs.tar",
+    "expected_bytes": 1735618560,
+    "destination": "/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/opendrawer_calibration_inputs.tar",
+    "contains": "all 22973 original Bridge features/PCA plus exactly 32 original ID calibration demo parquet files and metadata",
+    "not_full_SFT_replay": false,
+    "original_ID_episode_count": 128,
+    "completion_marker": "/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/FULL_ID_RESTORE_COMPLETE.json"
+  },
+  "local_radius_multiplier": 2,
   "radius_provenance": "Existing 2026-09-08 Implementation_Notes specifies twice the ID 95th-percentile cross-episode nearest-neighbor distance; made explicit before any feedback collection, without using OOD outcomes.",
   "protocol_state": "method_and_endpoints_fixed_asset_paths_pending_live_verification",
-  "feedback": {"execution_block": 5, "monte_carlo_samples": 2, "error_ID_quantile": 0.95, "reversal_ID_quantile": 0.95, "lambda": 2.0, "beta": 0.5, "minimum_interventions": 2, "minimum_absolute_vote": 0.25, "max_wait_blocks": 1, "memory_reset": "each_independent_collection_stream", "memory_commit": "only_after_completed_intervention", "feedback_valid_window": "five_actual_expert_actions_no_padding", "initial_memory": "empty"},
-  "comparison": {"initial_gate": "same_successful_ID_rollout_maximum_q95", "PCA_reference": "same_original_ID_demo_bridge_features", "checkpoint": "same_task_specific_immutable_ID_base", "seed_pairing": "same_reset_and_policy_RNG_until_actual_takeover", "formal_stream_replicates": 3, "accepted_per_arm_stream": 100, "raw_schedule": "strict_alternating_ID_OOD_no_accepted_quota", "max_raw_attempts": 2000, "retention": "exact_common_low_level_action_budget_using_complete_successful_suffixes", "source_mix": "ID:expert_1:1", "training_steps": {"stackcube_legacy_ood": 2000, "airplane_yaw_ood": 2500}, "temporal_mask": true, "all_real_anchors_retained": true, "final_episodes_per_policy": {"ID": 100, "OOD": 100}, "test_seeds": "reserved_before_formal_collection_never_used_for_tuning", "primary_endpoint": "post_SFT_unassisted_OOD_success", "airplane_endpoint": "ever_grasped_with_strict_success_also_reported", "secondary": ["ID_success", "all_executed_expert_actions", "accepted_actions", "takeover_time_and_misses", "paired_actual_timing_shifts", "cue_support_and_conflict", "feedback_compute_seconds"]},
+  "feedback": {
+    "execution_block": 5,
+    "monte_carlo_samples": 2,
+    "error_ID_quantile": 0.95,
+    "reversal_ID_quantile": 0.95,
+    "lambda": 2,
+    "beta": 0.5,
+    "minimum_interventions": 2,
+    "minimum_absolute_vote": 0.25,
+    "max_wait_blocks": 1,
+    "memory_reset": "each_independent_collection_stream",
+    "memory_commit": "only_after_completed_intervention",
+    "feedback_valid_window": "five_actual_expert_actions_no_padding",
+    "initial_memory": "empty"
+  },
+  "comparison": {
+    "initial_gate": "same_successful_ID_rollout_maximum_q95",
+    "PCA_reference": "same_original_ID_demo_bridge_features",
+    "checkpoint": "same_task_specific_immutable_ID_base",
+    "seed_pairing": "same_reset_and_policy_RNG_until_actual_takeover",
+    "formal_stream_replicates": 3,
+    "accepted_per_arm_stream": 100,
+    "raw_schedule": "strict_alternating_ID_OOD_no_accepted_quota",
+    "max_raw_attempts": 2000,
+    "retention": "exact_common_low_level_action_budget_using_complete_successful_suffixes",
+    "source_mix": "ID:expert_1:1",
+    "training_steps": {
+      "stackcube_legacy_ood": 2000,
+      "airplane_yaw_ood": 2500
+    },
+    "temporal_mask": true,
+    "all_real_anchors_retained": true,
+    "final_episodes_per_policy": {
+      "ID": 100,
+      "OOD": 100
+    },
+    "test_seeds": "reserved_before_formal_collection_never_used_for_tuning",
+    "primary_endpoint": "post_SFT_unassisted_OOD_success",
+    "airplane_endpoint": "ever_grasped_with_strict_success_also_reported",
+    "secondary": [
+      "ID_success",
+      "all_executed_expert_actions",
+      "accepted_actions",
+      "takeover_time_and_misses",
+      "paired_actual_timing_shifts",
+      "cue_support_and_conflict",
+      "feedback_compute_seconds"
+    ]
+  },
   "placement_preflight": {
     "selected_server": "root@39.101.70.188:1012",
     "preferred_candidate": "root@39.101.70.188:1012",
     "snapshot_time_beijing": "2026-09-09 00:26",
-    "candidate_servers": [{"name":"H20","GPU_memory_used_MiB":[348,338],"preserve_pid":276925,"root_free_bytes":0,"tmp_free_GiB":13,"shm_capacity_GiB":256,"available_RAM_GiB":249,"native_pi05_runtime_candidate":"/root/Ask4Help-online-awbc/RLinf/.venv/bin/python","status":"checkpoint/runtime/storage_audit_pending"},{"name":"5090","idle_GPU_count":0,"root_free_MiB":191,"data_free_GiB":902,"status":"rejected_currently_all_GPUs_occupied"}],
+    "candidate_servers": [
+      {
+        "name": "H20",
+        "GPU_memory_used_MiB": [
+          348,
+          338
+        ],
+        "preserve_pid": 276925,
+        "root_free_bytes": 0,
+        "tmp_free_GiB": 13,
+        "shm_capacity_GiB": 256,
+        "available_RAM_GiB": 249,
+        "native_pi05_runtime_candidate": "/root/Ask4Help-online-awbc/RLinf/.venv/bin/python",
+        "status": "checkpoint/runtime/storage_audit_pending"
+      },
+      {
+        "name": "5090",
+        "idle_GPU_count": 0,
+        "root_free_MiB": 191,
+        "data_free_GiB": 902,
+        "status": "rejected_currently_all_GPUs_occupied"
+      }
+    ],
     "persistent_output_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1",
     "scratch_candidate": "/tmp/pi05_timing_feedback_ablation_v1",
     "expected_output": "collection traces/videos under 15GiB; 12 final model-weight copies about 120-150GiB plus checkpoints/optimizer states; precise footprint before training launch",
-    "required_assets": ["pi05_base_torch", "task_checkpoint", "original_ID_dataset_and_norm", "PCA_ID_features_or_rebuild", "successful_ID_calibration", "simulator_and_planner", "native_runtime", "audited_training_entrypoint"]
+    "required_assets": [
+      "pi05_base_torch",
+      "task_checkpoint",
+      "original_ID_dataset_and_norm",
+      "PCA_ID_features_or_rebuild",
+      "successful_ID_calibration",
+      "simulator_and_planner",
+      "native_runtime",
+      "audited_training_entrypoint"
+    ]
   },
   "task_assets": {
-    "open_drawer_grasp_ood": {"checkpoint":"/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909/full_weights.pt","reference_checkpoint":"/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000","norm":"/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909","ID_dataset":"/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/ID_subset","source_root":"tools/runtime_snapshots/opendrawer","qualification":"runtime smoke passed; preserves historical preliminary base, not newly ID-qualified; ID_subset contains only calibration demos, not full SFT replay"},
-    "open_drawer_goal_ood": {"checkpoint":"/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909/full_weights.pt","norm":"/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909","source_root":"tools/runtime_snapshots/opendrawer","qualification":"runtime smoke only; stage locality and complete ID/oracle protocol still require checking"},
-    "stackcube_legacy_ood": {"checkpoint":"/mnt/data/ask4help/results/stackcube_id_sft/pi05_id_sft_10000_visual_v1_20260722_dual/member_0/maniskill_stackcube_pi05_id_sft/checkpoints/global_step_7000","ID_dataset":"/mnt/data/ask4help/datasets/lerobot/local/stackcube_id_128_visual_v1_20260722","norm":"/mnt/data/ask4help/datasets/lerobot/local/stackcube_id_128_visual_v1_20260722/norm_stats_id.json","source_provenance":"/mnt/data/ask4help/results/stackcube_gated_dagger/full_v5/failure_recovery_successful_experts_100_from7000_retry1/summary.json","live_files_verified":false},
-    "airplane_yaw_ood": {"checkpoint":"/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/id_sft_no180_modelonly_step2000_plus3000_v1/maniskill_stackcube_pi05_id_sft/checkpoints/global_step_3000","checkpoint_note":"native3000_after_ID2000_total5000; never label as a newly trained model","ID_dataset_candidate":"/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/id_expert_no180_98_v2","norm":"/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/assets/id_expert_norm_stats","source_provenance":"/mnt/data/ask4help/results/pick_single_ycb_airplane/four_group_dagger_v1/formal_v3/bridge_pca_collection/collection_provenance.json","live_files_verified":false}
+    "open_drawer_grasp_ood": {
+      "checkpoint": "/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909/full_weights.pt",
+      "reference_checkpoint": "/sdd/ask4help-open-drawer/results/open_drawer_pi05_v9_recovery_from5000_v4/training/v9_full_prompt/checkpoints/global_step_5000",
+      "norm": "/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909",
+      "ID_dataset": "/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/ID_subset",
+      "source_root": "tools/runtime_snapshots/opendrawer",
+      "qualification": "original128 ID fully restored; rank1000 native reference complete; calibration and current-state oracle ongoing; historical base remains preliminary"
+    },
+    "open_drawer_goal_ood": {
+      "checkpoint": "/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909/full_weights.pt",
+      "norm": "/mnt/data/ask4help/models/pi05_opendrawer_v9_native5000_feedback_20260909",
+      "source_root": "tools/runtime_snapshots/opendrawer",
+      "qualification": "runtime smoke only; stage locality and complete ID/oracle protocol still require checking"
+    },
+    "stackcube_legacy_ood": {
+      "checkpoint": "/mnt/data/ask4help/results/stackcube_id_sft/pi05_id_sft_10000_visual_v1_20260722_dual/member_0/maniskill_stackcube_pi05_id_sft/checkpoints/global_step_7000",
+      "ID_dataset": "/mnt/data/ask4help/datasets/lerobot/local/stackcube_id_128_visual_v1_20260722",
+      "norm": "/mnt/data/ask4help/datasets/lerobot/local/stackcube_id_128_visual_v1_20260722/norm_stats_id.json",
+      "source_provenance": "/mnt/data/ask4help/results/stackcube_gated_dagger/full_v5/failure_recovery_successful_experts_100_from7000_retry1/summary.json",
+      "live_files_verified": false
+    },
+    "airplane_yaw_ood": {
+      "checkpoint": "/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/id_sft_no180_modelonly_step2000_plus3000_v1/maniskill_stackcube_pi05_id_sft/checkpoints/global_step_3000",
+      "checkpoint_note": "native3000_after_ID2000_total5000; never label as a newly trained model",
+      "ID_dataset_candidate": "/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/id_expert_no180_98_v2",
+      "norm": "/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/assets/id_expert_norm_stats",
+      "source_provenance": "/mnt/data/ask4help/results/pick_single_ycb_airplane/four_group_dagger_v1/formal_v3/bridge_pca_collection/collection_provenance.json",
+      "live_files_verified": false
+    }
   },
-  "execution_audit": {"failure_marker":"EXECUTION_AUDIT_FAILED","required":["manifest_vs_actual_process","checkpoint_reload_finite_forward","paired_reset_and_visual_frame","same_first_episode_actions","no_current_or_future_episode_memory","expert_action_generation_without_teacher_input","same_action_scaling","ID_only_calibration_and_reserved_test_seeds","full_suffix_and_all_anchor_temporal_mask","exact_budget_and_identical_SFT_settings","complete_independent_ID_OOD_denominators"]},
-  "forbidden": ["old_invalid_Stage2_controlled_results", "relabel_old_knn_results_as_PCA", "report_assisted_success_as_post_training_SR", "test_set_hyperparameter_selection", "overwrite_old_artifacts", "alter_other_pipeline_locks", "delete_non_task_files", "allocate_occupied_5090_GPUs", "write_new_hashes"],
+  "execution_audit": {
+    "failure_marker": "EXECUTION_AUDIT_FAILED",
+    "required": [
+      "manifest_vs_actual_process",
+      "checkpoint_reload_finite_forward",
+      "paired_reset_and_visual_frame",
+      "same_first_episode_actions",
+      "no_current_or_future_episode_memory",
+      "expert_action_generation_without_teacher_input",
+      "same_action_scaling",
+      "ID_only_calibration_and_reserved_test_seeds",
+      "full_suffix_and_all_anchor_temporal_mask",
+      "exact_budget_and_identical_SFT_settings",
+      "complete_independent_ID_OOD_denominators"
+    ]
+  },
+  "forbidden": [
+    "old_invalid_Stage2_controlled_results",
+    "relabel_old_knn_results_as_PCA",
+    "report_assisted_success_as_post_training_SR",
+    "test_set_hyperparameter_selection",
+    "overwrite_old_artifacts",
+    "alter_other_pipeline_locks",
+    "delete_non_task_files",
+    "allocate_occupied_5090_GPUs",
+    "write_new_hashes"
+  ],
   "completion_marker": "PIPELINE_COMPLETE.json",
   "completion": "At least two task settings have complete audited paired collection, exact-budget SFT, independent final evaluation, full positive/null/negative results, and a directly usable LaTeX ablation paragraph/table. Positive benefit must be demonstrated by evidence to be claimed; no intermediate phase completes the objective."
 }

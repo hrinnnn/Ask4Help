@@ -2,6 +2,8 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **04:21更新**：128-ID/22973-anchor/rank1000 native PCA已完成，controller1307826自动启动ID校准worker1336534（GPU0）。修复direct-oracle初始planner_mode与reset记录时点后，smoke v5/grasp worker1336653在GPU1。v3的t120 OOD失败仍属错误planner初始化的工程诊断，不计入gate比较；v4因发布确认失败在模型加载时停止。现用GitHub已核实同树部署commit25a7f0cc（API发布分支codex/pi05-feedback-deployment，等价本地79df1bbc），正式工作分支推送网络暂不稳定。
+- Grasp-OOD TASR原18-reference/6-check小包已导出；6条旧检查轨迹数值回归通过，未改变阈值。Goal-OOD不得借用抓取target定义。没有新OD反馈配对结果，也没有SFT启动。
 - **04时段真实更新**：原Plane v1配对20raw/arm已完成，实际时机完全相同，matched828 TASR×3=104/828两组相同。独立饱和夹爪候选commitment_v2两条新stream均完成；1772000 matched1327为200/1327→345/1327（15.07→26.00%），成本2247→2497；1773000 OOD时机中位数提前15，但共同整后缀预算167只剩ID、TASR=0→0，不作为OOD验证成功。完整结果见候选报告；没有启动SFT。
 - **当前OpenDrawer**：全部128条原始ID、22973 anchors恢复marker已通过。GPU0 reference controller1307826/worker1315075正用同一原始ID集在H20重建rank1000参考；原cached跨机器maxdiff0.0625的失败单独保留。当前state位于 `opendrawer_native_reference_pipeline_v1/controller_state.json`，不是下方历史PID。之后同controller自动ID校准与独立审计。GPU1仅用于本Goal新direct-current-state oracle smoke，先检查400步端点及真实RGB；不改变其他owner任务。
 
