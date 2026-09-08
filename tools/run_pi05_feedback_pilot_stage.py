@@ -56,6 +56,7 @@ def main(args):
              '--task',args.task,'--arm',arm,'--manifest',str(args.code/'configs/pipelines/pi05_timing_feedback_ablation_v1.json'),
              '--calibration',str(args.calibration),'--output',str(output),'--seed',str(args.seed),'--episodes',str(args.episodes)]
         cmd+=['--feedback-rule',args.feedback_rule]
+        cmd+=['--support-mode',args.support_mode]
         if args.opening_calibration is not None:cmd+=['--opening-calibration',str(args.opening_calibration)]
         log=args.logs/f'{args.task}_{arm}_pilot.log'
         env=dict(os.environ,CUDA_VISIBLE_DEVICES=args.gpu,VK_ICD_FILENAMES='/etc/vulkan/icd.d/nvidia_icd.json',
@@ -79,4 +80,5 @@ if __name__=='__main__':
     p.add_argument('--gpu',required=True);p.add_argument('--cpu',required=True);p.add_argument('--episodes',type=int,default=20)
     p.add_argument('--feedback-rule',choices=['displacement_v1','commitment_v2'],default='displacement_v1')
     p.add_argument('--opening-calibration',type=Path)
+    p.add_argument('--support-mode',choices=['hard_radius','soft_mass'],default='hard_radius')
     sys.exit(main(p.parse_args()))

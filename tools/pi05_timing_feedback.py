@@ -112,6 +112,7 @@ class TimingFeedbackGate:
     min_vote: float = .25
     block: int = 5
     enabled: bool = True
+    support_mode: str = "hard_radius"
     memory: list = field(default_factory=list)
     episode: int | None = None
     deadline: int | None = None
@@ -127,12 +128,17 @@ class TimingFeedbackGate:
             if cue["episode"] >= self.episode:
                 raise ValueError("current/future episode feedback leaked into query")
             distance = float(np.linalg.norm(normalized - cue["feature"]))
-            if distance <= self.radius:
+            if self.support_mode=="soft_mass" or distance <= self.radius:
                 nearby.append((np.exp(-.5 * (distance / self.radius) ** 2), cue["direction"]))
         direction = 0.
         vote = 0.
-        if self.enabled and len(nearby) >= self.min_support:
-            mass = sum(w for w, _ in nearby)
+        mass = sum(w for w, _ in nearby)
+        ready=len(nearby)>=self.min_support
+        if self.support_mode=="soft_mass":
+            # Preserve the minimum total weight guaranteed by the old
+            # min_support neighbors inside one Gaussian bandwidth.
+            ready=ready and mass>=self.min_support*np.exp(-.5)
+        if self.enabled and ready:
             total = sum(w * y for w, y in nearby)
             vote = total / mass
             if abs(vote) >= self.min_vote:
@@ -146,6 +152,7 @@ class TimingFeedbackGate:
         return {"threshold": threshold, "baseline_stop": baseline_stop,
                 "stop": bool(stop or deadline_reached), "deadline": self.deadline,
                 "deadline_reached": deadline_reached, "support": len(nearby),
+                "support_mass": float(mass), "support_ready": bool(ready),
                 "vote": float(vote), "direction": float(direction)}
 
     def commit(self, cue, feature, *, completed_episode):

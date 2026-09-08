@@ -31,15 +31,20 @@ def audit(root):
         assert len(row['queries'])==len(data['query_features'])==len(data['query_steps'])
         deadline=None
         for j,q in enumerate(row['queries']):
-            z=(data['query_features'][j]-center)/cal['scale']
+            z=(data['query_features'][j].astype(float)-center)/cal['scale']
             neighbors=[]
             for ep,z_i,y in memory:
                 assert ep<i
                 dist=np.linalg.norm(z-z_i)
-                if dist<=radius:neighbors.append((np.exp(-.5*(dist/radius)**2),y))
+                if cfg.get('support_mode','hard_radius')=='soft_mass' or dist<=radius:
+                    neighbors.append((np.exp(-.5*(dist/radius)**2),y))
             direction=0.
-            if provenance['arm']=='feedback' and len(neighbors)>=cfg['minimum_interventions']:
-                mass=sum(w for w,y in neighbors);weighted=sum(w*y for w,y in neighbors)
+            mass=sum(w for w,y in neighbors)
+            ready=len(neighbors)>=cfg['minimum_interventions']
+            if cfg.get('support_mode','hard_radius')=='soft_mass':
+                ready=ready and mass>=cfg['minimum_interventions']*np.exp(-.5)
+            if provenance['arm']=='feedback' and ready:
+                weighted=sum(w*y for w,y in neighbors)
                 if abs(weighted/mass)>=cfg['minimum_absolute_vote']:direction=weighted/(cfg['lambda']+mass)
             threshold=cal['baseline_threshold']*np.exp(-cfg['beta']*direction)
             assert np.isclose(threshold,q['threshold'],rtol=1e-7)
@@ -68,7 +73,7 @@ def audit(root):
         if provenance['arm']=='feedback' and cue is not None:
             idx=-2 if cue['attribution']=='previous_query' else -1
             assert cue['credit_step']==int(data['query_steps'][idx])
-            memory.append((i,(data['query_features'][idx]-center)/cal['scale'],cue['direction']))
+            memory.append((i,(data['query_features'][idx].astype(float)-center)/cal['scale'],cue['direction']))
         total_cost+=row['all_executed_expert_actions'];accepted+=int(row['accepted'])
         report.append({'episode':i,'actions':n,'expert_cost':row['all_executed_expert_actions'],'status':'PASS'})
     assert total_cost==summary['all_expert_actions'] and accepted==summary['accepted']

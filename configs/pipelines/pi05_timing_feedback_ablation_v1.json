@@ -15,8 +15,21 @@
   },
   "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
   "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
-  "current_stage": "OpenDrawer_original_eval_mode_calibration_repair",
-  "next_stage": "full32_demo50_policy_eval_calibration_then_two_stage_pairs",
+  "current_stage": "OpenDrawer_v1_null_results_and_soft_support_validation",
+  "next_stage": "new_seed_soft_support_pairs_then_TASR_and_training_admission",
+  "soft_support_candidate": {
+    "status":"frozen_before_new_closed_loop_results",
+    "plan":"docs/experiment_management/plans/Pi05_Feedback_Soft_Support_Candidate.md",
+    "support_mode":"soft_mass",
+    "minimum_total_weight":"minimum_interventions * exp(-0.5)",
+    "unchanged":["PCA","baseline_threshold","Gaussian bandwidth","lambda","beta","cue rule","q_e","q_R","one-block deadline"],
+    "Grasp_seed":1784000,
+    "Goal_seed":1785000,
+    "raw_per_arm":40,
+    "root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
+    "original_v1_results":"Both stages all actual timing unchanged; TASR_x3 Grasp60/325 and Goal203/708 unchanged",
+    "interpretation":"Exploratory support-rule revision; no efficacy claim before fresh closed-loop results"
+  },
   "OpenDrawer_mode_repair": {
     "mode":"eval",
     "reason":"Original OpenDrawer gated and fixed-timing source uses eval; previous generic adapter inherited Plane train/SDE mode.",

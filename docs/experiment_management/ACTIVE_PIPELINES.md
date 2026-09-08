@@ -2,6 +2,7 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **首轮结果/下一候选**：eval-mode Grasp/Goal各20raw×2arms已完整通过timing/TASR审计；所有takeover不变，Grasp60/325=18.46%、Goal203/708=28.67%均不变。原支持条件覆盖分别仅1/1019、0/811 eligible queries。保留零结果；已按诊断冻结soft_mass候选，带宽不变、取消硬截断、保留2*exp(-.5)总权重下限。新seed1784000/1785000，各40raw/arm，独立新root `opendrawer_soft_support_v1`；未获得新结果前不声称改进。
 - **06时段当前执行**：正确eval校准已完整结束，32 demos/50 ID policies，33 strict成功，独立审计通过（gamma0.3362330496311188，q_e0.20073064610519734）。controller1368627已自动启动两个stage的真实paired20：Grasp controller1387638，Goal controller1387639；fixed均完成20，feedback workers1396060/1395890继续运行。实际state在 `opendrawer_stage_feedback_eval_v2`，旧SDE50不参与。
 - SFT工程数据两组1327完整样本已导出，原生reader尾mask/真实8维loss调用及实际1:1混合batch均通过。报告 `diagnostics/Pi05_Feedback_SFT_Interface_20260909.md`。尚未真实两步GPU训练或正式SFT；pending自然composition/preliminary基座例外未收到回答。
 - **模式协议修复，优先于以下旧状态**：旧OpenDrawer通用接口误用了Plane的train/SDE采样；原任务gated/fixed-timing/eval源码均为eval。旧50-ID仅10成功和32-demo动作误差保留为不同策略诊断，不再尝试直接补100。原VLM-only PCA和expert-only Goal nominal bank可保留；重新全量计算32 dense demos+50 policy的eval校准，双卡分片，新root `opendrawer_eval_ID_calibration_v4`。随后配对root为`opendrawer_stage_feedback_eval_v2`。原controllers1307826/1349662已终止失败，不重启；无任何OD on/off结果已被用于选择模式。

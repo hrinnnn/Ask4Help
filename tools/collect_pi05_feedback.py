@@ -151,7 +151,8 @@ def main(args):
         and manifest['task_assets'][cal['task']]['checkpoint']==manifest['task_assets'][args.task]['checkpoint']
         and manifest['task_assets'][cal['task']]['norm']==manifest['task_assets'][args.task]['norm'])
     arrays=np.load(args.calibration/'gate_arrays.npz');mean=arrays['mean'];basis=arrays['basis']
-    cfg={**manifest['feedback'],'radius_multiplier':manifest['local_radius_multiplier'],'rule':args.feedback_rule}
+    cfg={**manifest['feedback'],'radius_multiplier':manifest['local_radius_multiplier'],'rule':args.feedback_rule,
+         'support_mode':args.support_mode}
     opening_reference=None
     if args.feedback_rule=='commitment_v2':
         if args.opening_calibration is None:raise ValueError('commitment_v2 requires its frozen ID opening calibration')
@@ -161,7 +162,8 @@ def main(args):
         cfg['opening_calibration']=str(args.opening_calibration)
     gate=TimingFeedbackGate(cal['baseline_threshold'],arrays['center'],cal['scale'],cal['radius']*cfg['radius_multiplier'],
                             regularization=cfg['lambda'],strength=cfg['beta'],min_support=cfg['minimum_interventions'],
-                            min_vote=cfg['minimum_absolute_vote'],block=cfg['execution_block'],enabled=args.arm=='feedback')
+                            min_vote=cfg['minimum_absolute_vote'],block=cfg['execution_block'],enabled=args.arm=='feedback',
+                            support_mode=args.support_mode)
     runtime=Pi05FeedbackRuntime(args.task,manifest['task_assets'][args.task]);runtime.torch.set_num_threads(4)
     write_json(args.output/'provenance.json',{'runtime':runtime.provenance(),'calibration':str(args.calibration),'arm':args.arm,'seed':args.seed,'episodes':args.episodes,'accepted_target':args.accepted_target,'feedback':cfg})
     runtime.load_model();results=[];accepted=0
@@ -195,6 +197,7 @@ if __name__=='__main__':
     p.add_argument('--accepted-target',type=int);p.add_argument('--force-takeover-step',type=int)
     p.add_argument('--feedback-rule',choices=['displacement_v1','commitment_v2'],default='displacement_v1')
     p.add_argument('--opening-calibration',type=Path)
+    p.add_argument('--support-mode',choices=['hard_radius','soft_mass'],default='hard_radius')
     args=p.parse_args()
     try:main(args)
     except Exception as error:
