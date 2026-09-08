@@ -2,6 +2,11 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **04时段真实更新**：原Plane v1配对20raw/arm已完成，实际时机完全相同，matched828 TASR×3=104/828两组相同。独立饱和夹爪候选commitment_v2两条新stream均完成；1772000 matched1327为200/1327→345/1327（15.07→26.00%），成本2247→2497；1773000 OOD时机中位数提前15，但共同整后缀预算167只剩ID、TASR=0→0，不作为OOD验证成功。完整结果见候选报告；没有启动SFT。
+- **当前OpenDrawer**：全部128条原始ID、22973 anchors恢复marker已通过。GPU0 reference controller1307826/worker1315075正用同一原始ID集在H20重建rank1000参考；原cached跨机器maxdiff0.0625的失败单独保留。当前state位于 `opendrawer_native_reference_pipeline_v1/controller_state.json`，不是下方历史PID。之后同controller自动ID校准与独立审计。GPU1仅用于本Goal新direct-current-state oracle smoke，先检查400步端点及真实RGB；不改变其他owner任务。
+
+### 较早pilot阶段记录（下述Plane运行PID已经结束）
+
 - **最新**：SC两arm各20raw完成及独立审计/TASR完成，OOD两条35→10和40→20，10OOD其余8不变；matched296动作TASR×3=122/296→123/296，×1相同、×2略降，不称稳定有效。两组accepted=3ID+9OOD=75%，已异步询问本次消融能否保留自然比例；未收到例外授权，不启动SC训练。
 - **当前进程**：Plane原development_v1因旧oracle越过250-action时限和诊断inf写JSON失败保持无效。修复后late-smoke严格140+110=250、独立审计通过；`development_v2_horizon/airplane_yaw_ood` controller1282003、feedback worker1285539真实运行，source35f1e4e1。state以该root内文件为准，不再读已结束calibration的全局state作为当前进度。
 - OpenDrawer原8,526,557,492-byte权重和norm已恢复到H20；原样环境source与5090/本地RLinf一致。Grasp ID/OOD双RGB、10×8动作、2048Bridge和重复预测差0检查通过，尚未做OD feedback collection或SFT。task源码快照e0269103。

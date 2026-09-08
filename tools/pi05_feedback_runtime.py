@@ -130,7 +130,7 @@ class Pi05FeedbackRuntime:
         def array(v): return v.detach().cpu().numpy().copy()
         base=env.unwrapped
         obj=base.cubeA if hasattr(base,'cubeA') else base.obj
-        return {'main':array(raw['sensor_data']['base_camera']['rgb'])[0],
+        snapshot={'main':array(raw['sensor_data']['base_camera']['rgb'])[0],
                 'wrist':array(raw['sensor_data']['hand_camera']['rgb'])[0],
                 'qpos':array(raw['agent']['qpos'])[0],
                 'tcp':array(base.agent.tcp.pose.p)[0],
@@ -138,6 +138,59 @@ class Pi05FeedbackRuntime:
                 'object_p':array(obj.pose.p)[0],
                 'object_q':array(obj.pose.q)[0],
                 'grasped':bool(base.agent.is_grasping(obj))}
+        if hasattr(base,'drawer'):
+            evaluation=base.evaluate()
+            snapshot.update(drawer_qpos=array(base.drawer.get_qpos())[0],
+                            target_p=array(base.target_tray.pose.p)[0])
+            for key in ['ever_drawer_opened','ever_grasped','ever_lifted',
+                        'object_in_target','object_released','is_robot_static','success']:
+                snapshot[key]=bool(evaluation[key])
+        return snapshot
+
+    def opendrawer_expert(self, env, raw, seed, remaining_actions):
+        """Original direct-grasp oracle, from live state, with a hard endpoint."""
+        import toolkits.lerobot as package
+        snapshot_path=Path(__file__).parent/'runtime_snapshots/opendrawer'
+        if str(snapshot_path) not in package.__path__:
+            package.__path__.insert(0,str(snapshot_path))
+        from toolkits.lerobot.validate_open_drawer_retrieve_place_oracle import PandaPosePlannerClient
+        from toolkits.lerobot.collect_maniskill_peg_lerobot_joint import (
+            _joint_delta_arm_bounds, _convert_solver_action_to_joint_delta)
+        spec=importlib.util.spec_from_file_location('_feedback_direct_drawer_oracle',
+                                                   Path(__file__).parent/'open_drawer_direct_takeover_oracle.py')
+        oracle=importlib.util.module_from_spec(spec);spec.loader.exec_module(oracle)
+        lower,upper=_joint_delta_arm_bounds(env)
+        actions=[];snapshots=[];runtime=self
+        class Endpoint(Exception):
+            def __init__(self,success,reason):self.success=success;self.reason=reason
+        class Proxy:
+            @property
+            def unwrapped(self):return env.unwrapped
+            def __getattr__(self,name):return getattr(env,name)
+            def step(self,solver_action,*args,**kwargs):
+                qpos=env.unwrapped.agent.robot.get_qpos().detach().cpu().numpy().reshape(-1)
+                action=_convert_solver_action_to_joint_delta(qpos,solver_action,lower,upper)
+                result=env.step(action,*args,**kwargs)
+                actions.append(np.asarray(action,dtype=np.float32).copy())
+                snapshots.append(runtime.snapshot(env,result[0]))
+                if bool(result[4]['success']):raise Endpoint(True,'task_success')
+                if bool(result[2]) or bool(result[3]) or len(actions)>=remaining_actions:
+                    raise Endpoint(False,'episode_horizon_or_termination')
+                return result
+        if remaining_actions<=0:raise ValueError('no expert action budget remains')
+        planner=PandaPosePlannerClient()
+        try:
+            with isolated_python_numpy_rng(seed+600000):
+                report=oracle.continue_episode(Proxy(),planner,seed=seed)
+            report['accepted']=bool(report['success'])
+        except Endpoint as endpoint:
+            report={'accepted':endpoint.success,'success':endpoint.success,
+                    'termination_reason':endpoint.reason,'takeover_from_current_state':True,
+                    'oracle_mode':'direct_grasp_from_current_state'}
+        finally:
+            planner.close()
+        return {'actions':actions,'snapshots':snapshots,'all_actions':actions,
+                'all_snapshots':snapshots,'attempt_lengths':[len(actions)],'report':report}
 
     def raw_snapshot(self, snapshot):
         torch=self.torch

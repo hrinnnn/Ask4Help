@@ -4,8 +4,26 @@
   "latest_user_decision": {"date":"2026-09-09","allow_multiple_OpenDrawer_OOD_stages_as_task_settings":true,"report_order":["actual_takeover_timing","TASR_on_collected_expert_data","post_SFT_success_rate"],"training_may_continue_in_background_after_timing_TASR_report":true,"final_goal_still_requires_training_and_SR":true,"note":"OpenDrawer stage alternatives are authorized candidates, not permission to overwrite older pipelines or fabricate results."},
   "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
   "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
-  "current_stage": "paired_pilot_TASR_and_OpenDrawer_runtime",
-  "next_stage": "finish_airplane_pilot_TASR_then_OpenDrawer_stage_calibration_and_training_admission",
+  "current_stage": "OpenDrawer_native_ID_reference_and_current_state_oracle",
+  "next_stage": "audit_OpenDrawer_ID_calibration_and_oracle_then_stage_paired_pilots",
+  "current_execution_20260909": {
+    "source_base_commit":"2619c2e5",
+    "reference_controller_pid":1307826,
+    "reference_worker_pid":1315075,
+    "reference_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_native_reference_pipeline_v1",
+    "reference_state":"full_ID_reference",
+    "original_ID_restored":{"episodes":128,"anchors":22973,"full_restore_marker":"/mnt/data/ask4help/datasets/pi05_opendrawer_feedback_calibration_20260909/FULL_ID_RESTORE_COMPLETE.json"},
+    "old_cached_reference_attempt":"opendrawer_ID_calibration_v1 failed maxdiff0.0625; not used",
+    "reference_repair":"same original128 ID demos and rank1000; fit/scoring both H20 native batch1; per-episode first-frame VLM-only vs postprediction bridge equivalence1e-6",
+    "oracle_scope":"original direct_grasp_from_current_state, unchanged source snapshot from5090; 400 total action cap; diagnostic reset/120-step ID/OOD continuation first",
+    "planned_oracle_GPU":"H20 GPU1 CPU4-7, preserves original PID276925; GPU0 belongs to native reference controller",
+    "SFT_started":false
+  },
+  "completed_pilots_20260909": {
+    "original_airplane_v1":{"root":"development_v2_horizon/airplane_yaw_ood","both_arms_raw":20,"takeover_changes":0,"budget":828,"TASR_x3":[0.12560386473429952,0.12560386473429952]},
+    "candidate_airplane_stream1772000":{"root":"commitment_candidate_v1/airplane/stream_1772000","both_arms_raw":20,"OOD_earlier_same_later":[6,2,0],"OOD_paired_median_shift":-35,"budget":1327,"TASR_x3":[0.15071590052750566,0.25998492840994725],"all_executed_expert_actions":[2247,2497]},
+    "candidate_airplane_stream1773000":{"root":"commitment_candidate_v1/airplane/stream_1773000","both_arms_raw":20,"OOD_earlier_same_later":[5,1,0],"OOD_paired_median_shift":-15,"budget":167,"TASR_x3":[0,0],"matched_OOD_points":[0,0],"interpretation":"ID-only common subset is uninformative about OOD TASR; not a replicated matched-budget efficacy gain","descriptive_unmatched_TASR_x3":[0.1394658753709199,0.2011111111111111],"all_executed_expert_actions":[1292,1430]}
+  },
   "task_progress": {"stackcube":{"status":"paired_pilot_TASR_complete","root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/development_v1/stackcube_legacy_ood","OOD_pairs":10,"earlier_takeovers":[[35,10],[40,20]],"matched_budget":296,"TASR_x3_fixed":0.41216216216216217,"TASR_x3_feedback":0.4155405405405405,"meaning":"one compatible point difference, not a strong efficacy claim"},"airplane":{"status":"horizon_repaired_pilot_running","controller_pid":1282003,"worker_pid":1285539,"root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/development_v2_horizon/airplane_yaw_ood","source_commit":"35f1e4e1","invalid_previous_root":"development_v1/airplane_yaw_ood","repair":"honor task termination/250 total action cap; keep planner infinite unreachable-distance diagnostic as explicit text"},"OpenDrawer":{"status":"weights_restored_and_Grasp_ID_OOD_RGB_forward_smoke_passed","weight_bytes":8526557492,"root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_runtime_smoke_v1/grasp","task_source_commit":"e0269103","pending":"ID demonstration/PCA assets, expert binding and stage-specific collection"}},
   "training_admission": {"status":"no_SFT_started","stackcube_pilot_accepted_ID":3,"stackcube_pilot_accepted_OOD":9,"stackcube_pilot_OOD_fraction":0.75,"legacy_required_fraction":0.8,"user_override_requested":true,"user_override_received":false,"scope":"Hold StackCube training admission pending explicit natural-composition exception; continue authorized timing/TASR and other task diagnostics."},
   "runtime_deployment": {"code_commit":"651372c3","local_worktree":"/Users/zhaozhixuan/Desktop/tsinghua_learning/Research/SEEN_workspace/Ask4Help_feedback_ablation","server_code":"/tmp/pi05_timing_feedback_ablation_v1/code","python":"/root/Ask4Help-online-awbc/RLinf/.venv/bin/python","task_source":{"stackcube_legacy_ood":{"root":"/root/Ask4Help-online-awbc-code","commit":"9a9f55c","rlinf_commit":"a2a68e73"},"airplane_yaw_ood":{"root":"/root/Ask4Help-pick-airplane-four-group","commit":"dc4c4c1","rlinf_commit":"116bcdd22"}},"submodule_policy":"Experiment code is pulled from GitHub; model/task imports explicitly use their existing version-pinned native runtime source roots rather than installing a new RLinf checkout.","GPU_to_CPU":{"0":"0-3","1":"4-7"},"preserve_pid":276925,"output_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1"},

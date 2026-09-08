@@ -93,7 +93,8 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
             expert_all={'all_actions':actions[takeover:],'all_snapshots':snapshots[takeover+1:]}
             expert_report={'phases':phases,'accepted':success,'attempt_lengths':[len(actions)-takeover]}
         else:
-            result=runtime.airplane_expert(env,raw,seed,runtime.horizon-takeover)
+            expert=runtime.opendrawer_expert if runtime.task.startswith('open_drawer_') else runtime.airplane_expert
+            result=expert(env,raw,seed,runtime.horizon-takeover)
             actions.extend(result['actions']);snapshots.extend(result['snapshots'])
             expert_all=result;expert_report=result['report'];expert_report['attempt_lengths']=result['attempt_lengths']
             success=bool(result['report']['accepted'])
@@ -143,7 +144,10 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
 def main(args):
     args.output.mkdir(parents=True,exist_ok=False);start=time.time()
     manifest=json.loads(args.manifest.read_text());cal=json.loads((args.calibration/'calibration.json').read_text())
-    assert cal['task']==args.task
+    assert cal['task']==args.task or (
+        cal['task'].startswith('open_drawer_') and args.task.startswith('open_drawer_')
+        and manifest['task_assets'][cal['task']]['checkpoint']==manifest['task_assets'][args.task]['checkpoint']
+        and manifest['task_assets'][cal['task']]['norm']==manifest['task_assets'][args.task]['norm'])
     arrays=np.load(args.calibration/'gate_arrays.npz');mean=arrays['mean'];basis=arrays['basis']
     cfg={**manifest['feedback'],'radius_multiplier':manifest['local_radius_multiplier'],'rule':args.feedback_rule}
     opening_reference=None
@@ -182,7 +186,7 @@ def main(args):
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--task',choices=['stackcube_legacy_ood','airplane_yaw_ood'],required=True)
+    p=argparse.ArgumentParser();p.add_argument('--task',choices=['stackcube_legacy_ood','airplane_yaw_ood','open_drawer_grasp_ood','open_drawer_goal_ood'],required=True)
     p.add_argument('--arm',choices=['fixed','feedback'],required=True);p.add_argument('--manifest',type=Path,required=True)
     p.add_argument('--calibration',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--seed',type=int,required=True);p.add_argument('--episodes',type=int,default=20)
