@@ -67,8 +67,9 @@ def main(args):
     if not (dataset/'meta/info.json').exists():dataset=dataset/'lerobot'
     episodes=[json.loads(s) for s in (dataset/'meta/episodes.jsonl').read_text().splitlines()]
     progress('load_ID_reference')
-    prior_asset=torch.load(ASSETS[args.task]['pca'],map_location='cpu',weights_only=False)
-    cache=torch.load(ASSETS[args.task]['cache'],map_location='cpu',weights_only=False)
+    asset_paths={'pca':str(args.reference_asset),'cache':str(args.reference_asset)} if args.reference_asset else ASSETS[args.task]
+    prior_asset=torch.load(asset_paths['pca'],map_location='cpu',weights_only=False)
+    cache=torch.load(asset_paths['cache'],map_location='cpu',weights_only=False)
     if args.task!='airplane_yaw_ood':
         pca=prior_asset['detectors']['vlm_bridge_final_mean__pca_residual']['statistics']
         features=cache['layers']['vlm_bridge_final_mean'].float().reshape(-1,2048)
@@ -164,7 +165,7 @@ def main(args):
             'ID_demonstrations':len(selected),'qualifying_ID_policy_episodes':len(success_maxima),
             'policy_episodes':args.policy_episodes,'fixed_prior':'bridge only; action prior does not affect VLM prefix',
             'calibration_success_rule':'ever_grasped' if args.task=='airplane_yaw_ood' else 'strict',
-            'provenance':runtime.provenance(),'reference_assets':ASSETS[args.task],
+            'provenance':runtime.provenance(),'reference_assets':asset_paths,
             'source_dataset':str(dataset),'array_file':'gate_arrays.npz'}
     (args.output/'calibration.json').write_text(json.dumps(result,indent=2))
     (args.output/'CALIBRATION_COMPLETE.json').write_text(json.dumps({'task':args.task,'status':'ID_ONLY_CALIBRATION_COMPLETE'}))
@@ -174,6 +175,7 @@ def main(args):
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--task',choices=list(ASSETS),required=True)
     p.add_argument('--manifest',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--reference-asset',type=Path)
     p.add_argument('--demo-episodes',type=int,default=32);p.add_argument('--policy-episodes',type=int,default=50)
     p.add_argument('--seed',type=int,default=1740000);args=p.parse_args()
     try:main(args)
