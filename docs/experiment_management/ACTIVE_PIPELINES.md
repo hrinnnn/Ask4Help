@@ -1,5 +1,12 @@
 # Active Pipelines
 
+## π0.5 Timing Feedback Ablation（2026-09-09）
+
+- 新授权完整消融pipeline=`pi05_timing_feedback_ablation_v1`，owner=`01a07faa-682a-7e01-9d5b-eeac5b96864d`；manifest=`configs/pipelines/pi05_timing_feedback_ablation_v1.json`，plan=`docs/experiment_management/plans/Pi05_Timing_Feedback_Ablation.md`。
+- 主任务StackCube/Grab Plane，固定gate与有反馈gate；完成新采集、同预算SFT、独立ID/OOD SR和论文LaTeX。旧X-VLA探针不替代新π0.5结果，OpenDrawer需先核实资格。
+- 首次预检：H20原任务weights/norm/ID数据存在，原生Torch/NumPy导入通过；反馈核心9测试通过。当前`asset_runtime_preflight`，下一阶段`paired_smoke_then_ID_calibration`；尚无新GPU作业，不报告运行中。
+- 5090全卡占用；H20保留PID276925，根盘满，使用独立/tmp与OSS前必须验收存储。所有正/零/负结果保留，不能提前写提升。
+
 更新时间：2026-08-25
 
 本文件是当前长实验的执行总表。Owner、Leader 和 Heartbeat 每次接力必须先读本文件，再读对应 manifest、plan 与远端 `pipeline_state.json`。聊天历史中的旧模型路线或旧阶段不得覆盖本文件。

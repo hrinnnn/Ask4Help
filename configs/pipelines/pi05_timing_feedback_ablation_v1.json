@@ -1,0 +1,35 @@
+{
+  "pipeline_id": "pi05_timing_feedback_ablation_v1",
+  "authorized": true,
+  "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
+  "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
+  "current_stage": "asset_runtime_preflight",
+  "next_stage": "paired_smoke_then_ID_calibration",
+  "process": null,
+  "plan": "docs/experiment_management/plans/Pi05_Timing_Feedback_Ablation.md",
+  "method_source": "outputs/method_minimal_revision_20260908/完整修订稿.tex",
+  "primary_tasks": ["stackcube_legacy_ood", "airplane_yaw_ood"],
+  "conditional_third_task": "open_drawer_goal_ood_requires_qualification_and_protocol_unlock",
+  "arms": ["fixed_bridge_pca", "feedback_bridge_pca"],
+  "protocol_state": "method_and_endpoints_fixed_asset_paths_pending_live_verification",
+  "feedback": {"execution_block": 5, "monte_carlo_samples": 2, "error_ID_quantile": 0.95, "reversal_ID_quantile": 0.95, "lambda": 2.0, "beta": 0.5, "minimum_interventions": 2, "minimum_absolute_vote": 0.25, "max_wait_blocks": 1, "memory_reset": "each_independent_collection_stream", "memory_commit": "only_after_completed_intervention", "feedback_valid_window": "five_actual_expert_actions_no_padding", "initial_memory": "empty"},
+  "comparison": {"initial_gate": "same_successful_ID_rollout_maximum_q95", "PCA_reference": "same_original_ID_demo_bridge_features", "checkpoint": "same_task_specific_immutable_ID_base", "seed_pairing": "same_reset_and_policy_RNG_until_actual_takeover", "formal_stream_replicates": 3, "accepted_per_arm_stream": 100, "raw_schedule": "strict_alternating_ID_OOD_no_accepted_quota", "max_raw_attempts": 2000, "retention": "exact_common_low_level_action_budget_using_complete_successful_suffixes", "source_mix": "ID:expert_1:1", "training_steps": {"stackcube_legacy_ood": 2000, "airplane_yaw_ood": 2500}, "temporal_mask": true, "all_real_anchors_retained": true, "final_episodes_per_policy": {"ID": 100, "OOD": 100}, "test_seeds": "reserved_before_formal_collection_never_used_for_tuning", "primary_endpoint": "post_SFT_unassisted_OOD_success", "airplane_endpoint": "ever_grasped_with_strict_success_also_reported", "secondary": ["ID_success", "all_executed_expert_actions", "accepted_actions", "takeover_time_and_misses", "paired_actual_timing_shifts", "cue_support_and_conflict", "feedback_compute_seconds"]},
+  "placement_preflight": {
+    "selected_server": null,
+    "preferred_candidate": "root@39.101.70.188:1012",
+    "snapshot_time_beijing": "2026-09-09 00:26",
+    "candidate_servers": [{"name":"H20","GPU_memory_used_MiB":[348,338],"preserve_pid":276925,"root_free_bytes":0,"tmp_free_GiB":13,"shm_capacity_GiB":256,"available_RAM_GiB":249,"native_pi05_runtime_candidate":"/root/Ask4Help-online-awbc/RLinf/.venv/bin/python","status":"checkpoint/runtime/storage_audit_pending"},{"name":"5090","idle_GPU_count":0,"root_free_MiB":191,"data_free_GiB":902,"status":"rejected_currently_all_GPUs_occupied"}],
+    "persistent_output_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1",
+    "scratch_candidate": "/tmp/pi05_timing_feedback_ablation_v1",
+    "expected_output": "collection traces/videos under 15GiB; 12 final model-weight copies about 120-150GiB plus checkpoints/optimizer states; precise footprint before training launch",
+    "required_assets": ["pi05_base_torch", "task_checkpoint", "original_ID_dataset_and_norm", "PCA_ID_features_or_rebuild", "successful_ID_calibration", "simulator_and_planner", "native_runtime", "audited_training_entrypoint"]
+  },
+  "task_assets": {
+    "stackcube_legacy_ood": {"checkpoint":"/mnt/data/ask4help/results/stackcube_id_sft/pi05_id_sft_10000_visual_v1_20260722_dual/member_0/maniskill_stackcube_pi05_id_sft/checkpoints/global_step_7000","ID_dataset":"/mnt/data/ask4help/datasets/lerobot/local/stackcube_id_128_visual_v1_20260722","norm":"/mnt/data/ask4help/datasets/lerobot/local/stackcube_id_128_visual_v1_20260722/norm_stats_id.json","source_provenance":"/mnt/data/ask4help/results/stackcube_gated_dagger/full_v5/failure_recovery_successful_experts_100_from7000_retry1/summary.json","live_files_verified":false},
+    "airplane_yaw_ood": {"checkpoint":"/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/id_sft_no180_modelonly_step2000_plus3000_v1/maniskill_stackcube_pi05_id_sft/checkpoints/global_step_3000","checkpoint_note":"native3000_after_ID2000_total5000; never label as a newly trained model","ID_dataset_candidate":"/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/id_expert_no180_98_v2","norm":"/mnt/data/ask4help/results/pick_single_ycb_airplane/yaw_swap_v1/assets/id_expert_norm_stats","source_provenance":"/mnt/data/ask4help/results/pick_single_ycb_airplane/four_group_dagger_v1/formal_v3/bridge_pca_collection/collection_provenance.json","live_files_verified":false}
+  },
+  "execution_audit": {"failure_marker":"EXECUTION_AUDIT_FAILED","required":["manifest_vs_actual_process","checkpoint_reload_finite_forward","paired_reset_and_visual_frame","same_first_episode_actions","no_current_or_future_episode_memory","expert_action_generation_without_teacher_input","same_action_scaling","ID_only_calibration_and_reserved_test_seeds","full_suffix_and_all_anchor_temporal_mask","exact_budget_and_identical_SFT_settings","complete_independent_ID_OOD_denominators"]},
+  "forbidden": ["old_invalid_Stage2_controlled_results", "relabel_old_knn_results_as_PCA", "report_assisted_success_as_post_training_SR", "test_set_hyperparameter_selection", "overwrite_old_artifacts", "alter_other_pipeline_locks", "delete_non_task_files", "allocate_occupied_5090_GPUs", "write_new_hashes"],
+  "completion_marker": "PIPELINE_COMPLETE.json",
+  "completion": "At least two task settings have complete audited paired collection, exact-budget SFT, independent final evaluation, full positive/null/negative results, and a directly usable LaTeX ablation paragraph/table. Positive benefit must be demonstrated by evidence to be claimed; no intermediate phase completes the objective."
+}
