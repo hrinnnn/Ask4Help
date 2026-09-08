@@ -145,6 +145,8 @@ def continue_episode(env: Any, planner: Any, *, seed: int | None = None) -> dict
         "planner_mode": getattr(planner, "planner_mode", os.environ.get("PANDA_PLANNER_MODE", "unknown")),
         "unnecessary_handle_retreat_removed": True,
     }
+    if hasattr(env, "record_expert_stages"):
+        env.record_expert_stages(stages)
     drawer_opened_before = _drawer_is_open(base)
     stages["drawer_opened_before_takeover"] = drawer_opened_before
     if not drawer_opened_before:

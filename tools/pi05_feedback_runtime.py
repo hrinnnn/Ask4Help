@@ -42,7 +42,7 @@ class Pi05FeedbackRuntime:
         elif task.startswith('open_drawer_'):
             import rlinf.envs.maniskill as package
             snapshot_path=Path(__file__).parent/'runtime_snapshots/opendrawer'
-            package.__path__.insert(0,str(snapshot_path))
+            package.__path__=[str(snapshot_path),*package.__path__]
             from rlinf.envs.maniskill.open_drawer_retrieve_place_spec import TASK_INSTRUCTION, ENV_IDS, reset_metadata
             import rlinf.envs.maniskill.open_drawer_retrieve_place
             self.instruction=TASK_INSTRUCTION;self.open_drawer_ids=ENV_IDS
@@ -160,10 +160,13 @@ class Pi05FeedbackRuntime:
                                                    Path(__file__).parent/'open_drawer_direct_takeover_oracle.py')
         oracle=importlib.util.module_from_spec(spec);spec.loader.exec_module(oracle)
         lower,upper=_joint_delta_arm_bounds(env)
-        actions=[];snapshots=[];runtime=self
+        actions=[];snapshots=[];runtime=self;stages={}
         class Endpoint(Exception):
             def __init__(self,success,reason):self.success=success;self.reason=reason
         class Proxy:
+            def record_expert_stages(self,value):
+                nonlocal stages
+                stages=value
             @property
             def unwrapped(self):return env.unwrapped
             def __getattr__(self,name):return getattr(env,name)
@@ -184,7 +187,7 @@ class Pi05FeedbackRuntime:
                 report=oracle.continue_episode(Proxy(),planner,seed=seed)
             report['accepted']=bool(report['success'])
         except Endpoint as endpoint:
-            report={'accepted':endpoint.success,'success':endpoint.success,
+            report={**stages,'accepted':endpoint.success,'success':endpoint.success,
                     'termination_reason':endpoint.reason,'takeover_from_current_state':True,
                     'oracle_mode':'direct_grasp_from_current_state'}
         finally:
