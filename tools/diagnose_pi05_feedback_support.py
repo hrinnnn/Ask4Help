@@ -2,6 +2,7 @@
 import argparse,json
 from pathlib import Path
 import numpy as np
+from pi05_feedback_artifacts import episode_path
 
 
 def run(a):
@@ -12,7 +13,7 @@ def run(a):
         root=a.root/task/'feedback';summary=json.loads((root/'summary.json').read_text())
         memory=[];labels=[];second=[];at_alarm=[];hard=0;soft=0;eligible=0;episodes=[]
         for row in summary['rows']:
-            data=np.load(root/('episode_%04d'%row['episode'])/'trace.npz')
+            data=np.load(episode_path(root,row)/'trace.npz')
             z=(data['query_features'].astype(float)-center)/cal['scale']
             if len(memory)>=2:
                 distances=np.linalg.norm(z[:,None,:]-np.asarray(memory)[None,:,:],axis=2)

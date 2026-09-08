@@ -5,6 +5,7 @@ from zipfile import ZipFile
 import numpy as np
 from analyze_open_drawer_target_ratio import relative_pose,stage_blocks,compare_block,PHASES
 from score_pi05_feedback_tasr import budget_selection
+from pi05_feedback_artifacts import episode_path
 
 
 def parts_against_reference(query,bank):
@@ -48,7 +49,7 @@ def run(args):
             if row['split']=='id':
                 result.update(compatible_points={str(f):0 for f in [1,2,3]},coverage='ID_excluded_from_numerator')
                 rows.append(result);continue
-            data=np.load(args.root/arm/f'episode_{i:04d}/trace.npz')
+            data=np.load(episode_path(args.root/arm,row)/'trace.npz')
             # The endpoint may cut final release/settle actions at true success.
             # Preserve the earlier completed target-stage counts unchanged.
             meta={'actual_takeover_step':take,'expert_action_steps':n,'expert_result':row['expert_report'],'accepted':False}

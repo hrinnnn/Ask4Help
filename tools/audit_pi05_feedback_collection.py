@@ -3,6 +3,7 @@ import argparse
 import json
 from pathlib import Path
 import numpy as np
+from pi05_feedback_artifacts import episode_path
 
 
 def audit(root):
@@ -14,7 +15,7 @@ def audit(root):
     cfg=provenance['feedback'];radius=cal['radius']*cfg['radius_multiplier']
     memory=[];report=[];total_cost=0;accepted=0
     for i,row in enumerate(summary['rows']):
-        data=np.load(root/f'episode_{i:04d}'/'trace.npz')
+        data=np.load(episode_path(root,row)/'trace.npz')
         assert row['episode']==i and row['split']==('id' if i%2==0 else 'ood')
         n=len(data['actions']);assert len(data['main'])==len(data['wrist'])==len(data['qpos'])==n+1
         horizon=400 if summary['task'].startswith('open_drawer_') else (100 if summary['task']=='stackcube_legacy_ood' else 250)

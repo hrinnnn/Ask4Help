@@ -4,6 +4,7 @@ import io
 import json
 import os
 import time
+import gc
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +12,7 @@ import numpy as np
 from pi05_feedback_runtime import Pi05FeedbackRuntime
 from pi05_timing_feedback import TimingFeedbackGate, action_block_error, corrective_motion, timing_cue, isolated_python_numpy_rng
 from pi05_timing_feedback import gripper_commitment_opening, commitment_timing_cue
+from pi05_feedback_artifacts import completed_rows,restore_memory
 
 
 def jsonable(v):
@@ -165,19 +167,36 @@ def main(args):
                             min_vote=cfg['minimum_absolute_vote'],block=cfg['execution_block'],enabled=args.arm=='feedback',
                             support_mode=args.support_mode)
     runtime=Pi05FeedbackRuntime(args.task,manifest['task_assets'][args.task]);runtime.torch.set_num_threads(4)
-    write_json(args.output/'provenance.json',{'runtime':runtime.provenance(),'calibration':str(args.calibration),'arm':args.arm,'seed':args.seed,'episodes':args.episodes,'accepted_target':args.accepted_target,'feedback':cfg})
-    runtime.load_model();results=[];accepted=0
-    for episode in range(args.episodes):
+    provenance={'runtime':runtime.provenance(),'calibration':str(args.calibration),'arm':args.arm,'seed':args.seed,'episodes':args.episodes,'accepted_target':args.accepted_target,'feedback':cfg}
+    results=[]
+    if args.resume_from is not None:
+        old=json.loads((args.resume_from/'provenance.json').read_text())
+        for key in ['calibration','arm','seed','episodes','accepted_target','feedback']:
+            assert old[key]==provenance[key],('resume contract changed',key)
+        for key in ['task','checkpoint','norm','inference_mode']:
+            assert old['runtime'].get(key)==provenance['runtime'].get(key)
+        results=completed_rows(args.resume_from)
+        restore_memory(gate,results)
+        provenance['resume_from']=str(args.resume_from)
+        provenance['resumed_completed_episodes']=len(results)
+    write_json(args.output/'provenance.json',provenance)
+    runtime.load_model();accepted=sum(r['accepted'] for r in results)
+    stop=min(args.episodes,len(results)+args.max_new_episodes)
+    for episode in range(len(results),stop):
         split='id' if episode%2==0 else 'ood';seed=args.seed+episode//2
         result,snapshots,actions,prefix,expert_all=collect_episode(runtime,gate,cal,mean,basis,seed,split,episode,args.force_takeover_step,
                                                                 args.feedback_rule,opening_reference)
         directory=args.output/f'episode_{episode:04d}';directory.mkdir()
+        result['artifact_directory']=str(directory)
         write_trace(directory,snapshots,actions,prefix,expert_all);write_json(directory/'result.json',result)
         accepted+=int(result['accepted']);results.append(result)
         row={'pid':os.getpid(),'arm':args.arm,'task':args.task,'episodes':len(results),'accepted':accepted,
              'elapsed':time.time()-start,'last_takeover':result['takeover'],'last_cue':result['cue'],
-             'all_expert_actions':sum(r['all_executed_expert_actions'] for r in results)}
+             'all_expert_actions':sum(r['all_executed_expert_actions'] for r in results),
+             'open_file_descriptors':len(os.listdir('/proc/self/fd'))}
         write_json(args.output/'progress.json',row);print(json.dumps(row),flush=True)
+        del snapshots,actions,prefix,expert_all
+        gc.collect()
         if args.accepted_target is not None and accepted>=args.accepted_target:break
     summary={'task':args.task,'arm':args.arm,'episodes':len(results),'accepted':accepted,
              'accepted_ID':sum(r['accepted'] and r['split']=='id' for r in results),
@@ -186,7 +205,9 @@ def main(args):
              'successful_expert_actions':sum(r['expert_suffix_actions'] for r in results if r['accepted']),
              'rows':results,'whole_pipeline_complete':False}
     write_json(args.output/'summary.json',summary)
-    write_json(args.output/'COLLECTION_COMPLETE.json',{'episodes':len(results),'accepted':accepted,'target_reached':args.accepted_target is None or accepted>=args.accepted_target})
+    complete=len(results)>=args.episodes or (args.accepted_target is not None and accepted>=args.accepted_target)
+    marker='COLLECTION_COMPLETE.json' if complete else 'COLLECTION_CHUNK_COMPLETE.json'
+    write_json(args.output/marker,{'episodes':len(results),'accepted':accepted,'target_reached':complete})
 
 
 if __name__=='__main__':
@@ -198,6 +219,8 @@ if __name__=='__main__':
     p.add_argument('--feedback-rule',choices=['displacement_v1','commitment_v2'],default='displacement_v1')
     p.add_argument('--opening-calibration',type=Path)
     p.add_argument('--support-mode',choices=['hard_radius','soft_mass'],default='hard_radius')
+    p.add_argument('--resume-from',type=Path)
+    p.add_argument('--max-new-episodes',type=int,default=20)
     args=p.parse_args()
     try:main(args)
     except Exception as error:

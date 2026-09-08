@@ -8,6 +8,7 @@ from zipfile import ZipFile
 import numpy as np
 from scipy.spatial.transform import Rotation
 from compute_pi05_tasr import PandaFK, PHASES, pair, target_blocks
+from pi05_feedback_artifacts import episode_path
 
 
 def compatible_pose(tcp, rotations, object_p, widths, end):
@@ -58,7 +59,7 @@ def run(args):
             row={'arm':arm,'episode':episode,'seed':r['seed'],'split':r['split'],'expert_points':n}
             if r['split']=='id':
                 row.update(compatible_points={str(f):0 for f in [1,2,3]},coverage='ID_excluded_from_numerator');rows.append(row);continue
-            data=np.load(args.root/arm/f'episode_{episode:04d}'/'trace.npz')
+            data=np.load(episode_path(args.root/arm,r)/'trace.npz')
             try:
                 blocks=target_blocks(args.task,data['actions'],data['grasped'],start,n)
                 qpos=data['qpos'][start:start+n];tcp=data['tcp'][start:start+n]

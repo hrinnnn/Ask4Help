@@ -56,6 +56,8 @@ def run(args):
                         '--logs',args.logs/split,'--calibration',cal,'--task',task,'--seed',seed,
                         '--gpu',gpu,'--cpu',cpu,'--episodes',args.episodes,'--feedback-rule','displacement_v1',
                         '--support-mode',args.support_mode)
+            if args.resume_root:cmd+=['--resume-root',str(args.resume_root/split)]
+            if args.shared_fixed_root:cmd+=['--shared-fixed-from',str(args.shared_fixed_root/split/'fixed')]
             running.append(start(split+'_paired',cmd,{'TMPDIR':f'/tmp/pi05_timing_feedback_ablation_v1/tmp{gpu}'}))
         for child,row in running:finish(child,row)
         state['stage']='two_stage_TASR';save()
@@ -77,4 +79,6 @@ if __name__=='__main__':
     p.add_argument('--episodes',type=int,default=20)
     p.add_argument('--grasp-seed',type=int,default=1782000)
     p.add_argument('--goal-seed',type=int,default=1783000)
+    p.add_argument('--resume-root',type=Path)
+    p.add_argument('--shared-fixed-root',type=Path)
     raise SystemExit(run(p.parse_args()))

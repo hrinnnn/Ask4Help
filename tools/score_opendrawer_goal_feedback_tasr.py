@@ -5,6 +5,7 @@ import numpy as np
 from analyze_open_drawer_target_ratio import compare_block,MIN_RADIUS
 from collect_opendrawer_goal_tasr_reference import goal_blocks
 from score_pi05_feedback_tasr import budget_selection
+from pi05_feedback_artifacts import episode_path
 
 PHASES=['transport','place','release']
 
@@ -79,7 +80,7 @@ def score(root,bank_root):
             out={'arm':arm,'episode':i,'seed':row['seed'],'split':row['split'],'expert_points':n}
             if row['split']=='id':out.update(compatible_points={str(f):0 for f in [1,2,3]},coverage='ID_excluded_from_numerator')
             else:
-                d=np.load(root/arm/f'episode_{i:04d}/trace.npz');blocks=goal_blocks(row['expert_report'],n)
+                d=np.load(episode_path(root/arm,row)/'trace.npz');blocks=goal_blocks(row['expert_report'],n)
                 blocks={p:[a+take,b+take] for p,(a,b) in blocks.items()}
                 query={'seed':row['seed'],'blocks':blocks,'comparison_pose':{'position':d['tcp']-d['target_p'],
                     'quaternion':d['tcp_q'],'width':d['qpos'][:,-2:].sum(1)[:,None]},

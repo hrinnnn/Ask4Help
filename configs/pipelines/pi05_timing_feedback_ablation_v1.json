@@ -15,7 +15,16 @@
   },
   "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
   "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
-  "current_stage": "OpenDrawer_v1_null_results_and_soft_support_validation",
+  "current_stage": "soft_support_render_lifecycle_recovery",
+  "render_recovery": {
+    "failed_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
+    "complete_fixed_prefixes":{"grasp":24,"goal":24},
+    "failure":"Both processes failed creating the next environment with vk::createInstanceUnique/ErrorIncompatibleDriver.",
+    "retry_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v2_chunked",
+    "max_new_episodes_per_process":20,
+    "policy":"Reference immutable completed episodes, reconstruct exact prior feedback memory, preserve old failure files; no new seeds or parameter changes.",
+    "tests":"20 core/support/Ray/resumption tests passed"
+  },
   "next_stage": "new_seed_soft_support_pairs_then_TASR_and_training_admission",
   "soft_support_candidate": {
     "status": "running_fresh_fixed_controls_then_soft_feedback",
