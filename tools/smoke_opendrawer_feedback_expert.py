@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 import numpy as np
 from pi05_feedback_runtime import Pi05FeedbackRuntime
-from collect_pi05_feedback import write_json, write_trace, planner_diagnostic
+from collect_pi05_feedback import write_json, write_trace, planner_diagnostic, jsonable
 
 
 def main(args):
@@ -49,7 +49,7 @@ def main(args):
                  'reset':metadata,'expert_report':planner_diagnostic(result['report'])}
             write_json(directory/'result.json',row);rows.append(row);env.close()
             progress={'pid':os.getpid(),'episodes':len(rows),'elapsed':time.time()-start,'last':row}
-            write_json(args.output/'progress.json',progress);print(json.dumps(progress),flush=True)
+            write_json(args.output/'progress.json',progress);print(json.dumps(jsonable(progress)),flush=True)
     write_json(args.output/'summary.json',{'rows':rows,'scope':'oracle smoke, not gate efficacy or SFT'})
     write_json(args.output/'ORACLE_SMOKE_RECORDED.json',{'episodes':len(rows),'visual_audit_pending':True})
 
