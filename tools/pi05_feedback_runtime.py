@@ -109,6 +109,22 @@ class Pi05FeedbackRuntime:
             layers=self.model.extract_multilayer_llmd_features(self.observation(raw),prior)
         return layers['vlm_bridge_final_mean'].detach().float().cpu().numpy().reshape(-1)
 
+    def reference_bridge(self, raw):
+        """VLM-only reference extraction; checked against bridge() by builder."""
+        from openpi.models import model as observation_model
+        from rlinf.algorithms.vla_fail import pool_valid_prefix_tokens
+        torch=self.torch
+        with torch.inference_mode():
+            processed=self.model.precision_processor(self.model.input_transform(self.model.obs_processor(self.observation(raw)),transpose=False))
+            observation=observation_model.Observation.from_dict(processed)
+            images,masks,tokens,token_masks,state=self.model._preprocess_observation(observation,train=False)
+            device=state.device
+            images=[x.to(device) for x in images];masks=[x.to(device) for x in masks]
+            if tokens is not None:tokens=tokens.to(device)
+            if token_masks is not None:token_masks=token_masks.to(device)
+            prefix,valid,_cache=self.model._build_prefix_cache(images,masks,tokens,token_masks)
+            return pool_valid_prefix_tokens(prefix,valid).detach().float().cpu().numpy().reshape(-1)
+
     @staticmethod
     def snapshot(env, raw):
         def array(v): return v.detach().cpu().numpy().copy()
