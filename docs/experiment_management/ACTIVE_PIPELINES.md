@@ -2,6 +2,13 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **最新**：SC两arm各20raw完成及独立审计/TASR完成，OOD两条35→10和40→20，10OOD其余8不变；matched296动作TASR×3=122/296→123/296，×1相同、×2略降，不称稳定有效。两组accepted=3ID+9OOD=75%，已异步询问本次消融能否保留自然比例；未收到例外授权，不启动SC训练。
+- **当前进程**：Plane原development_v1因旧oracle越过250-action时限和诊断inf写JSON失败保持无效。修复后late-smoke严格140+110=250、独立审计通过；`development_v2_horizon/airplane_yaw_ood` controller1282003、feedback worker1285539真实运行，source35f1e4e1。state以该root内文件为准，不再读已结束calibration的全局state作为当前进度。
+- OpenDrawer原8,526,557,492-byte权重和norm已恢复到H20；原样环境source与5090/本地RLinf一致。Grasp ID/OOD双RGB、10×8动作、2048Bridge和重复预测差0检查通过，尚未做OD feedback collection或SFT。task源码快照e0269103。
+- 代码source-of-truth在本地独立worktree和GitHub分支；网络失败时只部署已在GitHub核实存在的精确commit archive。TASR source55f0489f已通过GitHub API核实，未因CLI报错假定提交未到达。
+
+### 之前阶段记录（以下PID/阶段不代表当前运行状态）
+
 - 当前真实阶段为`ID_calibration_running`：H20 controller1253424，SC worker1253425/GPU0/CPU0–3，Plane worker1253429/GPU1/CPU4–7；state=`/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/pipeline_state.json`。32-ID demo动作差异/纠正校准正在推进，随后各50独立ID policy；source`ab3a6aa6`已push/pull。下一阶段为真实expert接入、配对Timing/TASR数据、同预算后台SFT，阶段完成不结束Goal。
 
 - 用户追加授权：OpenDrawer不同OOD stage也可作为两项条件；先报真实Timing与TASR，再持久后台训练，最终仍补SR。新信息已写入manifest/plan。
