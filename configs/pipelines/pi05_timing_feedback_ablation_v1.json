@@ -18,50 +18,76 @@
   "current_stage": "OpenDrawer_v1_null_results_and_soft_support_validation",
   "next_stage": "new_seed_soft_support_pairs_then_TASR_and_training_admission",
   "soft_support_candidate": {
-    "status":"frozen_before_new_closed_loop_results",
-    "plan":"docs/experiment_management/plans/Pi05_Feedback_Soft_Support_Candidate.md",
-    "support_mode":"soft_mass",
-    "minimum_total_weight":"minimum_interventions * exp(-0.5)",
-    "unchanged":["PCA","baseline_threshold","Gaussian bandwidth","lambda","beta","cue rule","q_e","q_R","one-block deadline"],
-    "Grasp_seed":1784000,
-    "Goal_seed":1785000,
-    "raw_per_arm":40,
-    "root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
-    "original_v1_results":"Both stages all actual timing unchanged; TASR_x3 Grasp60/325 and Goal203/708 unchanged",
-    "interpretation":"Exploratory support-rule revision; no efficacy claim before fresh closed-loop results"
+    "status": "running_fresh_fixed_controls_then_soft_feedback",
+    "plan": "docs/experiment_management/plans/Pi05_Feedback_Soft_Support_Candidate.md",
+    "support_mode": "soft_mass",
+    "minimum_total_weight": "minimum_interventions * exp(-0.5)",
+    "unchanged": [
+      "PCA",
+      "baseline_threshold",
+      "Gaussian bandwidth",
+      "lambda",
+      "beta",
+      "cue rule",
+      "q_e",
+      "q_R",
+      "one-block deadline"
+    ],
+    "Grasp_seed": 1784000,
+    "Goal_seed": 1785000,
+    "raw_per_arm": 40,
+    "root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
+    "original_v1_results": "Both stages all actual timing unchanged; TASR_x3 Grasp60/325 and Goal203/708 unchanged",
+    "interpretation": "Exploratory support-rule revision; no efficacy claim before fresh closed-loop results",
+    "hard40_control": "Registered before inspecting new soft feedback results; reuse same fixed40, collect hard_radius feedback on same fresh seeds to distinguish memory length from kernel support."
   },
   "OpenDrawer_mode_repair": {
-    "mode":"eval",
-    "reason":"Original OpenDrawer gated and fixed-timing source uses eval; previous generic adapter inherited Plane train/SDE mode.",
-    "old_SDE_ID_successes":10,
-    "old_SDE_ID_episodes":50,
-    "old_SDE_root":"opendrawer_native_reference_pipeline_v1/ID_calibration_native_v2",
-    "reuse_SDE_demo_errors_or_policy_scores":false,
-    "planned_ID100_extension":"not launched; superseded by original-task mode repair",
-    "reference_reuse":"VLM-only PCA unaffected by action sampling; verify exact first-frame Bridge equivalence for all32 demos",
-    "eval_calibration_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_eval_ID_calibration_v4",
-    "eval_stage_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_stage_feedback_eval_v2",
-    "controller":"tools/run_opendrawer_eval_ID_calibration.py",
-    "full_demo_count":32,
-    "full_policy_count":50,
-    "two_GPU_parallel_shards":true,
-    "report":"docs/experiment_management/diagnostics/OpenDrawer_Inference_Mode_Repair_20260909.md"
+    "mode": "eval",
+    "reason": "Original OpenDrawer gated and fixed-timing source uses eval; previous generic adapter inherited Plane train/SDE mode.",
+    "old_SDE_ID_successes": 10,
+    "old_SDE_ID_episodes": 50,
+    "old_SDE_root": "opendrawer_native_reference_pipeline_v1/ID_calibration_native_v2",
+    "reuse_SDE_demo_errors_or_policy_scores": false,
+    "planned_ID100_extension": "not launched; superseded by original-task mode repair",
+    "reference_reuse": "VLM-only PCA unaffected by action sampling; verify exact first-frame Bridge equivalence for all32 demos",
+    "eval_calibration_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_eval_ID_calibration_v4",
+    "eval_stage_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_stage_feedback_eval_v2",
+    "controller": "tools/run_opendrawer_eval_ID_calibration.py",
+    "full_demo_count": 32,
+    "full_policy_count": 50,
+    "two_GPU_parallel_shards": true,
+    "report": "docs/experiment_management/diagnostics/OpenDrawer_Inference_Mode_Repair_20260909.md"
   },
   "OpenDrawer_stage_comparison": {
-    "nominal_Goal_pid":1343725,
-    "nominal_Goal_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_goal_nominal_TASR_v1",
-    "nominal_Goal_plan":"docs/experiment_management/plans/OpenDrawer_Goal_TASR_Reference_20260909.md",
-    "smoke_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_direct_oracle_smoke_v5",
-    "smoke_raw_audit":"both stage settings passed independent raw/reset/action checks; Grasp3/4 and Goal4/4 oracle completion, not gate efficacy",
-    "Grasp_remaining_caveat":"at t120 seed1781220 direct_grasp reached pose tolerance failed even after planner mode repair; retained failure and all42 actions, no tuning to erase it",
-    "Goal_visual_audit":"main view occludes rear tray; wrist reset sees green tray and terminal sees blue object in green tray. Original model camera unchanged.",
-    "stage_controller":"tools/run_opendrawer_stage_feedback_pilots.py",
-    "stage_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_stage_feedback_v1",
-    "Grasp_pair":{"seed":1782000,"raw_per_arm":20,"GPU":"0","CPU":"0-3"},
-    "Goal_pair":{"seed":1783000,"raw_per_arm":20,"GPU":"1","CPU":"4-7"},
-    "feedback_rule":"displacement_v1",
-    "prerequisites":["nominal reference bank audit","both raw oracle audits","same successful-ID gate calibration audit","reserved GPUs free of nonbaseline processes"],
-    "completion":"TIMING_TASR_PILOTS_COMPLETE.json is only an intermediate marker; SFT/SR still pending"
+    "nominal_Goal_pid": 1343725,
+    "nominal_Goal_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_goal_nominal_TASR_v1",
+    "nominal_Goal_plan": "docs/experiment_management/plans/OpenDrawer_Goal_TASR_Reference_20260909.md",
+    "smoke_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_direct_oracle_smoke_v5",
+    "smoke_raw_audit": "both stage settings passed independent raw/reset/action checks; Grasp3/4 and Goal4/4 oracle completion, not gate efficacy",
+    "Grasp_remaining_caveat": "at t120 seed1781220 direct_grasp reached pose tolerance failed even after planner mode repair; retained failure and all42 actions, no tuning to erase it",
+    "Goal_visual_audit": "main view occludes rear tray; wrist reset sees green tray and terminal sees blue object in green tray. Original model camera unchanged.",
+    "stage_controller": "tools/run_opendrawer_stage_feedback_pilots.py",
+    "stage_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_stage_feedback_v1",
+    "Grasp_pair": {
+      "seed": 1782000,
+      "raw_per_arm": 20,
+      "GPU": "0",
+      "CPU": "0-3"
+    },
+    "Goal_pair": {
+      "seed": 1783000,
+      "raw_per_arm": 20,
+      "GPU": "1",
+      "CPU": "4-7"
+    },
+    "feedback_rule": "displacement_v1",
+    "prerequisites": [
+      "nominal reference bank audit",
+      "both raw oracle audits",
+      "same successful-ID gate calibration audit",
+      "reserved GPUs free of nonbaseline processes"
+    ],
+    "completion": "TIMING_TASR_PILOTS_COMPLETE.json is only an intermediate marker; SFT/SR still pending"
   },
   "current_execution_20260909": {
     "source_base_commit": "2619c2e5",
@@ -175,13 +201,35 @@
     "airplane": {
       "status": "original_v1_and_two_exploratory_candidate_streams_complete",
       "report": "docs/experiment_management/diagnostics/Pi05_Feedback_Commitment_Two_Streams_20260909.md",
-      "post_SFT_SR": null
+      "post_SFT_SR": null,
+      "SFT_interface": {
+        "data_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/sft_data_engineering_v2/airplane_candidate_stream1772000",
+        "both_arms_anchors": 1327,
+        "native_tail_mask_audit": "PASS",
+        "native_transformed_balanced_batch_audit": "PASS",
+        "real_model_training_smoke": false
+      }
     },
     "OpenDrawer": {
-      "status": "full_ID_reference_complete_ID_calibration_and_repaired_oracle_smoke_running",
-      "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_native_reference_pipeline_v1/controller_state.json",
-      "collector_source": "25a7f0cc",
-      "new_gate_collection_started": false,
+      "status": "original_eval_feedback_pilots_complete_null_soft_candidate_running",
+      "original_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_stage_feedback_eval_v2",
+      "Grasp": {
+        "budget": 325,
+        "TASR_x3": [
+          0.18461538461538463,
+          0.18461538461538463
+        ],
+        "training_data_identical": true
+      },
+      "Goal": {
+        "budget": 708,
+        "TASR_x3": [
+          0.2867231638418079,
+          0.2867231638418079
+        ],
+        "training_data_identical": true
+      },
+      "new_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
       "post_SFT_SR": null
     }
   },
@@ -193,7 +241,8 @@
     "legacy_required_fraction": 0.8,
     "user_override_requested": true,
     "user_override_received": false,
-    "scope": "Hold StackCube training admission pending explicit natural-composition exception; continue authorized timing/TASR and other task diagnostics."
+    "scope": "Hold StackCube training admission pending explicit natural-composition exception; continue authorized timing/TASR and other task diagnostics.",
+    "latest_question": "Allow natural ID/OOD composition and transparently reported preliminary OpenDrawer base for this ablation?"
   },
   "runtime_deployment": {
     "code_commit": "651372c3",
@@ -221,15 +270,14 @@
     "output_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1"
   },
   "process": {
-    "controller_pid": 1307826,
+    "controller_pid": 1409675,
     "worker_pids": {
-      "ID_calibration": 1336534,
-      "oracle_smoke": 1336653
+      "grasp_fixed": 1409719,
+      "goal_fixed": 1409720
     },
-    "source_commit": "2619c2e5",
-    "oracle_source_commit": "25a7f0cc",
-    "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_native_reference_pipeline_v1/controller_state.json",
-    "phase_marker": "REFERENCE_CALIBRATION_COMPLETE.json",
+    "source_commit": "8ec60c40",
+    "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1/controller_state.json",
+    "phase_marker": "TIMING_TASR_PILOTS_COMPLETE.json",
     "whole_pipeline_complete": false
   },
   "plan": "docs/experiment_management/plans/Pi05_Timing_Feedback_Ablation.md",

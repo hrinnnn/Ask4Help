@@ -33,4 +33,8 @@
 - 同样的whole-successful-suffix预算规则、TASR×1/×2/×3；报告misses、实际专家成本、ID/OOD组成，不删除负例。
 - 首先判断真实timing是否改变；再看TASR是否朝有利方向变化。若仅激活增加而TASR不升，不能说反馈有效。最终学习结论仍需独立post-SFT SR。
 
+### 区分冷启动与支持规则
+
+在读取新soft反馈结果之前，追加登记同样1784000/1785000、40raw的hard_radius反馈控制。复用各stage的新fixed数据，不额外生成fixed；各反馈arm仍各自空记忆。这样可区分“40raw本身使原规则开始有效”与“soft support提供额外作用”。不得只报告较好的反馈版本；最终SR验证仍须使用明确冻结的版本。
+
 假设与检验按Hypothesis Generation skill分开记录；工具归属已在Scientific_Skills_Use_20260909.md记录，不作本方法效果证据。
