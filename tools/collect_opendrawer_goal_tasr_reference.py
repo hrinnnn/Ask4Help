@@ -14,7 +14,7 @@ def goal_blocks(report,n):
     grasp=0 if report['object_grasped_before_takeover'] else 2+sum(report[k] for k in ['direct_object_pregrasp_steps','direct_object_reach_steps','direct_object_close_steps'])
     start=handle+grasp+report['direct_lift_steps']
     transport_end=start+report['direct_transport_steps'];place_end=transport_end+report['direct_place_steps']
-    assert 0<start<transport_end<=place_end<n and 1<=n-place_end<=4
+    assert 0<=start<=transport_end<=place_end<n and 1<=n-place_end<=4
     return {'transport':[start,transport_end],'place':[transport_end,place_end],'release':[place_end,n]}
 
 

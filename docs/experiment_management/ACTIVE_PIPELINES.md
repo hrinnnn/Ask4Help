@@ -2,6 +2,8 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **04:35后续**：v5 Grasp/Goal oracle smoke均完成并通过独立raw/reset/action审计，完成数分别3/4与4/4；Grasp t120的一条direct-grasp失败在修正planner后仍保留，不改专家来消除负例。Goal主相机遮挡后方tray，但wrist reset/terminal可见绿盘与最终蓝块，已人工查看。Goal nominal TASR bank（fresh1786000–29）worker1343725已完成至少19个raw/19成功，GPU1；只做评价参考，不进入gate。
+- 已写好stage controller：nominal bank→独立Goal metric calibration→ID gate audit→Grasp/Goal各20raw×2arms并行→各自TASR。种子1782000/1783000，原displacement_v1，均空记忆；不把新commitment候选偷偷并入OD。源码和运行记录使用GitHub部署分支，原正式工作分支HTTPS push仍不稳定。最终训练/SR仍未启动。
 - **04:21更新**：128-ID/22973-anchor/rank1000 native PCA已完成，controller1307826自动启动ID校准worker1336534（GPU0）。修复direct-oracle初始planner_mode与reset记录时点后，smoke v5/grasp worker1336653在GPU1。v3的t120 OOD失败仍属错误planner初始化的工程诊断，不计入gate比较；v4因发布确认失败在模型加载时停止。现用GitHub已核实同树部署commit25a7f0cc（API发布分支codex/pi05-feedback-deployment，等价本地79df1bbc），正式工作分支推送网络暂不稳定。
 - Grasp-OOD TASR原18-reference/6-check小包已导出；6条旧检查轨迹数值回归通过，未改变阈值。Goal-OOD不得借用抓取target定义。没有新OD反馈配对结果，也没有SFT启动。
 - **04时段真实更新**：原Plane v1配对20raw/arm已完成，实际时机完全相同，matched828 TASR×3=104/828两组相同。独立饱和夹爪候选commitment_v2两条新stream均完成；1772000 matched1327为200/1327→345/1327（15.07→26.00%），成本2247→2497；1773000 OOD时机中位数提前15，但共同整后缀预算167只剩ID、TASR=0→0，不作为OOD验证成功。完整结果见候选报告；没有启动SFT。
