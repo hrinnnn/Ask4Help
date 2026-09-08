@@ -31,8 +31,8 @@ def run(args):
         for k,row in enumerate(rows):
             raw=raw_row(row);value=runtime.reference_bridge(raw)
             if k==0:
-                shape=(1,runtime.model.config.action_horizon,runtime.model.config.action_dim)
-                check=runtime.bridge(raw,torch.zeros(shape,device='cuda'))
+                _prediction,prior=runtime.predict(raw,1785000+i)
+                check=runtime.bridge(raw,prior)
                 error=float(np.max(abs(value-check)));assert error<1e-6,error
                 equivalence.append({'episode':i,'maximum_difference':error})
             values.append(value)
