@@ -110,13 +110,26 @@ def main(args):
                                'hand_camera':{'rgb':torch.from_numpy(wrist).unsqueeze(0)}}}
     selected=np.linspace(0,len(episodes)-1,min(args.demo_episodes,len(episodes)),dtype=int)
     demo_rows=[];reversals=[];error_maxima=[]
+    reused_demos={}
+    reused_policies=[]
+    if args.reuse_calibration is not None:
+        old_demos=json.loads((args.reuse_calibration/'demo_progress.json').read_text())
+        reused_policies=json.loads((args.reuse_calibration/'ID_policy_progress.json').read_text())
+        assert [r['episode'] for r in old_demos]==selected.tolist()
+        assert len(reused_policies)==50 and args.policy_episodes==100
+        assert sum(r['calibration_success'] for r in reused_policies)<20
+        assert [r['seed'] for r in reused_policies]==list(range(args.seed,args.seed+50))
+        reused_demos={r['episode']:r for r in old_demos}
     offsets=np.cumsum([0]+[e['length'] for e in episodes])
     for j,episode in enumerate(selected):
-        rows=pq.read_table(dataset/f'data/chunk-000/episode_{episode:06d}.parquet').to_pylist()
-        actions=np.asarray([r['actions'] for r in rows]);states=np.asarray([r['state'] for r in rows])
+        columns=['state'] if reused_demos else None
+        rows=pq.read_table(dataset/f'data/chunk-000/episode_{episode:06d}.parquet',columns=columns).to_pylist()
+        states=np.asarray([r['state'] for r in rows])
+        actions=None if reused_demos else np.asarray([r['actions'] for r in rows])
         positions=panda_tcp(states,urdf);width=states[:,-2:].sum(1)
-        errors=[]
-        for k in range(len(rows)-4):
+        errors=list(reused_demos[int(episode)]['errors']) if reused_demos else []
+        if reused_demos:assert len(errors)==len(rows)-4
+        for k in range(0 if reused_demos else len(rows)-4):
             raw=raw_row(rows[k]);samples=[]
             for m in range(2):
                 prediction,model_action=runtime.predict(raw,271009+int(episode)*10000+k*3+m)
@@ -136,8 +149,9 @@ def main(args):
         progress('ID_expert_calibration',done=j+1,total=len(selected),last_max_error=max(errors))
     q_e=float(np.quantile(error_maxima,.95,method='higher'))
     q_r=float(np.quantile(reversals,.95,method='higher'))
-    policy_rows=[];success_maxima=[]
-    for episode in range(args.policy_episodes):
+    policy_rows=list(reused_policies)
+    success_maxima=[r['maximum'] for r in policy_rows if r['calibration_success']]
+    for episode in range(len(policy_rows),args.policy_episodes):
         env=runtime.build_env('id');seed=args.seed+episode
         raw,info=env.reset(seed=seed);scores=[];steps=0;strict=False;ever_grasped=False
         while steps<runtime.horizon:
@@ -167,6 +181,7 @@ def main(args):
             'calibration_success_rule':'ever_grasped' if args.task=='airplane_yaw_ood' else 'strict',
             'provenance':runtime.provenance(),'reference_assets':asset_paths,
             'source_dataset':str(dataset),'array_file':'gate_arrays.npz'}
+    result.update(seed_start=args.seed,reused_calibration=str(args.reuse_calibration) if args.reuse_calibration else None)
     (args.output/'calibration.json').write_text(json.dumps(result,indent=2))
     (args.output/'CALIBRATION_COMPLETE.json').write_text(json.dumps({'task':args.task,'status':'ID_ONLY_CALIBRATION_COMPLETE'}))
     progress('complete',calibration=result)
@@ -176,6 +191,7 @@ if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--task',choices=list(ASSETS),required=True)
     p.add_argument('--manifest',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
     p.add_argument('--reference-asset',type=Path)
+    p.add_argument('--reuse-calibration',type=Path,help='Reuse completed32 ID-demo signals and insufficient first50 ID policies, then extend to100')
     p.add_argument('--demo-episodes',type=int,default=32);p.add_argument('--policy-episodes',type=int,default=50)
     p.add_argument('--seed',type=int,default=1740000);args=p.parse_args()
     try:main(args)

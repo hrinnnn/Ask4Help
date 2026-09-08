@@ -10,7 +10,14 @@ def audit(root):
     demos=json.loads((root/'demo_progress.json').read_text())
     policies=json.loads((root/'ID_policy_progress.json').read_text())
     assert len(demos)==cal['ID_demonstrations']==32
-    assert len(policies)==cal['policy_episodes']==50
+    assert len(policies)==cal['policy_episodes'] and len(policies) in [50,100]
+    if len(policies)==100:
+        previous=Path(cal['reused_calibration'])
+        original=json.loads((previous/'ID_policy_progress.json').read_text())
+        assert len(original)==50 and sum(r['calibration_success'] for r in original)<20
+        assert policies[:50]==original
+        assert demos==json.loads((previous/'demo_progress.json').read_text())
+        assert [r['seed'] for r in policies]==list(range(cal['seed_start'],cal['seed_start']+100))
     assert len({d['episode'] for d in demos})==len(demos)
     assert len({p['seed'] for p in policies})==len(policies)
     for d in demos:

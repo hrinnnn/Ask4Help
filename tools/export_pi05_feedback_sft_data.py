@@ -31,7 +31,7 @@ def run(args):
                           'actions':{'dtype':'float32','shape':(8,),'names':['actions']}})
             for output_index,r in enumerate(sources):
                 source=args.paired_root/arm/f'episode_{r["episode"]:04d}'/'trace.npz'
-                d=np.load(source);take=r['takeover'];n=r['expert_suffix_actions']
+                d=dict(np.load(source));take=r['takeover'];n=r['expert_suffix_actions']
                 assert len(d['actions'])==take+n and len(d['qpos'])==take+n+1
                 for k in range(take,take+n):
                     dataset.add_frame({'image':d['main'][k],'wrist_image':d['wrist'][k],

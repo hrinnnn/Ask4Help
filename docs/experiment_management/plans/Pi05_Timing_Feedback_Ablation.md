@@ -31,6 +31,10 @@ OpenDrawer作为第三项资格候选，不按效应大小选择。现有v9记�
 
 ## 关键判定
 
+2026-09-09 ID校准补样规格：若OpenDrawer首50条ID policy不足20条strict成功，复用原32条demo动作差异和首50条真实ID scores，在新目录补到固定100条（1781000–1781099）；保持同模型、PCA、q95和至少20条成功要求。旧50条失败marker保留，独立审计需证明旧demo和50条policy记录完全未变。此调整仅依据ID成功样本数量，不读取有/无feedback效果，不是逐次检验显著性后提前停止。
+
+训练接口预检：先把既有pilot的共同整后缀预算导出为原生LeRobot格式，检查最后真实action对应的observation仍保留、时间mask以及仅8个真实动作维度的loss。该工程预检不改变正式采集配额，不启动受门禁限制的SC训练，不把pilot数据或两步smoke冒充正式消融SR。
+
 - 当前query不能读取本episode稍后的专家动作；专家段结束后才产出一个cue，供后续episode使用。
 - 纠正证据优先；attribution是实际存在的上一个policy query，不是虚构更早状态。
 - 同初始阈值/同budget下的反馈增益不等于全局最佳takeover已被证明。

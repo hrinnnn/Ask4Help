@@ -34,8 +34,9 @@ def run(args):
         for split in ['grasp','goal']:
             smoke=args.smokes/split
             finish(*start(split+'_oracle_audit',command('audit_opendrawer_feedback_smoke.py','--root',smoke)))
-        cal=args.gate_root/'ID_calibration_native_v2'
-        wait_marker(args.gate_root/'REFERENCE_CALIBRATION_COMPLETE.json',[cal/'CALIBRATION_FAILED.json'],'waiting_successful_ID_gate_calibration')
+        cal=args.calibration or args.gate_root/'ID_calibration_native_v2'
+        completion=cal/'CALIBRATION_COMPLETE.json' if args.calibration else args.gate_root/'REFERENCE_CALIBRATION_COMPLETE.json'
+        wait_marker(completion,[cal/'CALIBRATION_FAILED.json'],'waiting_successful_ID_gate_calibration')
         finish(*start('ID_gate_audit',command('audit_pi05_feedback_calibration.py','--root',cal)))
         # Both H20 slots are reserved by this Goal; never occupy a new external job.
         state['stage']='waiting_reserved_GPUs';save()
@@ -68,4 +69,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser()
     for name in ['code','root','logs','bank','smokes','gate-root','grasp-reference']:
         p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--calibration',type=Path,help='Explicit successful-ID calibration extension root, preserving previous failed50 root')
     raise SystemExit(run(p.parse_args()))
