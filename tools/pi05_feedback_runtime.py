@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import numpy as np
+from pi05_timing_feedback import isolated_python_numpy_rng
 
 SOURCE_ROOTS = {
     'stackcube_legacy_ood': Path('/root/Ask4Help-online-awbc-code'),
@@ -76,7 +77,7 @@ class Pi05FeedbackRuntime:
 
     def predict(self, raw, rng_seed):
         torch=self.torch
-        with torch.random.fork_rng(devices=[torch.cuda.current_device()]):
+        with isolated_python_numpy_rng(rng_seed), torch.random.fork_rng(devices=[torch.cuda.current_device()]):
             torch.manual_seed(int(rng_seed));torch.cuda.manual_seed_all(int(rng_seed))
             with torch.inference_mode():
                 actions, result=self.model.predict_action_batch(env_obs=self.observation(raw),mode='train')

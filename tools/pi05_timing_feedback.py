@@ -5,7 +5,24 @@ collector owns observations, normal policy generation, episode completion and
 the expert budget; only commit() changes the memory used by later episodes.
 """
 from dataclasses import dataclass, field
+from contextlib import contextmanager
+import random
 import numpy as np
+
+
+@contextmanager
+def isolated_python_numpy_rng(seed):
+    """RLinf Flow-SDE chooses its stochastic step with Python random.
+
+    Forking only Torch leaves this source unpaired. Restore external state so
+    post-intervention diagnostics cannot perturb subsequent rollout randomness.
+    """
+    python_state, numpy_state = random.getstate(), np.random.get_state()
+    random.seed(int(seed)); np.random.seed(int(seed) % (2**32))
+    try:
+        yield
+    finally:
+        random.setstate(python_state); np.random.set_state(numpy_state)
 
 
 def action_block_error(predictions, expert_actions, block=5):

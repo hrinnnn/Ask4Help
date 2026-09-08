@@ -1,9 +1,21 @@
 import unittest
+import random
 import numpy as np
-from tools.pi05_timing_feedback import TimingFeedbackGate, action_block_error, corrective_motion, timing_cue
+from tools.pi05_timing_feedback import TimingFeedbackGate, action_block_error, corrective_motion, timing_cue, isolated_python_numpy_rng
 
 
 class TimingFeedbackTests(unittest.TestCase):
+    def test_external_rng_pairing_and_restoration(self):
+        random.seed(17); np.random.seed(21)
+        expected=(random.random(),np.random.rand())
+        random.seed(17); np.random.seed(21)
+        with isolated_python_numpy_rng(23009):
+            first=(random.randrange(10),np.random.rand())
+        with isolated_python_numpy_rng(23009):
+            second=(random.randrange(10),np.random.rand())
+        self.assertEqual(first,second)
+        self.assertEqual((random.random(),np.random.rand()),expected)
+
     def gate(self, enabled=True):
         return TimingFeedbackGate(1., np.zeros(2), 1., 1., enabled=enabled)
 
