@@ -36,7 +36,9 @@ def run(args):
             finish(*start(split+'_oracle_audit',command('audit_opendrawer_feedback_smoke.py','--root',smoke)))
         cal=args.calibration or args.gate_root/'ID_calibration_native_v2'
         completion=cal/'CALIBRATION_COMPLETE.json' if args.calibration else args.gate_root/'REFERENCE_CALIBRATION_COMPLETE.json'
-        wait_marker(completion,[cal/'CALIBRATION_FAILED.json'],'waiting_successful_ID_gate_calibration')
+        failures=[cal/'CALIBRATION_FAILED.json']
+        if args.calibration:failures.append(cal.parent/'ID_CALIBRATION_CONTROLLER_FAILED.json')
+        wait_marker(completion,failures,'waiting_successful_ID_gate_calibration')
         finish(*start('ID_gate_audit',command('audit_pi05_feedback_calibration.py','--root',cal)))
         # Both H20 slots are reserved by this Goal; never occupy a new external job.
         state['stage']='waiting_reserved_GPUs';save()
