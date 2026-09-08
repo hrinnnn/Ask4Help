@@ -73,6 +73,33 @@ def timing_cue(errors, error_reference, *, reversal=None,
     return None
 
 
+def gripper_commitment_opening(previous_commands, expert_commands, width_before, width_after):
+    """Opening against a sustained closing command, measured in metres."""
+    closing=max(0.,-float(np.mean(previous_commands)))
+    opening=max(0.,float(np.mean(expert_commands)))
+    return closing*opening*max(0.,float(width_after-width_before))
+
+
+def commitment_timing_cue(errors, error_reference, *, opening_score,
+                          opening_reference, reversal=None,
+                          reversal_reference=None, has_previous_query=False,
+                          block=5):
+    """Exploratory v2: distinguish saturated closed-gripper correction.
+
+    Ordinary release without policy/expert disagreement does not activate
+    this added rule. Existing displacement-based reversal has precedence.
+    """
+    original=timing_cue(errors,error_reference,reversal=reversal,
+                        reversal_reference=reversal_reference,
+                        has_previous_query=has_previous_query,block=block)
+    if original is not None and original['direction']==1:return original
+    disagreement=bool(len(errors) and errors[0] is not None and
+                      np.isfinite(errors[0]) and errors[0]>error_reference)
+    if has_previous_query and disagreement and opening_score>opening_reference:
+        return {'direction':1,'attribution':'previous_query','reason':'gripper_commitment_undo'}
+    return original
+
+
 @dataclass
 class TimingFeedbackGate:
     baseline_threshold: float

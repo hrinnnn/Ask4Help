@@ -2,9 +2,23 @@ import unittest
 import random
 import numpy as np
 from tools.pi05_timing_feedback import TimingFeedbackGate, action_block_error, corrective_motion, timing_cue, isolated_python_numpy_rng
+from tools.pi05_timing_feedback import gripper_commitment_opening, commitment_timing_cue
 
 
 class TimingFeedbackTests(unittest.TestCase):
+    def test_saturated_gripper_commitment_is_distinguished_from_keep(self):
+        opening=gripper_commitment_opening([-1]*5,[1]*5,0.,.079)
+        self.assertAlmostEqual(opening,.079)
+        self.assertEqual(timing_cue([.5],.1)['direction'],0)
+        cue=commitment_timing_cue([.5],.1,opening_score=opening,opening_reference=.01,has_previous_query=True)
+        self.assertEqual(cue['direction'],1)
+
+    def test_normal_release_or_unobserved_prior_does_not_advance(self):
+        self.assertEqual(commitment_timing_cue([.01]*5,.1,opening_score=.08,opening_reference=.01,has_previous_query=True)['direction'],-1)
+        self.assertEqual(commitment_timing_cue([.5],.1,opening_score=.08,opening_reference=.01,has_previous_query=False)['direction'],0)
+        self.assertEqual(gripper_commitment_opening([-1]*5,[-1]*5,0.,.08),0.)
+        self.assertEqual(commitment_timing_cue([.5],.1,opening_score=.08,opening_reference=.09,has_previous_query=True)['direction'],0)
+
     def test_external_rng_pairing_and_restoration(self):
         random.seed(17); np.random.seed(21)
         expected=(random.random(),np.random.rand())
