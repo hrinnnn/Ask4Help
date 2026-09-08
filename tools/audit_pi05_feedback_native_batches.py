@@ -1,5 +1,6 @@
 """CPU audit of the actual OpenPI transforms and exact source-balanced batches."""
-import argparse,dataclasses,json,sys
+import argparse,dataclasses,json,sys,os
+os.environ.setdefault('JAX_PLATFORMS','cpu')
 from pathlib import Path
 
 

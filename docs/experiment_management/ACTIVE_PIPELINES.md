@@ -2,6 +2,8 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **06时段当前执行**：正确eval校准已完整结束，32 demos/50 ID policies，33 strict成功，独立审计通过（gamma0.3362330496311188，q_e0.20073064610519734）。controller1368627已自动启动两个stage的真实paired20：Grasp controller1387638，Goal controller1387639；fixed均完成20，feedback workers1396060/1395890继续运行。实际state在 `opendrawer_stage_feedback_eval_v2`，旧SDE50不参与。
+- SFT工程数据两组1327完整样本已导出，原生reader尾mask/真实8维loss调用及实际1:1混合batch均通过。报告 `diagnostics/Pi05_Feedback_SFT_Interface_20260909.md`。尚未真实两步GPU训练或正式SFT；pending自然composition/preliminary基座例外未收到回答。
 - **模式协议修复，优先于以下旧状态**：旧OpenDrawer通用接口误用了Plane的train/SDE采样；原任务gated/fixed-timing/eval源码均为eval。旧50-ID仅10成功和32-demo动作误差保留为不同策略诊断，不再尝试直接补100。原VLM-only PCA和expert-only Goal nominal bank可保留；重新全量计算32 dense demos+50 policy的eval校准，双卡分片，新root `opendrawer_eval_ID_calibration_v4`。随后配对root为`opendrawer_stage_feedback_eval_v2`。原controllers1307826/1349662已终止失败，不重启；无任何OD on/off结果已被用于选择模式。
 - 训练工程接口已准备：native时间mask之外显式仅计算8维动作；pilot SFT数据导出v1因重复解压NPZ效率问题终止，源数据未变，修复后将在新目录重试。尚无SFT。自然composition/历史preliminary OD基座用于本次消融的例外已再次简明询问用户，未收到新决定。
 - **04:35后续**：v5 Grasp/Goal oracle smoke均完成并通过独立raw/reset/action审计，完成数分别3/4与4/4；Grasp t120的一条direct-grasp失败在修正planner后仍保留，不改专家来消除负例。Goal主相机遮挡后方tray，但wrist reset/terminal可见绿盘与最终蓝块，已人工查看。Goal nominal TASR bank（fresh1786000–29）worker1343725已完成至少19个raw/19成功，GPU1；只做评价参考，不进入gate。

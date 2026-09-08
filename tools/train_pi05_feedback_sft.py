@@ -3,7 +3,8 @@
 Derived from RLinf examples/sft/train_vla_sft.py (Apache-2.0).
 Only the worker class changes; optimizer, accumulation and checkpointing stay native.
 """
-import json,logging
+import json,logging,os
+os.environ.setdefault('JAX_PLATFORMS','cpu')
 import hydra
 import torch.multiprocessing as mp
 from omegaconf import OmegaConf
@@ -12,12 +13,15 @@ from rlinf.runners.sft_runner import SFTRunner
 from rlinf.scheduler import Cluster
 from rlinf.utils.placement import HybridComponentPlacement
 from pi05_feedback_sft_worker import FeedbackVlaSftWorker
+from pi05_feedback_ray_isolation import install as isolate_ray
 
 mp.set_start_method('spawn',force=True)
 
 
 @hydra.main(version_base='1.1',config_path=None,config_name=None)
 def main(cfg):
+    assert cfg.cluster.num_nodes==1
+    isolate_ray()
     cfg=validate_cfg(cfg)
     logging.info(json.dumps(OmegaConf.to_container(cfg,resolve=True),indent=2))
     cluster=Cluster(cluster_cfg=cfg.cluster);placement=HybridComponentPlacement(cfg,cluster)
