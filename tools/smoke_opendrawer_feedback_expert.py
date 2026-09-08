@@ -20,6 +20,7 @@ def main(args):
         for split in ['id','ood']:
             seed=args.seed+requested
             env=runtime.build_env(split);raw,_=env.reset(seed=seed)
+            metadata=runtime.reset_metadata(env,split=split)
             snapshots=[runtime.snapshot(env,raw)];actions=[];queries=[];ended=False
             while len(actions)<requested and not ended:
                 step=len(actions);pred,_=runtime.predict(raw,seed*1000+step)
@@ -29,7 +30,6 @@ def main(args):
                     ended=bool(term) or bool(trunc) or bool(info['success'])
                     if ended:break
             takeover=len(actions);initial=snapshots[-1]
-            metadata=runtime.reset_metadata(env,split=split)
             result={'actions':[],'snapshots':[],'all_actions':[],'all_snapshots':[],
                     'report':{'accepted':False,'reason':'policy_ended_before_takeover'}}
             if not ended:

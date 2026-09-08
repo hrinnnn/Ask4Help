@@ -182,6 +182,10 @@ class Pi05FeedbackRuntime:
                 return result
         if remaining_actions<=0:raise ValueError('no expert action budget remains')
         planner=PandaPosePlannerClient()
+        # The original direct-oracle launch sets shortest_joint_path.
+        # Closed-drawer handling temporarily switches to screw_then_qpos;
+        # already-open takeovers must also begin in the object planner mode.
+        planner.planner_mode='shortest_joint_path'
         try:
             with isolated_python_numpy_rng(seed+600000):
                 report=oracle.continue_episode(Proxy(),planner,seed=seed)
