@@ -86,7 +86,8 @@ class Pi05FeedbackRuntime:
     def bridge(self, raw, model_actions):
         torch=self.torch
         with torch.inference_mode():
-            layers=self.model.extract_multilayer_llmd_features(self.observation(raw),torch.zeros_like(model_actions))
+            prior=torch.zeros_like(model_actions).reshape(-1,self.model.config.action_horizon,self.model.config.action_dim)
+            layers=self.model.extract_multilayer_llmd_features(self.observation(raw),prior)
         return layers['vlm_bridge_final_mean'].detach().float().cpu().numpy().reshape(-1)
 
     @staticmethod
