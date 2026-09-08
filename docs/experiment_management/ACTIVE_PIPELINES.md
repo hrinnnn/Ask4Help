@@ -2,6 +2,9 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- 用户追加授权：OpenDrawer不同OOD stage也可作为两项条件；先报真实Timing与TASR，再持久后台训练，最终仍补SR。新信息已写入manifest/plan。
+- 真实前向`runtime_smoke_v3_prior`已完成：SC与Plane分别ID/OOD同query配对动作差0，均10×8 actions与2048维Bridge，384×384双RGB，实际每split执行5动作。v1发现Python random未配对，v2发现prior扁平维度，修复后通过；这些是工程smoke，不是rollout SR。当前无smoke进程，下一步ID校准/真实专家采集接入，并盘点OpenDrawer。
+
 - 新授权完整消融pipeline=`pi05_timing_feedback_ablation_v1`，owner=`01a07faa-682a-7e01-9d5b-eeac5b96864d`；manifest=`configs/pipelines/pi05_timing_feedback_ablation_v1.json`，plan=`docs/experiment_management/plans/Pi05_Timing_Feedback_Ablation.md`。
 - 主任务StackCube/Grab Plane，固定gate与有反馈gate；完成新采集、同预算SFT、独立ID/OOD SR和论文LaTeX。旧X-VLA探针不替代新π0.5结果，OpenDrawer需先核实资格。
 - 首次预检：H20原任务weights/norm/ID数据存在，原生Torch/NumPy导入通过；反馈核心9测试通过。当前`asset_runtime_preflight`，下一阶段`paired_smoke_then_ID_calibration`；尚无新GPU作业，不报告运行中。

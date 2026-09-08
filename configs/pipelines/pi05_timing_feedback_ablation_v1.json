@@ -1,6 +1,7 @@
 {
   "pipeline_id": "pi05_timing_feedback_ablation_v1",
   "authorized": true,
+  "latest_user_decision": {"date":"2026-09-09","allow_multiple_OpenDrawer_OOD_stages_as_task_settings":true,"report_order":["actual_takeover_timing","TASR_on_collected_expert_data","post_SFT_success_rate"],"training_may_continue_in_background_after_timing_TASR_report":true,"final_goal_still_requires_training_and_SR":true,"note":"OpenDrawer stage alternatives are authorized candidates, not permission to overwrite older pipelines or fabricate results."},
   "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
   "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
   "current_stage": "paired_RGB_action_bridge_smoke",
