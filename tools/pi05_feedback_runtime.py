@@ -15,6 +15,8 @@ from pi05_timing_feedback import isolated_python_numpy_rng
 SOURCE_ROOTS = {
     'stackcube_legacy_ood': Path('/root/Ask4Help-online-awbc-code'),
     'airplane_yaw_ood': Path('/root/Ask4Help-pick-airplane-four-group'),
+    'open_drawer_grasp_ood': Path('/root/Ask4Help-pick-airplane-four-group'),
+    'open_drawer_goal_ood': Path('/root/Ask4Help-pick-airplane-four-group'),
 }
 
 
@@ -37,6 +39,16 @@ class Pi05FeedbackRuntime:
             self.instruction = STACK_CUBE_TASK
             self.reset_metadata = reset_metadata
             self.horizon = 100
+        elif task.startswith('open_drawer_'):
+            import rlinf.envs.maniskill as package
+            snapshot_path=Path(__file__).parent/'runtime_snapshots/opendrawer'
+            package.__path__.insert(0,str(snapshot_path))
+            from rlinf.envs.maniskill.open_drawer_retrieve_place_spec import TASK_INSTRUCTION, ENV_IDS, reset_metadata
+            import rlinf.envs.maniskill.open_drawer_retrieve_place
+            self.instruction=TASK_INSTRUCTION;self.open_drawer_ids=ENV_IDS
+            self.ood_split='grasp_ood' if task.endswith('grasp_ood') else 'goal_ood'
+            self.reset_metadata=lambda env,split:reset_metadata(env,split=split if split=='id' else self.ood_split)
+            self.horizon=400
         else:
             from rlinf.envs.maniskill.pick_single_ycb_airplane_variants import PICK_SINGLE_YCB_AIRPLANE_TASK, reset_metadata
             from toolkits.lerobot.collect_maniskill_pick_single_ycb_airplane_lerobot import _build_env
@@ -63,6 +75,13 @@ class Pi05FeedbackRuntime:
     def build_env(self, split):
         if self.task == 'stackcube_legacy_ood':
             return self.helper._build_env(self.horizon,task='stack',split=split,sim_backend='physx_cpu')
+        if self.task.startswith('open_drawer_'):
+            import gymnasium as gym
+            actual=split if split=='id' else self.ood_split
+            return gym.make(self.open_drawer_ids[actual],robot_uids='panda_wristcam',num_envs=1,obs_mode='rgb',
+                            control_mode='pd_joint_delta_pos',sim_backend='physx_cpu',reward_mode='sparse',
+                            sim_config={'sim_freq':100,'control_freq':10},sensor_configs={'width':384,'height':384},
+                            max_episode_steps=400,render_mode='rgb_array')
         args = argparse.Namespace(split=split,image_size=384,control_freq=10,
                                   max_episode_steps=self.horizon,sim_backend='physx_cpu')
         return self.airplane_build_env(args,control_mode='pd_joint_delta_pos')

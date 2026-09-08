@@ -69,7 +69,7 @@ def main(args):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser()
-    p.add_argument('--task',choices=['stackcube_legacy_ood','airplane_yaw_ood'],required=True)
+    p.add_argument('--task',choices=['stackcube_legacy_ood','airplane_yaw_ood','open_drawer_grasp_ood','open_drawer_goal_ood'],required=True)
     p.add_argument('--manifest',type=Path,required=True)
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--seed',type=int,default=1730101)
