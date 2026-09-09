@@ -2,6 +2,8 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **08:45自主诊断完成**：20配对seed完全无接管复跑，ID抓起/抬起11/20、strict7/20；Goal-OOD均0/20，所有旧gate之前的动作差为0。不是单纯接管截断，当前基座/批次存在前置能力问题，不作为干净post-grasp timing验证；原数据全部保留。报告 `OpenDrawer_Goal_Autonomy_Censoring_20260909.md`。
+- 已自动启动冻结commitment_v2的跨任务复现：controller1470507，StackCube seed1774000、PickPlane1775000，各arm40raw，hard_radius及其余参数不变。root `commitment_replication40_v1`，source5c960d57。StackCube opening只用32-ID得到0并沿用10mm下限。不是新的阈值搜索，不混入Soft支持修改；正式训练仍待准入决定。
 - **08:35三组完成**：同40seed hard控制和三组共同预算已全部完成。Grasp B221时Fixed/Hard/Soft TASR×3均19/221；Goal B919均305/919。Goal Hard推迟4条、Soft10条，各5动作；没有TASR收益。成功专家成本Goal982→983，失败432→415，不把总成本小降称为成功数据效率提高。报告 `Pi05_Feedback_Three_Arm_40_Results_20260909.md`。
 - 当前是同seed无接管开发复跑：controller1464038，ID/OOD workers1464544/1464545，root `opendrawer_goal_autonomy_diagnostic_v1`，source622ef779。目标为区分被接管截断与前置抓取失败；不是post-SFT或reserved测试。最终测试9,100,000系列种子已冻结未用。StackCube的commitment候选ID参考已算好（32demo/q95=0/floor10mm），尚未新采集。正式SFT仍待准入决定。
 - **Soft40完整结果**：Grasp共同B221，TASR×3=19/221两组相同，新增1条失败报警导致专家成本510→540。Goal10条OOD配对接管推迟5步，但共同B920的TASR×3=304/920→303/920（33.04→32.93%）；成功专家动作982→983，失败段432→415，所以总成本减少不能包装成成功数据效率提升。hard40控制已自动运行，尚待三组同预算报告。

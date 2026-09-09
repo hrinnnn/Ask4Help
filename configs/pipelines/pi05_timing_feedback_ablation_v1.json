@@ -15,7 +15,7 @@
   },
   "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
   "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
-  "current_stage": "three_arm_pilots_complete_autonomous_censoring_probe",
+  "current_stage": "commitment_v2_frozen_cross_task_replication",
   "render_recovery": {
     "failed_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
     "complete_fixed_prefixes": {
@@ -31,7 +31,7 @@
     "observed_open_fds": 91,
     "feedback_started": true
   },
-  "next_stage": "audit_autonomous_stage_events_then_frozen_candidate_and_training_admission",
+  "next_stage": "paired40_TASR_then_training_admission_and_policy_update",
   "soft_support_candidate": {
     "status": "40_raw_three_arm_complete_no_clear_TASR_gain",
     "plan": "docs/experiment_management/plans/Pi05_Feedback_Soft_Support_Candidate.md",
@@ -310,14 +310,10 @@
     "output_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1"
   },
   "process": {
-    "controller_pid": 1464038,
-    "worker_pids": {
-      "id_autonomy": 1464544,
-      "ood_autonomy": 1464545
-    },
-    "source_commit": "622ef779",
-    "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_goal_autonomy_diagnostic_v1/controller_state.json",
-    "phase_marker": "AUTONOMY_PROBE_COMPLETE.json",
+    "controller_pid": 1470507,
+    "source_commit": "5c960d57",
+    "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_replication40_v1/controller_state.json",
+    "phase_marker": "COMMITMENT_REPLICATION_COMPLETE.json",
     "whole_pipeline_complete": false
   },
   "plan": "docs/experiment_management/plans/Pi05_Timing_Feedback_Ablation.md",
@@ -546,7 +542,24 @@
     "protocol": "configs/pipelines/opendrawer_goal_autonomous_diagnostic_v1.json",
     "purpose": "Resolve takeover censoring versus upstream failure, not reserved final SR",
     "seed_start": 1785000,
-    "episodes_per_split": 20
+    "episodes_per_split": 20,
+    "status": "complete_audited",
+    "results": {
+      "ID": {
+        "episodes": 20,
+        "grasped": 11,
+        "lifted": 11,
+        "strict": 7
+      },
+      "Goal_OOD": {
+        "episodes": 20,
+        "grasped": 0,
+        "lifted": 0,
+        "strict": 0
+      },
+      "prefix_action_max_difference": 0
+    },
+    "interpretation": "Current base/development cohort has upstream grasp failure under Goal-OOD; not a clean post-grasp timing test. Raw results preserved; not final SR."
   },
   "reserved_evaluation_protocol": "configs/pipelines/pi05_feedback_reserved_evaluation_v1.json",
   "reserved_evaluation_used": false,
@@ -556,5 +569,12 @@
     "ID_q95": 0,
     "opening_reference_m": 0.01,
     "new_collection_started": false
+  },
+  "commitment_replication": {
+    "protocol": "configs/pipelines/pi05_commitment_replication_v1.json",
+    "root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_replication40_v1",
+    "controller_pid": 1470507,
+    "status": "running",
+    "SFT_started": false
   }
 }
