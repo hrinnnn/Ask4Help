@@ -14,7 +14,7 @@ def run(a):
     seeds=list(range(specification[a.split+'_start'],specification[a.split+'_start']+protocol['episodes_per_split']))
     assets={**manifest['task_assets'][a.task],'checkpoint':str(a.checkpoint)}
     runtime=Pi05FeedbackRuntime(a.task,assets);runtime.inference_mode='eval';runtime.torch.set_num_threads(4)
-    provenance={'purpose':'reserved_final_evaluation','runtime':runtime.provenance(),'task':a.task,'split':a.split,
+    provenance={'purpose':protocol.get('evaluation_role','reserved_final_evaluation'),'runtime':runtime.provenance(),'task':a.task,'split':a.split,
                 'protocol':str(a.protocol),'seeds':seeds,'primary_endpoint':specification['primary_endpoint'],
                 'base_checkpoint':manifest['task_assets'][a.task]['checkpoint'],'expert_or_gate_used':False}
     rows=[]

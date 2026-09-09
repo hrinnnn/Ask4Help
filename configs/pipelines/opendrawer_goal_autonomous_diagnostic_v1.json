@@ -1,0 +1,19 @@
+{
+  "evaluation_role": "diagnostic_autonomous",
+  "purpose": "Resolve takeover censoring versus upstream failure on the already-used development seeds, not final held-out SR.",
+  "episodes_per_split": 20,
+  "inference_mode": "eval",
+  "tasks": {
+    "open_drawer_goal_ood": {
+      "id_start": 1785000,
+      "ood_start": 1785000,
+      "primary_endpoint": "strict_success"
+    }
+  },
+  "controls": "Same task base checkpoint, prompt, norm, reset seeds and policy query RNG as the 40-raw gated pilot.",
+  "questions": [
+    "Does the autonomous policy grasp/lift after the recorded baseline gate time?",
+    "How often does Goal-OOD impair grasp before the nominal placement stage, relative to paired ID?"
+  ],
+  "boundary": "Never interpret absent grasp in a gate-truncated prefix as proof that the autonomous policy cannot grasp."
+}
