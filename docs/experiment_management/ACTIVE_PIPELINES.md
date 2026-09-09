@@ -2,6 +2,7 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **训练工程预检准备**：当前StackCube fixed40成功后缀为20OOD+3ID（不是旧pilot的75%）；是否正式可用仍待完整arm/协议验收。已准备独立2-update训练+重载流程，在StackCube本轮paired完成、GPU0实际空闲后，使用已验收的PickPlane1327样本工程数据验证SFT链路。只做2步，不作为正式SFT/效应数据，不绕过正式训练准入；原reserved测试seed不使用。checkpoint先写独立/dev/shm任务目录，重载通过后复制到OSS，保留scratch。
 - **08:45自主诊断完成**：20配对seed完全无接管复跑，ID抓起/抬起11/20、strict7/20；Goal-OOD均0/20，所有旧gate之前的动作差为0。不是单纯接管截断，当前基座/批次存在前置能力问题，不作为干净post-grasp timing验证；原数据全部保留。报告 `OpenDrawer_Goal_Autonomy_Censoring_20260909.md`。
 - 已自动启动冻结commitment_v2的跨任务复现：controller1470507，StackCube seed1774000、PickPlane1775000，各arm40raw，hard_radius及其余参数不变。root `commitment_replication40_v1`，source5c960d57。StackCube opening只用32-ID得到0并沿用10mm下限。不是新的阈值搜索，不混入Soft支持修改；正式训练仍待准入决定。
 - **08:35三组完成**：同40seed hard控制和三组共同预算已全部完成。Grasp B221时Fixed/Hard/Soft TASR×3均19/221；Goal B919均305/919。Goal Hard推迟4条、Soft10条，各5动作；没有TASR收益。成功专家成本Goal982→983，失败432→415，不把总成本小降称为成功数据效率提高。报告 `Pi05_Feedback_Three_Arm_40_Results_20260909.md`。
