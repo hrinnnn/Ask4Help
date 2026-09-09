@@ -1,5 +1,5 @@
 """Ordinary BC worker with explicit real-action dimension and temporal masking."""
-import torch
+import torch,os
 from rlinf.models.embodiment.base_policy import ForwardType
 from rlinf.workers.sft.fsdp_vla_sft_worker import FSDPVlaSftWorker
 
@@ -17,6 +17,16 @@ class SizedMaskedLoader:
 
 
 class FeedbackVlaSftWorker(FSDPVlaSftWorker):
+    def __init__(self,cfg):
+        expected=os.environ.get('FEEDBACK_ASSIGNED_GPU')
+        if expected is not None:
+            assert os.environ.get('CUDA_VISIBLE_DEVICES')==expected,'Unexpected physical GPU assignment'
+        super().__init__(cfg)
+        cpu=os.environ.get('FEEDBACK_ASSIGNED_CPUS')
+        if cpu:
+            lo,hi=map(int,cpu.split('-'));os.sched_setaffinity(0,range(lo,hi+1))
+            torch.set_num_threads(hi-lo+1)
+
     def build_dataloader(self,data_paths,eval_dataset=False):
         loader,config=super().build_dataloader(data_paths,eval_dataset=eval_dataset)
         if not eval_dataset:

@@ -6,6 +6,7 @@ Only the worker class changes; optimizer, accumulation and checkpointing stay na
 import json,logging,os
 os.environ.setdefault('JAX_PLATFORMS','cpu')
 import hydra
+import ray
 import torch.multiprocessing as mp
 from omegaconf import OmegaConf
 from rlinf.config import validate_cfg
@@ -22,13 +23,16 @@ mp.set_start_method('spawn',force=True)
 def main(cfg):
     assert cfg.cluster.num_nodes==1
     isolate_ray()
-    cfg=validate_cfg(cfg)
-    logging.info(json.dumps(OmegaConf.to_container(cfg,resolve=True),indent=2))
-    cluster=Cluster(cluster_cfg=cfg.cluster);placement=HybridComponentPlacement(cfg,cluster)
-    assert cfg.actor.training_backend in ['fsdp','fsdp2']
-    actor=FeedbackVlaSftWorker.create_group(cfg).launch(cluster,name=cfg.actor.group_name,
-                                                       placement_strategy=placement.get_strategy('actor'))
-    runner=SFTRunner(cfg=cfg,actor=actor);runner.init_workers();runner.run()
+    try:
+        cfg=validate_cfg(cfg)
+        logging.info(json.dumps(OmegaConf.to_container(cfg,resolve=True),indent=2))
+        cluster=Cluster(cluster_cfg=cfg.cluster);placement=HybridComponentPlacement(cfg,cluster)
+        assert cfg.actor.training_backend in ['fsdp','fsdp2']
+        actor=FeedbackVlaSftWorker.create_group(cfg).launch(cluster,name=cfg.actor.group_name,
+                                                           placement_strategy=placement.get_strategy('actor'))
+        runner=SFTRunner(cfg=cfg,actor=actor);runner.init_workers();runner.run()
+    finally:
+        if ray.is_initialized():ray.shutdown()
 
 
 if __name__=='__main__':main()
