@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-from tools.pi05_timing_feedback import TimingFeedbackGate
+from tools.pi05_timing_feedback import TimingFeedbackGate, observed_agreement_steps
 
 class DeferredAlarmTests(unittest.TestCase):
     def gate(self):
@@ -24,3 +24,15 @@ class DeferredAlarmTests(unittest.TestCase):
         g=self.gate();g.query([0],1.05,10);g.begin_episode(3)
         self.assertIsNone(g.pending_alarm)
         self.assertFalse(g.query([3],.1,0)['stop'])
+    def test_measured_duration_expires_without_restarting(self):
+        g=self.gate();g.use_later_duration=True
+        g.memory[0]['later_valid_steps']=15
+        self.assertFalse(g.query([0],1.05,10)['stop'])
+        self.assertFalse(g.query([0],.1,20)['stop'])
+        self.assertTrue(g.query([0],.1,25)['stop'])
+    def test_gripper_mismatch_is_not_diluted_by_arm_agreement(self):
+        blocks=[dict(offset=k,overall_MSE=.06,gripper_sign_disagreement=0.) for k in [0,5,10]]
+        blocks[2]['gripper_sign_disagreement']=.2
+        self.assertEqual(observed_agreement_steps(blocks,.18),10)
+    def test_no_extrapolation_past_observed_prefix(self):
+        self.assertEqual(observed_agreement_steps([dict(offset=0,overall_MSE=.01,gripper_sign_disagreement=0.)],.18),5)

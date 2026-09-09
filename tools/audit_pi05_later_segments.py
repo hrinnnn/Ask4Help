@@ -11,9 +11,13 @@ def main(a):
     runtime.torch.set_num_threads(4);runtime.load_model()
     cal=json.loads((a.calibration/'calibration.json').read_text())
     rows=json.loads((a.collection/'summary.json').read_text())['rows']
+    selected=[('development_later',row) for row in rows if row.get('cue') and row['cue']['direction']==-1] if a.all_later else [('development_case',rows[i]) for i in [1,3,7,17]]
+    if a.id_control_collection:
+        controls=json.loads((a.id_control_collection/'summary.json').read_text())['rows']
+        selected += [('ID_expert_control',row) for row in controls if row['split']=='id' and row['accepted']]
     reports=[]
-    for episode in [1,3,7,17]:
-        row=rows[episode];directory=Path(row['artifact_directory'])
+    for group,row in selected:
+        episode=row['episode'];directory=Path(row['artifact_directory'])
         with np.load(directory/'trace.npz') as data:
             qpos=data['qpos'];main_rgb=data['main'];wrist=data['wrist'];actions=data['actions']
         env=runtime.build_env(row['split']);env.reset(seed=row['seed'])
@@ -30,7 +34,7 @@ def main(a):
                 per_dimension_MSE=sq.mean(axis=(0,1)).tolist(),predictions=pred.tolist(),expert_actions=targets.tolist(),
                 passes_old_threshold=bool(sq.mean()<=cal['error_reference'])))
         env.close()
-        reports.append(dict(episode=episode,source=str(directory),takeover=t,old_cue=row['cue'],blocks=blocks))
+        reports.append(dict(group=group,episode=episode,source=str(directory),takeover=t,old_cue=row['cue'],blocks=blocks))
         (a.output/'progress.json').write_text(json.dumps({'completed_cases':len(reports),'last_episode':episode}))
         print(json.dumps({'episode':episode,'blocks':[{k:v for k,v in b.items() if k not in ['predictions','expert_actions','per_dimension_MSE']} for b in blocks]}),flush=True)
     report=dict(scope='diagnostic on prior development expert states; not autonomous continuation or fresh validation',
@@ -41,4 +45,6 @@ def main(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser()
     for key in ['manifest','calibration','collection','output']:p.add_argument('--'+key,type=Path,required=True)
+    p.add_argument('--all-later',action='store_true')
+    p.add_argument('--id-control-collection',type=Path)
     main(p.parse_args())

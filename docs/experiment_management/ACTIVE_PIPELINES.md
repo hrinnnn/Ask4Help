@@ -2,6 +2,8 @@
 
 ## 2026-09-09 用户授权：修正过度推迟机制（仍不训练）
 
+- 4case完整expert片段前向审计已完成，root`later_segment_audit_v1`、code142810d8，明确发现offset10夹爪方向20%不一致仍被整体MSE判为一致。新可选pending报警＋measured Later时长原型25测试通过，尚未接collector。后续执行按独立worktree计划`docs/experiment_management/plans/Pi05_Later_Repair_20260909.md`：全部开发Later审计、ID开合边界检查、接入/审计、新seed1870000配对、1880000独立BA；用户已授权继续改进，无训练。旧Small30继续完成，不能结束旧诊断后遗忘本修订。
+
 - 同owner认领新的局部诊断与修订。旧Small30继续完成，不改原运行参数。
 - 已核实episode17第10步阈值仅从0.7149提高到0.7255；暂缓首次crossing后，分数下降导致原alarm被遗忘，第25步direction已转正仍未接管，直到55。保持旧memory/实际prefix的离线反事实中pending-alarm修订使55→25；episode7仅50→45，说明此项修订不充分。
 - 已本地实现可选remember_deferred_alarm，默认关闭，22项相关测试通过。下一项为开发数据4条完整expert suffix的机械臂/夹爪分项误差前向审计；不改变gate、不启动训练。

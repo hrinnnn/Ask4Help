@@ -115,6 +115,7 @@ class TimingFeedbackGate:
     support_mode: str = "hard_radius"
     max_wait_blocks: int | None = 1
     remember_deferred_alarm: bool = False
+    use_later_duration: bool = False
     memory: list = field(default_factory=list)
     episode: int | None = None
     deadline: int | None = None
@@ -132,8 +133,13 @@ class TimingFeedbackGate:
             if cue["episode"] >= self.episode:
                 raise ValueError("current/future episode feedback leaked into query")
             distance = float(np.linalg.norm(normalized - cue["feature"]))
+            cue_direction = cue["direction"]
+            if self.use_later_duration and cue_direction < 0:
+                elapsed = 0 if self.pending_alarm is None else int(step)-self.pending_alarm
+                if elapsed >= cue.get("later_valid_steps",0):
+                    cue_direction = 0
             if self.support_mode in ("soft_mass", "continuous") or distance <= self.radius:
-                nearby.append((np.exp(-.5 * (distance / self.radius) ** 2), cue["direction"]))
+                nearby.append((np.exp(-.5 * (distance / self.radius) ** 2), cue_direction))
         direction = 0.
         vote = 0.
         mass = sum(w for w, _ in nearby)
@@ -176,4 +182,23 @@ class TimingFeedbackGate:
             raise ValueError("only one cue per intervention episode")
         self.memory.append({"episode": int(completed_episode),
                             "feature": (np.asarray(feature, dtype=float) - self.center) / self.scale,
-                            "direction": int(cue["direction"])})
+                            "direction": int(cue["direction"]),
+                            "later_valid_steps": int(cue.get("later_valid_steps",0))})
+
+
+def observed_agreement_steps(blocks, error_reference, block_size=5):
+    """Only a contiguous measured prefix licenses Later; gripper disagreement vetoes it.
+
+    This is expert-path evidence, not a guarantee of autonomous recoverability.
+    The caller provides chronological nonoverlapping, fully observed blocks.
+    """
+    length=0
+    for b in blocks:
+        if b['offset'] != length:
+            break
+        if not np.isfinite(b['overall_MSE']) or b['overall_MSE']>error_reference:
+            break
+        if not np.isfinite(b['gripper_sign_disagreement']) or b['gripper_sign_disagreement']>0:
+            break
+        length+=block_size
+    return length
