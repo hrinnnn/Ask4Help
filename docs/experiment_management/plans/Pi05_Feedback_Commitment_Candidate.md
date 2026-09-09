@@ -26,3 +26,7 @@
 - 这是基于development失败分析提出的探索性修订，不冒充事先预测，也不改变仍待用户确认的训练composition门槛。
 
 本记录按Hypothesis Generation skill区分观察、候选、竞争解释与可反驳预测。没有额外失败标签或人工最佳时间进入gate。
+
+## 已冻结规则的跨任务复现（2026-09-09追加）
+
+在新数据生成前登记：StackCube seed1774000、PickPlane seed1775000，各arm40raw，仍用hard_radius，不混入OpenDrawer的soft支持修改。StackCube opening参考只用原32条ID校准得到q95=0，因此仍采用原10mm下限。PCA、gamma、其他cue和核参数均不变。保留之前Plane正向第一组、第二组预算不足及原v1/OpenDrawer零结果；本批用于可重复性和转移检验，不追改阈值。先在当前自主诊断之后执行，训练准入例外仍待用户。

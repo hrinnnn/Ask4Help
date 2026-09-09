@@ -1,0 +1,18 @@
+{
+  "purpose": "Independent transfer and replication of the already-frozen commitment_v2 cue; no new parameter tuning or SFT.",
+  "frozen_date": "2026-09-09",
+  "feedback_rule": "commitment_v2",
+  "support_mode": "hard_radius",
+  "raw_episodes_per_arm": 40,
+  "task_settings": [
+    {"task":"stackcube_legacy_ood","short_name":"stackcube","seed":1774000,"gpu":"0","cpu":"0-3",
+     "calibration":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/calibration_v1/stackcube_legacy_ood",
+     "opening_calibration":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_candidate_v1/stackcube_opening_ID_calibration.json"},
+    {"task":"airplane_yaw_ood","short_name":"airplane","seed":1775000,"gpu":"1","cpu":"4-7",
+     "calibration":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/calibration_v1/airplane_yaw_ood",
+     "opening_calibration":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_candidate_v1/airplane_opening_ID_calibration.json"}
+  ],
+  "unchanged": ["base checkpoint","task-native collection mode","PCA and initial threshold","ID error/reversal reference","opening rule and10mm floor","lambda2","beta0.5","radius multiplier2","one-block deadline","success rule"],
+  "interpretation": "Prior positive/null/indeterminate pilots remain separate. This tests the same frozen rule on fresh seeds, not a claim of robust learning benefit.",
+  "training_admission": "No training is launched by this controller; existing pending approval remains in force."
+}
