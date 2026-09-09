@@ -1,0 +1,25 @@
+{
+  "pipeline_id":"pi05_evidence_wait_v1",
+  "authorized":true,
+  "training_authorized":false,
+  "owner_thread":"01a07faa-682a-7e01-9d5b-eeac5b96864d",
+  "parent_manifest":"configs/pipelines/pi05_timing_feedback_ablation_v1.json",
+  "accepted_target":30,
+  "max_raw_attempts":400,
+  "milestones":[5,10,20,30],
+  "passive_raw_episodes":100,
+  "chunk_size":20,
+  "arms":{
+    "fixed":{"support_mode":"hard_radius","enabled":false,"max_wait_blocks":1},
+    "old":{"support_mode":"continuous","enabled":true,"max_wait_blocks":null},
+    "sensitive":{"support_mode":"continuous","enabled":true,"max_wait_blocks":null,"remember_deferred_alarm":true,"use_later_duration":true}
+  },
+  "task_settings":[{"name":"stackcube","task":"stackcube_legacy_ood","collection_seed":1870000,"evaluation_seed":1880000,"gpu":"0","cpu":"0-3","feedback_rule":"commitment_v2","calibration":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/calibration_v1/stackcube_legacy_ood","opening_calibration":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_candidate_v1/stackcube_opening_ID_calibration.json"}],
+  "interpretation":"old is Small30 continuous, sensitive is evidence-duration repair; not original hard gate. Fresh seeds, no threshold tuning on old BA. First20 raw per arm are audited before continuation.",
+  "rule":"Preserve a suppressed baseline crossing. Later contributions expire at measured contiguous expert-action agreement length counted from that crossing, no renewal. Overall MSE uses old ID threshold; any gripper sign disagreement ends the measured prefix. Earlier formula unchanged. No training.",
+  "prerequisites":{"all_later_audit":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/later_segment_all_v2/SEGMENT_AUDIT_COMPLETE.json","findings":"9 Later events measured: eight10steps, one20steps. Three successful ID expert controls all fail immediate overall-error check; these are conditional controls, not a new ID calibration."},
+  "placement_preflight":{"server":"root@39.101.70.188:1012","GPU":"0","CPU":"0-3","protect_PID":276925,"runtime":"/root/Ask4Help-online-awbc/RLinf/.venv/bin/python","assets":"unchanged co-located StackCube checkpoint/norm/PCA/calibration from parent","root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/evidence_wait_v1","other_pipeline":"OpenDrawer Small30 uses GPU1; leave untouched","storage":"durable OSS results, task-local tmp logs, no checkpoint writes"},
+  "limitations":["Expert-path agreement does not guarantee autonomous state agreement","Earlier false-positive mechanism is unchanged and BA benefit is not assumed","Gripper-sign rule may stop at an ordinary grasp/release transition; report this behavior"],
+  "next_stage":"paired_collection_then_independent_BA_and_video_review",
+  "completion":"Audited three arms and100 independent trajectories plus paired videos and report, including negative outcomes; no automatic SFT"
+}

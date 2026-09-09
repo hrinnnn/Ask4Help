@@ -9,7 +9,8 @@ import time
 from pi05_feedback_artifacts import completed_rows
 
 def main(a):
-    plan=json.loads((a.code/'configs/pipelines/pi05_feedback_small30_v1.json').read_text())
+    planpath=a.plan or a.code/'configs/pipelines/pi05_feedback_small30_v1.json'
+    plan=json.loads(planpath.read_text())
     assert plan['authorized'] and not plan['training_authorized']
     task=next(t for t in plan['task_settings'] if t['name']==a.task)
     parent=json.loads((a.code/plan['parent_manifest']).read_text())
@@ -39,6 +40,8 @@ def main(a):
             state.update(stage='collect_'+name,next_stage='independent_detection' if name=='sensitive' else 'continue_diagnostics');save()
             armroot=a.root/name;armroot.mkdir(exist_ok=True)
             manifest=json.loads(json.dumps(parent));manifest['feedback']['max_wait_blocks']=settings['max_wait_blocks']
+            for key in ['remember_deferred_alarm','use_later_duration']:
+                manifest['feedback'][key]=settings.get(key,False)
             manifestpath=armroot/'manifest.json'
             if manifestpath.exists():assert json.loads(manifestpath.read_text())==manifest
             else:manifestpath.write_text(json.dumps(manifest,indent=2))
@@ -71,7 +74,7 @@ def main(a):
             state['completed_roots'][name]=str(resume);save()
         state.update(stage='independent_timing_BA_analysis',next_stage='video_review_no_training');save()
         run([sys.executable,str(a.code/'tools/analyze_pi05_feedback_small30.py'),'--root',str(a.root),
-             '--plan',str(a.code/'configs/pipelines/pi05_feedback_small30_v1.json'),'--task',a.task],'analysis')
+             '--plan',str(planpath),'--task',a.task],'analysis')
         state.update(stage='timing_BA_complete_pending_visual_review',next_stage='qualitative_video_review',finished=time.time());save()
         (a.root/'TIMING_BA_COMPLETE.json').write_text(json.dumps(state,indent=2))
     except Exception as e:
@@ -80,4 +83,5 @@ def main(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser()
     for name in ['code','root','logs']:p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--plan',type=Path)
     p.add_argument('--task',required=True);main(p.parse_args())

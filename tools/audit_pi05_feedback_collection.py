@@ -30,13 +30,14 @@ def audit(root):
             assert len(suffix)==row['expert_suffix_actions']
             if len(suffix):assert np.array_equal(suffix,data['all_expert_actions'][-len(suffix):])
         assert len(row['queries'])==len(data['query_features'])==len(data['query_steps'])
-        deadline=None
+        deadline=None;pending=None
         for j,q in enumerate(row['queries']):
             z=(data['query_features'][j].astype(float)-center)/cal['scale']
             neighbors=[]
-            for ep,z_i,y in memory:
+            for ep,z_i,y,duration in memory:
                 assert ep<i
                 dist=np.linalg.norm(z-z_i)
+                if cfg.get('use_later_duration') and y<0 and (0 if pending is None else q['step']-pending)>=duration:y=0
                 if cfg.get('support_mode','hard_radius') in ('soft_mass','continuous') or dist<=radius:
                     neighbors.append((np.exp(-.5*(dist/radius)**2),y))
             direction=0.
@@ -51,12 +52,27 @@ def audit(root):
                 if cfg.get('support_mode')=='continuous' or abs(weighted/mass)>=cfg['minimum_absolute_vote']:direction=weighted/(cfg['lambda']+mass)
             threshold=cal['baseline_threshold']*np.exp(-cfg['beta']*direction)
             assert np.isclose(threshold,q['threshold'],rtol=1e-7)
+            if provenance['arm']=='feedback' and cfg.get('remember_deferred_alarm') and pending is None and q['score']>cal['baseline_threshold'] and q['score']<=threshold:
+                pending=q['step']
             if provenance['arm']=='feedback' and cfg.get('max_wait_blocks',1) is not None and deadline is None and q['score']>cal['baseline_threshold'] and q['score']<=threshold:
                 deadline=q['step']+cfg['execution_block']*cfg.get('max_wait_blocks',1)
-            stop=q['score']>threshold or (deadline is not None and q['step']>=deadline)
+            stop=q['score']>threshold or (deadline is not None and q['step']>=deadline) or (cfg.get('remember_deferred_alarm') and pending is not None and direction>=0)
             assert bool(stop)==q['stop'] and q['deadline']==deadline
             assert len(memory)==q['memory_episodes']
         cue=row['cue']
+        if cfg.get('use_later_duration') and cue and cue['direction']==-1:
+            duration=0
+            for b in row['later_blocks']:
+                assert b['offset']==duration
+                pred=np.asarray(b['predictions']);target=np.asarray(b['expert_actions'])
+                assert pred.shape==(2,5,8) and target.shape==(5,8)
+                assert np.allclose(target,data['actions'][row['takeover']+duration:row['takeover']+duration+5])
+                error=float(((pred-target[None])**2).mean())
+                mismatch=float((np.sign(pred[:,:,7])!=np.sign(target[None,:,7])).mean())
+                assert np.isclose(error,b['overall_MSE']) and np.isclose(mismatch,b['gripper_sign_disagreement'])
+                if error>cal['error_reference'] or mismatch>0:break
+                duration+=5
+            assert duration==cue['later_valid_steps']
         if cfg.get('rule')=='commitment_v2' and row['takeover'] is not None:
             t=row['takeover'];opening=0.
             if t>=5 and row['expert_suffix_actions']>=5:
@@ -76,7 +92,7 @@ def audit(root):
         if provenance['arm']=='feedback' and cue is not None:
             idx=-2 if cue['attribution']=='previous_query' else -1
             assert cue['credit_step']==int(data['query_steps'][idx])
-            memory.append((i,(data['query_features'][idx].astype(float)-center)/cal['scale'],cue['direction']))
+            memory.append((i,(data['query_features'][idx].astype(float)-center)/cal['scale'],cue['direction'],cue.get('later_valid_steps',0)))
         total_cost+=row['all_executed_expert_actions'];accepted+=int(row['accepted'])
         report.append({'episode':i,'actions':n,'expert_cost':row['all_executed_expert_actions'],'status':'PASS'})
     assert total_cost==summary['all_expert_actions'] and accepted==summary['accepted']

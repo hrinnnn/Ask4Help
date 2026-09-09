@@ -12,6 +12,7 @@ import numpy as np
 from pi05_feedback_runtime import Pi05FeedbackRuntime
 from pi05_timing_feedback import TimingFeedbackGate, action_block_error, corrective_motion, timing_cue, isolated_python_numpy_rng
 from pi05_timing_feedback import gripper_commitment_opening, commitment_timing_cue
+from pi05_timing_feedback import observed_agreement_steps
 from pi05_feedback_artifacts import completed_rows,restore_memory
 
 
@@ -100,7 +101,7 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
             actions.extend(result['actions']);snapshots.extend(result['snapshots'])
             expert_all=result;expert_report=result['report'];expert_report['attempt_lengths']=result['attempt_lengths']
             success=bool(result['report']['accepted'])
-    errors=[];reversal=None;cue=None;feedback_seconds=0.;opening_score=0.
+    errors=[];reversal=None;cue=None;feedback_seconds=0.;opening_score=0.;later_blocks=[]
     expert_n=0 if takeover is None else len(actions)-takeover
     if takeover is not None:
         begin=time.time()
@@ -124,6 +125,20 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
             cue=commitment_timing_cue(errors,calibration['error_reference'],opening_score=opening_score,
                                       opening_reference=opening_reference,**arguments)
         else:cue=timing_cue(errors,calibration['error_reference'],**arguments)
+        if cue is not None and cue['direction']==-1 and gate.use_later_duration:
+            for offset in range(0,expert_n-4,5):
+                target=np.asarray(actions[takeover+offset:takeover+offset+5])
+                samples=[]
+                for m in range(2):
+                    pred,_=runtime.predict(runtime.raw_snapshot(snapshots[takeover+offset]),280009+seed*10+offset*2+m)
+                    samples.append(runtime.clip(pred,env)[:5])
+                pred=np.asarray(samples)
+                record={'offset':offset,'overall_MSE':float(((pred-target[None])**2).mean()),
+                        'gripper_sign_disagreement':float((np.sign(pred[:,:,7])!=np.sign(target[None,:,7])).mean()),
+                        'predictions':pred.tolist(),'expert_actions':target.tolist()}
+                later_blocks.append(record)
+                if record['overall_MSE']>calibration['error_reference'] or record['gripper_sign_disagreement']>0:break
+            cue={**cue,'later_valid_steps':observed_agreement_steps(later_blocks,calibration['error_reference'])}
         if cue is not None:
             credit=prefix[-2] if cue['attribution']=='previous_query' else prefix[-1]
             cue={**cue,'credit_step':credit['step']}
@@ -138,6 +153,7 @@ def collect_episode(runtime, gate, calibration, mean, basis, seed, split, episod
              'reset':metadata,'feedback_errors':errors,'motion_reversal':reversal,'cue':cue,
              'feedback_seconds':feedback_seconds,'expert_report':planner_diagnostic(expert_report),
              'feedback_rule':feedback_rule,'opening_score_m':opening_score,
+             'later_blocks':later_blocks,
              'forced_takeover_diagnostic':force_step is not None,
              'video_scope':'policy prefix plus final expert candidate; abandoned planner candidates counted separately'}
     return summary,snapshots,actions,prefix,expert_all
@@ -165,7 +181,9 @@ def main(args):
     gate=TimingFeedbackGate(cal['baseline_threshold'],arrays['center'],cal['scale'],cal['radius']*cfg['radius_multiplier'],
                             regularization=cfg['lambda'],strength=cfg['beta'],min_support=cfg['minimum_interventions'],
                             min_vote=cfg['minimum_absolute_vote'],block=cfg['execution_block'],enabled=args.arm=='feedback',
-                            support_mode=args.support_mode,max_wait_blocks=cfg.get('max_wait_blocks',1))
+                            support_mode=args.support_mode,max_wait_blocks=cfg.get('max_wait_blocks',1),
+                            remember_deferred_alarm=cfg.get('remember_deferred_alarm',False),
+                            use_later_duration=cfg.get('use_later_duration',False))
     runtime=Pi05FeedbackRuntime(args.task,manifest['task_assets'][args.task]);runtime.torch.set_num_threads(4)
     provenance={'runtime':runtime.provenance(),'calibration':str(args.calibration),'arm':args.arm,'seed':args.seed,'episodes':args.episodes,'accepted_target':args.accepted_target,'feedback':cfg}
     results=[]
