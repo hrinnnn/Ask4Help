@@ -11,6 +11,7 @@ def run(root):
     assert (root/'EVALUATION_COMPLETE.json').exists() and summary['complete']
     assert len(rows)==summary['episodes']==len(provenance['seeds'])==100
     assert provenance['runtime']['inference_mode']=='eval' and not provenance['expert_or_gate_used']
+    assert provenance['purpose']=='reserved_final_evaluation'
     assert summary['checkpoint']==provenance['runtime']['checkpoint']
     assert [r['seed'] for r in rows]==provenance['seeds'] and len(set(provenance['seeds']))==100
     horizon=100 if summary['task']=='stackcube_legacy_ood' else (400 if summary['task'].startswith('open_drawer_') else 250)

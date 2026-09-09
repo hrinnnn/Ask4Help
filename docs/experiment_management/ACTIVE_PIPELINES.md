@@ -2,6 +2,8 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **Soft40完整结果**：Grasp共同B221，TASR×3=19/221两组相同，新增1条失败报警导致专家成本510→540。Goal10条OOD配对接管推迟5步，但共同B920的TASR×3=304/920→303/920（33.04→32.93%）；成功专家动作982→983，失败段432→415，所以总成本减少不能包装成成功数据效率提升。hard40控制已自动运行，尚待三组同预算报告。
+- 已登记后续同seed无接管开发复跑：Goal-ID/OOD各20，seed1785000–19，原base/eval模式，等待hard40完成后运行。目的区分“被提前接管截断”与“确实无法自主抓起”；不是reserved最终SR。接管前0/20抓起不能直接推断没有自主抓取能力。最终测试已另行冻结9,100,000系列seed，未使用。
 - **07:40恢复已推进**：新root `opendrawer_soft_support_v2_chunked` controller1422325，固定组两stage均补齐40并通过审计，原24条只引用、无覆盖。新16条过程中FD计数稳定91；不把底层原因夸称已完全解释。当前feedback首chunk workers1429579/1429478，最多每进程20新episode，后续从已完成记录恢复精确memory。source949827ef（本地07151958）。
 - 同40新seed原hard-radius对照已持久化等待：controller1426109，source98af1d4a，root `opendrawer_hard40_control_v1`。Soft完成后自动复用同fixed数据、收集hard feedback，最后重新求fixed/hard/soft三者共同整后缀预算，避免把不同二元预算下的TASR直接横比。正式SFT仍未启动，准入例外仍待用户确认。
 - **渲染生命周期恢复**：soft_support_v1两fixed worker均在已完成24条后，创建第25个环境时出现vk::createInstanceUnique/ErrorIncompatibleDriver并退出；没有soft反馈结果。保存原24条，恢复将采用每进程最多20个新episode、episode后GC、显式恢复过去cue记忆；新root `opendrawer_soft_support_v2_chunked`。旧原始episode只被引用，不复制/覆盖，不改变seed或算法。文件描述符计数会写入进度，以核实资源累积，尚不把它断言为驱动不支持Vulkan。

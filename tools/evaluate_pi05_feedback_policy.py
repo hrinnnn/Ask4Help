@@ -55,7 +55,8 @@ def run(a):
     summary={'task':a.task,'split':a.split,'episodes':len(rows),'successes':sum(r['success'] for r in rows),
              'strict_successes':sum(r['strict_success'] for r in rows),'ever_grasped_successes':sum(r['ever_grasped'] for r in rows),
              'primary_endpoint':specification['primary_endpoint'],'checkpoint':str(a.checkpoint),'rows':rows,
-             'expert_or_gate_used':False,'complete':len(rows)==len(seeds)}
+             'expert_or_gate_used':False,'complete':len(rows)==len(seeds),
+             'evaluation_role':provenance['purpose'],'reserved_test_seeds':provenance['purpose']=='reserved_final_evaluation'}
     write_json(a.output/'summary.json',summary)
     marker='EVALUATION_COMPLETE.json' if summary['complete'] else 'EVALUATION_CHUNK_COMPLETE.json'
     write_json(a.output/marker,{'episodes':len(rows),'complete':summary['complete'],'checkpoint':str(a.checkpoint)})
