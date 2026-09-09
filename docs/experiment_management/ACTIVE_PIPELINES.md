@@ -1,5 +1,26 @@
 # Active Pipelines
 
+## 2026-09-09 最新追加：OpenDrawer Stage2优先，与StackCube修订并行
+
+- 2026-09-09 22:28北京时间：SSH已恢复，OpenDrawer Stage2 controller正常自动推进至old/chunk0040审计（1742739），无error；未因短暂连接中断重启任何进程。
+
+- 2026-09-09 22:16北京时间：本次两次SSH连接均被H20远端关闭，未取得新的进程或产物状态。上次已确认old组正常推进；不能将连接异常当作实验失败或重启依据。保留现有controller，后续先恢复只读连通再判断状态，不重启或改参数。
+
+- 2026-09-09 22:05北京时间检查：OpenDrawer Stage2 fixed已205raw/30accepted（10ID20OOD）、4810全部专家动作，独立audit PASS；controller1650915自动进入old连续反馈组，首20条审计中（1727889）。仍无Stage2最终比较或新训练，按冻结序列继续。
+
+- 2026-09-09 20:17北京时间：evidence_wait_v1 StackCube三组与100passive已完成并独立复核。固定/上一版连续/修订BA95.50/87.16/90.19%，FP1/7/5（33成功），FN4/3/3（67失败）；修订尚未超固定。共同44raw中两反馈均12条提前>=10、2条推迟>=10，最大推迟45→10；具体ep35 60→25（fixed15），ep43 45→30（fixed20）。报告与三路视频在主工作区`artifacts/evidence_wait_review_20260909/stackcube/`，代表帧已检查。OpenDrawer Stage2 fixed111raw/14accepted、worker1692500健康，继续全部冻结条件，无训练。
+
+- 2026-09-09 19:33北京时间检查：evidence_wait_v1 StackCube fixed52raw/30accepted、old44raw/30accepted完成；修订sensitive首20条独立audit PASS，已进入chunk0020 worker1667614，确认remember_deferred_alarm/use_later_duration启用。OpenDrawer grasp fixed前40条完成审计，chunk0040 worker1667584正常初始化。两controller健康，无训练。
+
+- 已实际启动并产出轨迹：controller1650914/1650915，fixed workers1650947/1650948；SC6raw/4accepted、OD Stage2首条完成。source74dced4d，native27+7测试通过。各task状态文件位于新evidence_wait_v1根；后续以此推进，不重复启动。
+- 初步阶段核对：旧Stage2 7条已报警OOD在56–94步打开抽屉，135–350步接管，6条接管前未抓起，1条在195接管时首次grasp。没有初始化即报警的证据；继续区分用户旧图版本与相对操作阶段的“早”。
+- 旧Small30 Goal独立BA已完整：fixed/old/sensitive92.00/92.00/87.33%，FP1/1/2（25成功），FN9/9/13（75失败）；保留为旧负结果，新Stage2不会据此调测试阈值。
+
+- 用户明确授权继续StackCube，同时重点验证OpenDrawer Stage2抓取位姿OOD；目标至少一个任务相对固定Bridge-PCA有改善，保留全部结果。仍无训练。
+- 修订已接入collector/memory恢复/独立审计与被动评测；新manifest `configs/pipelines/pi05_evidence_wait_v1.json`，GitHub部署74dced4d。三组fixed、old（Small30 continuous）、sensitive（pending+实测Later时长）；各30 accepted/400raw cap，首20逐组审计，后100独立passive。不要把此old和历史hard-radius组混淆。
+- StackCube GPU0/CPU0-3，collection1870000/eval1880000；OpenDrawer grasp GPU1/CPU4-7，collection1890000/eval1900000。输出根`/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/evidence_wait_v1`。旧Small30两任务采集/BA均已完成，OpenDrawer报告已重算seed-clustered但尚待完整视频交付。
+- 旧Stage2两批共30OOD未出现t0或前25步报警；已触发时机135–385步。需按drawer-open/grasp事件核对用户说的相对阶段提前，不能直接断言初始化即报警或静默替换旧PCA版本。
+
 ## 2026-09-09 用户授权：修正过度推迟机制（仍不训练）
 
 - 4case完整expert片段前向审计已完成，root`later_segment_audit_v1`、code142810d8，明确发现offset10夹爪方向20%不一致仍被整体MSE判为一致。新可选pending报警＋measured Later时长原型25测试通过，尚未接collector。后续执行按独立worktree计划`docs/experiment_management/plans/Pi05_Later_Repair_20260909.md`：全部开发Later审计、ID开合边界检查、接入/审计、新seed1870000配对、1880000独立BA；用户已授权继续改进，无训练。旧Small30继续完成，不能结束旧诊断后遗忘本修订。

@@ -13,6 +13,9 @@ def main(a):
     plan=json.loads(planpath.read_text())
     assert plan['authorized'] and not plan['training_authorized']
     task=next(t for t in plan['task_settings'] if t['name']==a.task)
+    task=dict(task)
+    if a.gpu is not None:task['gpu']=a.gpu
+    if a.cpu is not None:task['cpu']=a.cpu
     parent=json.loads((a.code/plan['parent_manifest']).read_text())
     a.root.mkdir(parents=True,exist_ok=True);a.logs.mkdir(parents=True,exist_ok=True)
     statepath=a.root/'controller_state.json'
@@ -35,8 +38,26 @@ def main(a):
     if task['opening_calibration']:assert Path(task['opening_calibration']).exists()
     save()
     try:
-        for name,settings in [*plan['arms'].items(),('passive',plan['arms']['fixed'])]:
+        stages=[*plan['arms'].items(),('passive',plan['arms']['fixed'])]
+        if a.only_arm:stages=[(n,s) for n,s in stages if n==a.only_arm]
+        elif a.external_sensitive_root:
+            stages=[(n,s) for n,s in stages if n!='sensitive']+[('sensitive',plan['arms']['sensitive'])]
+        for name,settings in stages:
             if name in state['completed_roots']:continue
+            if name=='sensitive' and a.external_sensitive_root:
+                state.update(stage='waiting_parallel_sensitive',next_stage='independent_timing_BA_analysis');save()
+                while not (a.external_sensitive_root/'ARM_COMPLETE.json').exists():
+                    p=a.external_sensitive_root/'controller_state.json'
+                    if p.exists() and json.loads(p.read_text()).get('error'):raise RuntimeError('parallel sensitive requires repair')
+                    time.sleep(60)
+                external=json.loads((a.external_sensitive_root/'controller_state.json').read_text())
+                path=Path(external['completed_roots']['sensitive'])
+                assert (path/'INDEPENDENT_COLLECTION_AUDIT.json').exists()
+                provenance=json.loads((path/'provenance.json').read_text())
+                assert provenance['seed']==task['collection_seed'] and provenance['accepted_target']==plan['accepted_target']
+                assert provenance['runtime']['task']==task['task']
+                assert provenance['feedback']['remember_deferred_alarm'] and provenance['feedback']['use_later_duration']
+                state['completed_roots'][name]=str(path);save();continue
             state.update(stage='collect_'+name,next_stage='independent_detection' if name=='sensitive' else 'continue_diagnostics');save()
             armroot=a.root/name;armroot.mkdir(exist_ok=True)
             manifest=json.loads(json.dumps(parent));manifest['feedback']['max_wait_blocks']=settings['max_wait_blocks']
@@ -55,7 +76,7 @@ def main(a):
                 resume=chunks[-1];rows=completed_rows(resume)
                 if not (resume/'INDEPENDENT_COLLECTION_AUDIT.json').exists():
                     if not (resume/'summary.json').exists():raise RuntimeError(f'Partial chunk requires engineering review: {resume}')
-                    run([sys.executable,str(a.code/'tools/audit_pi05_feedback_collection.py'),'--root',str(resume)],name+'_resume_audit')
+                    run([sys.executable,str(a.code/'tools/audit_pi05_feedback_collection.py'),'--root',str(resume),'--incremental'],name+'_resume_audit')
             while len(rows)<cap and (target is None or sum(r['accepted'] for r in rows)<target):
                 output=armroot/f'chunk_{len(rows):04d}'
                 if output.exists():raise RuntimeError(f'Preserve partial chunk and investigate: {output}')
@@ -69,9 +90,13 @@ def main(a):
                 if task['opening_calibration']:cmd+=['--opening-calibration',task['opening_calibration']]
                 if name=='passive':cmd+=['--force-takeover-step','1000000']
                 run(cmd,name+f'_from{len(rows):04d}')
-                run([sys.executable,str(a.code/'tools/audit_pi05_feedback_collection.py'),'--root',str(output)],name+f'_audit{len(rows):04d}')
+                run([sys.executable,str(a.code/'tools/audit_pi05_feedback_collection.py'),'--root',str(output),'--incremental'],name+f'_audit{len(rows):04d}')
                 resume=output;rows=completed_rows(output)
+            run([sys.executable,str(a.code/'tools/audit_pi05_feedback_collection.py'),'--root',str(resume)],name+'_final_full_audit')
             state['completed_roots'][name]=str(resume);save()
+        if a.only_arm:
+            state.update(stage='parallel_arm_complete',next_stage='main_controller_analysis');save()
+            (a.root/'ARM_COMPLETE.json').write_text(json.dumps(state,indent=2));return
         state.update(stage='independent_timing_BA_analysis',next_stage='video_review_no_training');save()
         run([sys.executable,str(a.code/'tools/analyze_pi05_feedback_small30.py'),'--root',str(a.root),
              '--plan',str(planpath),'--task',a.task],'analysis')
@@ -84,4 +109,7 @@ if __name__=='__main__':
     p=argparse.ArgumentParser()
     for name in ['code','root','logs']:p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--plan',type=Path)
+    p.add_argument('--only-arm',choices=['fixed','old','sensitive','passive'])
+    p.add_argument('--external-sensitive-root',type=Path)
+    p.add_argument('--gpu');p.add_argument('--cpu')
     p.add_argument('--task',required=True);main(p.parse_args())

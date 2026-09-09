@@ -6,7 +6,7 @@ import numpy as np
 from pi05_feedback_artifacts import episode_path
 
 
-def audit(root):
+def audit(root, incremental=False):
     summary=json.loads((root/'summary.json').read_text())
     provenance=json.loads((root/'provenance.json').read_text())
     cal_root=Path(provenance['calibration'])
@@ -14,7 +14,24 @@ def audit(root):
     center=np.load(cal_root/'gate_arrays.npz')['center']
     cfg=provenance['feedback'];radius=cal['radius']*cfg['radius_multiplier']
     memory=[];report=[];total_cost=0;accepted=0
+    start=0
+    if incremental and provenance.get('resume_from'):
+        prior=Path(provenance['resume_from'])
+        verified=json.loads((prior/'INDEPENDENT_COLLECTION_AUDIT.json').read_text())
+        previous=json.loads((prior/'summary.json').read_text())
+        assert verified['status']=='PASS'
+        start=verified['episodes'];assert summary['rows'][:start]==previous['rows']
+        report=list(verified['rows']);total_cost=verified['all_expert_actions'];accepted=verified['accepted']
+        if provenance['arm']=='feedback':
+            for row in summary['rows'][:start]:
+                cue=row['cue']
+                if cue is None:continue
+                with np.load(episode_path(root,row)/'trace.npz') as cached:
+                    index=-2 if cue['attribution']=='previous_query' else -1
+                    feature=cached['query_features'][index].astype(float)
+                memory.append((row['episode'],(feature-center)/cal['scale'],cue['direction'],cue.get('later_valid_steps',0)))
     for i,row in enumerate(summary['rows']):
+        if i<start:continue
         data=np.load(episode_path(root,row)/'trace.npz')
         assert row['episode']==i and row['split']==('id' if i%2==0 else 'ood')
         n=len(data['actions']);assert len(data['main'])==len(data['wrist'])==len(data['qpos'])==n+1
@@ -96,9 +113,10 @@ def audit(root):
         total_cost+=row['all_executed_expert_actions'];accepted+=int(row['accepted'])
         report.append({'episode':i,'actions':n,'expert_cost':row['all_executed_expert_actions'],'status':'PASS'})
     assert total_cost==summary['all_expert_actions'] and accepted==summary['accepted']
-    return {'status':'PASS','episodes':len(report),'all_expert_actions':total_cost,'accepted':accepted,'rows':report}
+    return {'status':'PASS','episodes':len(report),'all_expert_actions':total_cost,'accepted':accepted,'rows':report,
+            'reused_verified_prefix_episodes':start,'newly_audited_episodes':len(report)-start}
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);args=p.parse_args()
-    result=audit(args.root);(args.root/'INDEPENDENT_COLLECTION_AUDIT.json').write_text(json.dumps(result,indent=2));print(json.dumps({k:v for k,v in result.items() if k!='rows'}))
+    p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--incremental',action='store_true');args=p.parse_args()
+    result=audit(args.root,args.incremental);(args.root/'INDEPENDENT_COLLECTION_AUDIT.json').write_text(json.dumps(result,indent=2));print(json.dumps({k:v for k,v in result.items() if k!='rows'}))
