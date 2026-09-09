@@ -63,6 +63,7 @@ def main(a):
             manifest=json.loads(json.dumps(parent));manifest['feedback']['max_wait_blocks']=settings['max_wait_blocks']
             for key in ['remember_deferred_alarm','use_later_duration']:
                 manifest['feedback'][key]=settings.get(key,False)
+            if 'max_feedback_events' in settings:manifest['feedback']['max_feedback_events']=settings['max_feedback_events']
             manifestpath=armroot/'manifest.json'
             if manifestpath.exists():assert json.loads(manifestpath.read_text())==manifest
             else:manifestpath.write_text(json.dumps(manifest,indent=2))

@@ -3,6 +3,11 @@ import numpy as np
 from tools.pi05_timing_feedback import TimingFeedbackGate, observed_agreement_steps
 
 class DeferredAlarmTests(unittest.TestCase):
+    def test_feedback_budget_survives_later_episodes(self):
+        g=TimingFeedbackGate(1.,np.zeros(1),1.,1.,max_feedback_events=2)
+        for i in range(5):
+            g.begin_episode(i);g.commit({'direction':1},[0],completed_episode=i)
+        self.assertEqual([x['episode'] for x in g.memory],[0,1])
     def gate(self):
         g=TimingFeedbackGate(1.,np.zeros(1),1.,1.,support_mode='continuous',max_wait_blocks=None,remember_deferred_alarm=True)
         g.begin_episode(0);g.commit({'direction':-1},[0],completed_episode=0)

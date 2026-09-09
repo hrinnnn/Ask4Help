@@ -183,7 +183,8 @@ def main(args):
                             min_vote=cfg['minimum_absolute_vote'],block=cfg['execution_block'],enabled=args.arm=='feedback',
                             support_mode=args.support_mode,max_wait_blocks=cfg.get('max_wait_blocks',1),
                             remember_deferred_alarm=cfg.get('remember_deferred_alarm',False),
-                            use_later_duration=cfg.get('use_later_duration',False))
+                            use_later_duration=cfg.get('use_later_duration',False),
+                            max_feedback_events=cfg.get('max_feedback_events'))
     runtime=Pi05FeedbackRuntime(args.task,manifest['task_assets'][args.task]);runtime.torch.set_num_threads(4)
     provenance={'runtime':runtime.provenance(),'calibration':str(args.calibration),'arm':args.arm,'seed':args.seed,'episodes':args.episodes,'accepted_target':args.accepted_target,'feedback':cfg}
     results=[]

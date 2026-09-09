@@ -1,0 +1,17 @@
+{
+  "pipeline_id":"pi05_evidence_wait_budget30_v1",
+  "authorized":true,"training_authorized":false,
+  "parent_manifest":"configs/pipelines/pi05_timing_feedback_ablation_v1.json",
+  "accepted_target":30,"max_raw_attempts":400,"milestones":[5,10,20,30],
+  "passive_raw_episodes":100,"chunk_size":20,
+  "arms":{
+    "fixed":{"support_mode":"hard_radius","enabled":false,"max_wait_blocks":1},
+    "sensitive":{"support_mode":"continuous","enabled":true,"max_wait_blocks":null,"remember_deferred_alarm":true,"use_later_duration":true,"max_feedback_events":30}
+  },
+  "task_settings":[{"name":"opendrawer_grasp","task":"open_drawer_grasp_ood","collection_seed":1910000,"evaluation_seed":1920000,"gpu":"1","cpu":"4-7","feedback_rule":"displacement_v1","calibration":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_eval_ID_calibration_v4/calibration","opening_calibration":null}],
+  "purpose":"Independently test the user's actual small-feedback requirement: no more than30 completed intervention cues including failed attempts. Earlier positive result used76 cues for30 accepted trajectories, so this is a distinct budgeted protocol, not a replication label.",
+  "rule":"Same evidence-wait equation, calibration, duration and gripper checks; freeze memory after first30 valid cues, no outcome-based selection. Keep all raw attempts and costs. No test-set threshold tuning.",
+  "placement":"Same co-located H20 assets; fixed/passive GPU1 CPU4-7, parallel sensitive GPU0 CPU0-3, preserve276925. Fresh output root evidence_wait_budget30_v1 and external evidence_wait_budget30_parallel_v1.",
+  "next_stage":"paired_collection_independent_BA_videos_report",
+  "completion":"Both arms full audited or transparent400raw cap, independent100passive, actual time and assisted outcomes/cost report, no training."
+}

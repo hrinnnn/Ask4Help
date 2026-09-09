@@ -116,6 +116,7 @@ class TimingFeedbackGate:
     max_wait_blocks: int | None = 1
     remember_deferred_alarm: bool = False
     use_later_duration: bool = False
+    max_feedback_events: int | None = None
     memory: list = field(default_factory=list)
     episode: int | None = None
     deadline: int | None = None
@@ -177,6 +178,8 @@ class TimingFeedbackGate:
         if completed_episode != self.episode:
             raise ValueError("commit must belong to the completed current episode")
         if cue is None or not self.enabled:
+            return
+        if self.max_feedback_events is not None and len(self.memory)>=self.max_feedback_events:
             return
         if any(c["episode"] == completed_episode for c in self.memory):
             raise ValueError("only one cue per intervention episode")

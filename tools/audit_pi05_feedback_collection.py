@@ -26,6 +26,7 @@ def audit(root, incremental=False):
             for row in summary['rows'][:start]:
                 cue=row['cue']
                 if cue is None:continue
+                if cfg.get('max_feedback_events') is not None and len(memory)>=cfg['max_feedback_events']:continue
                 with np.load(episode_path(root,row)/'trace.npz') as cached:
                     index=-2 if cue['attribution']=='previous_query' else -1
                     feature=cached['query_features'][index].astype(float)
@@ -106,7 +107,7 @@ def audit(root, incremental=False):
             elif len(errors)>=5:expected_direction=-1
             else:expected_direction=None
             assert (cue['direction'] if cue else None)==expected_direction
-        if provenance['arm']=='feedback' and cue is not None:
+        if provenance['arm']=='feedback' and cue is not None and (cfg.get('max_feedback_events') is None or len(memory)<cfg['max_feedback_events']):
             idx=-2 if cue['attribution']=='previous_query' else -1
             assert cue['credit_step']==int(data['query_steps'][idx])
             memory.append((i,(data['query_features'][idx].astype(float)-center)/cal['scale'],cue['direction'],cue.get('later_valid_steps',0)))

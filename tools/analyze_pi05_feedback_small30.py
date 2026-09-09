@@ -45,7 +45,8 @@ def main(root, plan, task, output_name='timing_BA_report.json'):
                 regularization=cfg['lambda'],strength=cfg['beta'],min_support=cfg['minimum_interventions'],
                 min_vote=cfg['minimum_absolute_vote'],block=cfg['execution_block'],enabled=name!='fixed',
                 support_mode=cfg['support_mode'],max_wait_blocks=cfg.get('max_wait_blocks',1),
-                remember_deferred_alarm=cfg.get('remember_deferred_alarm',False),use_later_duration=cfg.get('use_later_duration',False))
+                remember_deferred_alarm=cfg.get('remember_deferred_alarm',False),use_later_duration=cfg.get('use_later_duration',False),
+                max_feedback_events=cfg.get('max_feedback_events'))
             restore_memory(gate,prefix)
             times=[];changes=[]
             for i,(r,features) in enumerate(zip(passive,observations)):
@@ -80,7 +81,7 @@ def main(root, plan, task, output_name='timing_BA_report.json'):
                 threshold_relative_min=float(min(changes)),threshold_relative_max=float(max(changes)),
                 interpretation='Passive counterfactual alarms; CI conditional on one learned memory, clustered by reset seed. No BA-based tuning.')
             report['milestones'][name][str(milestone)]=result
-    for name in ['old','sensitive']:
+    for name in [a for a in summaries if a!='fixed']:
         pairs=[]
         for a,b in zip(summaries['fixed']['rows'],summaries[name]['rows']):
             assert (a['seed'],a['split'])==(b['seed'],b['split'])
