@@ -1,6 +1,28 @@
 # Active Pipelines
 
+## 2026-09-09 用户授权：修正过度推迟机制（仍不训练）
+
+- 同owner认领新的局部诊断与修订。旧Small30继续完成，不改原运行参数。
+- 已核实episode17第10步阈值仅从0.7149提高到0.7255；暂缓首次crossing后，分数下降导致原alarm被遗忘，第25步direction已转正仍未接管，直到55。保持旧memory/实际prefix的离线反事实中pending-alarm修订使55→25；episode7仅50→45，说明此项修订不充分。
+- 已本地实现可选remember_deferred_alarm，默认关闭，22项相关测试通过。下一项为开发数据4条完整expert suffix的机械臂/夹爪分项误差前向审计；不改变gate、不启动训练。
+- 计划：根据实际连续动作一致范围定义Later有效片段；再冻结新版本并使用新seed验证。旧独立BA已看过，仅作为旧版结果，不用于宣称新版本泛化效果。
+
 ## 2026-09-09 最新用户决定：小样本灵敏反馈，仅收集与检测，不训练
+
+- 2026-09-09 15:16北京时间检查：OpenDrawer old已88raw/30accepted（6ID24OOD）、3101专家动作，audit PASS；已自动进入sensitive worker1581872（continuous，无额外deadline），当前8raw/1accepted。fixed78raw/30accepted（6ID24OOD）、2786动作。没有BA新结果、没有训练；保持完整冻结序列，不因阶段成本变化调参数。
+
+- 2026-09-09 14:42北京时间检查：OpenDrawer old49raw/16accepted，worker1569391健康，前40条audit已通过。StackCube补充导出独立成功轨迹seed1830019（passive episode38，fixed无报警/sensitive30在20步报警）原视频`artifacts/small30_review_20260909/stackcube/passive_success_extra_alarm_step20.mp4`，10fps、38frames、终帧已检查；这是被动误报例，不是实际专家接管。另保留fixed/sensitive episode0不变且失败原视频。无新训练或阈值修改。
+
+- 2026-09-09 14:28-14:31北京时间：StackCube全部100 passive与三组采集完成；seed-clustered BA报告已另写并独立复核100个seed/split、50ID50OOD、零专家动作、confusion counts。30accepted节点fixed/old/sensitive BA=96.97/95.45/86.36%，FP=2/3/9（33成功），FN均0（67失败）。新版ΔBA=-10.61pp，条件于本次memory的reset-seed bootstrap95%区间[-18.33,-4.17]pp。该候选不满足用户BA不降低目标，禁止在测试集上回调参数。actual共同46raw中新版提前>=10步6条、推迟>=10步8条；被动24/69移动>=10步不得混称真实接管。
+- StackCube已导出提前35→5与推迟10→55的全局时间对齐视频，主工作区`artifacts/small30_review_20260909/stackcube/`，顶部fixed/底部sensitive、半速、绿条专家，已检查代表帧。OpenDrawer old仍健康采集（1564665），不停止其冻结实验，整轮未完成、无训练。
+
+- 2026-09-09 14:17北京时间检查：OpenDrawer fixed78 raw/30 accepted完成且audit PASS，自动进入old组worker1557040。StackCube independent passive79/100、worker1556699正常，尚未生成完整BA报告。两任务均无工程失败/训练，下一阶段仍由健康controller自动推进。
+
+- 2026-09-09 14:05北京时间检查：StackCube三组各30 accepted已全部完成并审计，fixed/old/sensitive raw分别58/56/46，全部专家动作995/955/856。已自动进入独立pure-policy检测，32/100，首20条audit PASS且零专家动作。OpenDrawer fixed65 raw/24 accepted，worker1549543健康。暂无独立BA结果，不把采集成本差当作检测或后训SR改善。
+
+- 2026-09-09 13:54北京时间检查：StackCube old已完成56 raw/30 accepted，audit PASS；sensitive首20条audit PASS，确认continuous且max_wait_blocks=null、无deadline，当前30 raw/18 accepted，worker1542648。OpenDrawer fixed当前49 raw/17 accepted，worker1540226，前40条分块审计通过。控制器正常自动推进；尚无独立BA，禁止据部分采集宣称改善。
+
+- 2026-09-09 13:42北京时间检查：StackCube fixed已完成58 raw→30 accepted（3ID/27OOD），995专家动作，独立audit PASS；自动进入old组，worker1534985已23 raw/10 accepted。OpenDrawer fixed worker1532403已28 raw/7 accepted，先前20条chunk audit PASS。两controller持续健康，未启动训练、无新BA结论，继续按冻结方案运行。
 
 - 已启动：GitHub部署`47349a02`（本地`44273c27`同树）；H20两任务controller为StackCube `1524113` / OpenDrawer Goal `1524114`，初始fixed workers `1524146` / `1524145`。输出根`/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/small30_v1`；各task的`controller_state.json`为真实状态源。服务器原生27项相关测试通过；当前初始化/首批采集验收中，尚无新结果。
 - 控制器依次执行fixed/old/sensitive各30成功接管上限（每arm400raw上限），每20个新episode独立进程并审计；然后100条独立纯policy轨迹（50ID+50OOD），再按5/10/20/30 accepted节点重建冻结memory计算BA和时机。不会调用任何训练入口。

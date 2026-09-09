@@ -114,13 +114,16 @@ class TimingFeedbackGate:
     enabled: bool = True
     support_mode: str = "hard_radius"
     max_wait_blocks: int | None = 1
+    remember_deferred_alarm: bool = False
     memory: list = field(default_factory=list)
     episode: int | None = None
     deadline: int | None = None
+    pending_alarm: int | None = None
 
     def begin_episode(self, episode):
         self.episode = int(episode)
         self.deadline = None
+        self.pending_alarm = None
 
     def query(self, feature, score, step):
         normalized = (np.asarray(feature, dtype=float) - self.center) / self.scale
@@ -149,14 +152,20 @@ class TimingFeedbackGate:
         threshold = float(self.baseline_threshold * np.exp(-self.strength * direction))
         baseline_stop = bool(score > self.baseline_threshold)
         stop = bool(score > threshold)
+        if self.enabled and self.remember_deferred_alarm and baseline_stop and not stop and self.pending_alarm is None:
+            self.pending_alarm = int(step)
+        # An earlier risk crossing remains pending while Later evidence
+        # supports deferral. A drop in residual alone cannot erase it.
+        deferred_evidence_lost = bool(self.remember_deferred_alarm and self.pending_alarm is not None and direction >= 0.)
         if self.enabled and self.max_wait_blocks is not None and self.deadline is None and baseline_stop and not stop:
             self.deadline = int(step) + self.block * self.max_wait_blocks
         deadline_reached = self.deadline is not None and step >= self.deadline
         return {"threshold": threshold, "baseline_stop": baseline_stop,
-                "stop": bool(stop or deadline_reached), "deadline": self.deadline,
+                "stop": bool(stop or deadline_reached or deferred_evidence_lost), "deadline": self.deadline,
                 "deadline_reached": deadline_reached, "support": len(nearby),
                 "support_mass": float(mass), "support_ready": bool(ready),
-                "vote": float(vote), "direction": float(direction)}
+                "vote": float(vote), "direction": float(direction),
+                "pending_alarm": self.pending_alarm, "deferred_evidence_lost": deferred_evidence_lost}
 
     def commit(self, cue, feature, *, completed_episode):
         if completed_episode != self.episode:
