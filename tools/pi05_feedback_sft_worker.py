@@ -11,6 +11,8 @@ class SizedMaskedLoader:
     def __iter__(self):return iter(self.loader)
     def data_config(self):return self.loader.data_config()
     @property
+    def pytorch_loader(self):return self.loader.pytorch_loader
+    @property
     def sampler(self):return self.loader.pytorch_loader.batch_sampler
     @property
     def dataset(self):return self.loader.pytorch_loader.dataset
