@@ -12,7 +12,7 @@ def metrics(labels, alarms):
     return dict(TP=tp,FN=fn,FP=fp,TN=tn,BA=(tp/(tp+fn)+tn/(tn+fp))/2 if tp+fn and tn+fp else None,
                 FPR=fp/(fp+tn) if fp+tn else None,FNR=fn/(tp+fn) if tp+fn else None)
 
-def main(root, plan, task):
+def main(root, plan, task, output_name='timing_BA_report.json'):
     state=json.loads((root/'controller_state.json').read_text())
     arms={k:Path(v) for k,v in state['completed_roots'].items()}
     passive=json.loads((arms['passive']/'summary.json').read_text())['rows']
@@ -58,14 +58,16 @@ def main(root, plan, task):
             alarms=[t is not None for t in times]
             result=metrics(labels,alarms)
             shifts=[b-a for a,b in zip(baseline_times,times) if a is not None and b is not None]
-            # Stratified paired trajectory bootstrap; not query/frame replicates.
+            # Resample complete reset-seed clusters, preserving paired ID/OOD.
             rng=np.random.default_rng(67031);y=np.asarray(labels);base=np.asarray(baseline_alarms);new=np.asarray(alarms)
             delta=[]
             if y.any() and (~y).any():
-                pos=np.where(y)[0];neg=np.where(~y)[0]
+                seeds=sorted({r['seed'] for r in passive})
+                clusters=[np.array([i for i,r in enumerate(passive) if r['seed']==seed]) for seed in seeds]
                 for _ in range(2000):
-                    ix=np.r_[rng.choice(pos,len(pos)),rng.choice(neg,len(neg))]
-                    delta.append(metrics(y[ix],new[ix])['BA']-metrics(y[ix],base[ix])['BA'])
+                    ix=np.concatenate([clusters[j] for j in rng.integers(0,len(clusters),len(clusters))])
+                    if y[ix].any() and (~y[ix]).any():
+                        delta.append(metrics(y[ix],new[ix])['BA']-metrics(y[ix],base[ix])['BA'])
             result.update(status='COMPLETE',raw_attempts=len(prefix),accepted=seen,feedback_events=len(gate.memory),
                 actual_expert_cost=sum(r['all_executed_expert_actions'] for r in prefix),
                 passive_first_alarms=times,passive_shifts=shifts,
@@ -75,7 +77,7 @@ def main(root, plan, task):
                 added_alarms=sum(a is None and b is not None for a,b in zip(baseline_times,times)),
                 BA_delta_CI95=np.quantile(delta,[.025,.975]).tolist() if delta else None,
                 threshold_relative_min=float(min(changes)),threshold_relative_max=float(max(changes)),
-                interpretation='Passive counterfactual alarms, not actual takeovers; no BA-based tuning.')
+                interpretation='Passive counterfactual alarms; CI conditional on one learned memory, clustered by reset seed. No BA-based tuning.')
             report['milestones'][name][str(milestone)]=result
     for name in ['old','sensitive']:
         pairs=[]
@@ -92,9 +94,10 @@ def main(root, plan, task):
         report['actual_timing'][name]={'common_raw_prefix_pairs':pairs,
             'unmatched_fixed_attempts':max(0,len(summaries['fixed']['rows'])-len(pairs)),
             'unmatched_feedback_attempts':max(0,len(summaries[name]['rows'])-len(pairs))}
-    (root/'timing_BA_report.json').write_text(json.dumps(report,indent=2,allow_nan=False))
+    (root/output_name).write_text(json.dumps(report,indent=2,allow_nan=False))
     print(json.dumps({'status':'TIMING_BA_COMPLETE','baseline':report['baseline']}))
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--root',type=Path,required=True);p.add_argument('--plan',type=Path,required=True);p.add_argument('--task',required=True)
-    a=p.parse_args();plan=json.loads(a.plan.read_text());main(a.root,plan,next(t for t in plan['task_settings'] if t['name']==a.task))
+    p.add_argument('--output-name',default='timing_BA_report.json')
+    a=p.parse_args();plan=json.loads(a.plan.read_text());main(a.root,plan,next(t for t in plan['task_settings'] if t['name']==a.task),a.output_name)

@@ -2,6 +2,10 @@
 
 ## 2026-09-09 最新用户决定：小样本灵敏反馈，仅收集与检测，不训练
 
+- 已启动：GitHub部署`47349a02`（本地`44273c27`同树）；H20两任务controller为StackCube `1524113` / OpenDrawer Goal `1524114`，初始fixed workers `1524146` / `1524145`。输出根`/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/small30_v1`；各task的`controller_state.json`为真实状态源。服务器原生27项相关测试通过；当前初始化/首批采集验收中，尚无新结果。
+- 控制器依次执行fixed/old/sensitive各30成功接管上限（每arm400raw上限），每20个新episode独立进程并审计；然后100条独立纯policy轨迹（50ID+50OOD），再按5/10/20/30 accepted节点重建冻结memory计算BA和时机。不会调用任何训练入口。
+- 监督：先确认真实episode落盘与视觉一致后再进入低频监测。工程异常保留原chunk，不改变模型/阈值/seed；结束于`TIMING_BA_COMPLETE`后仍需视频审查，不得当作整轮已完成。
+
 - 已认领：同一 owner `01a07faa-682a-7e01-9d5b-eeac5b96864d`；独立 worktree `Ask4Help_feedback_ablation`。
 - 用户批准 StackCube legacy OOD / OpenDrawer Goal-OOD，固定阈值、旧反馈5步上限、新版连续单事件反馈无额外延迟上限三个组，每组最多30个成功接管后缀；5/10/20/30节点检查独立BA与实际timing。
 - 本轮禁止新训练（包括训练smoke）、自动SFT与训练后SR。旧pipeline中指向训练的历史next_stage不再授权；先前工程smoke保留，不继续。
