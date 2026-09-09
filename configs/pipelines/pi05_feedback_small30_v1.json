@@ -1,0 +1,45 @@
+{
+  "pipeline_id": "pi05_feedback_small30_v1",
+  "authorized": true,
+  "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
+  "latest_user_decision": "Proceed with the agreed three-arm small-data timing and BA experiment; do not start training.",
+  "training_authorized": false,
+  "current_stage": "implementation_and_preflight",
+  "next_stage": "three_arm_collection_then_independent_detection",
+  "parent_manifest": "configs/pipelines/pi05_timing_feedback_ablation_v1.json",
+  "accepted_target": 30,
+  "max_raw_attempts": 400,
+  "milestones": [5, 10, 20, 30],
+  "passive_raw_episodes": 100,
+  "chunk_size": 20,
+  "arms": {
+    "fixed": {"support_mode": "hard_radius", "enabled": false, "max_wait_blocks": 1},
+    "old": {"support_mode": "hard_radius", "enabled": true, "max_wait_blocks": 1},
+    "sensitive": {"support_mode": "continuous", "enabled": true, "max_wait_blocks": null}
+  },
+  "new_rule": "w=exp(-distance^2/(2*radius^2)); direction=sum(w*y)/(2+sum(w)); threshold=baseline*exp(-0.5*direction). No support-count, weight-mass, or vote cutoff. No extra wait deadline.",
+  "unchanged": ["checkpoint", "PCA", "ID calibration", "radius multiplier 2", "lambda 2", "beta 0.5", "cue definition within each task", "success rule", "task horizon", "camera", "normalization"],
+  "data_policy": "Strict alternating ID/OOD from empty memory. Keep every raw attempt and expert cost. All eligible completed interventions may yield one cue, including failed ones; report cue count separately from accepted suffix count.",
+  "evaluation_policy": "Fresh autonomous base-policy trajectories, no expert, no memory updates, same inference mode as collection. Freeze feedback memories after each accepted milestone. Success/failure labels are strict task outcomes, not ID/OOD. All arms evaluated on identical trajectories; no tuning on BA.",
+  "timing_policy": "Compare actual on-policy first takeovers on the common raw-seed prefix, retain one-sided/no-alarm cases. Also report frozen-memory first-alarm shifts on independent autonomous traces, clearly passive not actual.",
+  "BA_policy": "Report confusion counts, BA, FPR, FNR, paired episode-bootstrap CI; BA missing if either outcome class absent. No noninferiority claim from point estimates.",
+  "task_settings": [
+    {"name": "stackcube", "task": "stackcube_legacy_ood", "collection_seed": 1810000, "evaluation_seed": 1830000, "gpu": "0", "cpu": "0-3", "feedback_rule": "commitment_v2", "calibration": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/calibration_v1/stackcube_legacy_ood", "opening_calibration": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_candidate_v1/stackcube_opening_ID_calibration.json"},
+    {"name": "opendrawer_goal", "task": "open_drawer_goal_ood", "collection_seed": 1820000, "evaluation_seed": 1840000, "gpu": "1", "cpu": "4-7", "feedback_rule": "displacement_v1", "calibration": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_eval_ID_calibration_v4/calibration", "opening_calibration": null}
+  ],
+  "placement_preflight": {
+    "selected_server": "root@39.101.70.188:1012",
+    "selected_reason": "Both task assets, calibration and native runtime co-located; old jobs finished.",
+    "runtime": "/root/Ask4Help-online-awbc/RLinf/.venv/bin/python",
+    "preserve_pid": 276925,
+    "H20_snapshot": {"GPU_used_MiB": [338,328], "RAM_available_GiB": 230, "tmp_free_GiB": 8.9, "shm_free_GiB": 238},
+    "rejected_5090": "All eight GPUs occupied at 28-32GB; data disk 95% used. No resources allocated.",
+    "output_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/small30_v1",
+    "storage": "Outputs on durable OSS; logs and runtime scratch in task-local /tmp. Worst case up to 250GB compressed RGB traces across 2400 raw plus200 passive; no checkpoints.",
+    "asset_provenance": "Use exact task assets in parent manifest; verify file existence and calibration audit before launch."
+  },
+  "scientific_stop": "At 400 raw attempts stop any arm short of30, retain partial result and report unmet target; no automatic threshold/seed/task changes.",
+  "forbidden": ["training", "training smoke", "post-SFT SR claims", "test-set threshold selection", "forced >=10 step shifts", "overwrite old runs", "reuse invalid Stage2", "calling OpenDrawer clean post-grasp timing"],
+  "completion_marker": "SMALL30_DIAGNOSTIC_COMPLETE.json",
+  "completion": "All three arms audited or transparently capped; independent BA at achieved milestones; timing/cost/miss summary and review videos delivered. No training transition."
+}

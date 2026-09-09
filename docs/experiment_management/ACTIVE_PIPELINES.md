@@ -1,5 +1,13 @@
 # Active Pipelines
 
+## 2026-09-09 最新用户决定：小样本灵敏反馈，仅收集与检测，不训练
+
+- 已认领：同一 owner `01a07faa-682a-7e01-9d5b-eeac5b96864d`；独立 worktree `Ask4Help_feedback_ablation`。
+- 用户批准 StackCube legacy OOD / OpenDrawer Goal-OOD，固定阈值、旧反馈5步上限、新版连续单事件反馈无额外延迟上限三个组，每组最多30个成功接管后缀；5/10/20/30节点检查独立BA与实际timing。
+- 本轮禁止新训练（包括训练smoke）、自动SFT与训练后SR。旧pipeline中指向训练的历史next_stage不再授权；先前工程smoke保留，不继续。
+- 当前阶段：新协议冻结与实现；尚未启动新一轮采集。新 manifest：`configs/pipelines/pi05_feedback_small30_v1.json`；所有旧结果保留。
+- 新版是探索性修订，不保证BA不降、不强制移动10步、不依据held-out结果再调阈值。OpenDrawer不宣称为干净post-grasp因果实验。
+
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
 - **训练工程预检准备**：当前StackCube fixed40成功后缀为20OOD+3ID（不是旧pilot的75%）；是否正式可用仍待完整arm/协议验收。已准备独立2-update训练+重载流程，在StackCube本轮paired完成、GPU0实际空闲后，使用已验收的PickPlane1327样本工程数据验证SFT链路。只做2步，不作为正式SFT/效应数据，不绕过正式训练准入；原reserved测试seed不使用。checkpoint先写独立/dev/shm任务目录，重载通过后复制到OSS，保留scratch。

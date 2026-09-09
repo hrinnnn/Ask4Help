@@ -9,9 +9,9 @@
       "TASR_on_collected_expert_data",
       "post_SFT_success_rate"
     ],
-    "training_may_continue_in_background_after_timing_TASR_report": true,
+    "training_may_continue_in_background_after_timing_TASR_report": false,
     "final_goal_still_requires_training_and_SR": true,
-    "note": "OpenDrawer stage alternatives are authorized candidates, not permission to overwrite older pipelines or fabricate results."
+    "note": "Latest user decision: execute small30 three-arm timing/BA diagnostics only; no new training or training smoke. See pi05_feedback_small30_v1.json."
   },
   "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
   "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
@@ -31,7 +31,7 @@
     "observed_open_fds": 91,
     "feedback_started": true
   },
-  "next_stage": "paired40_TASR_then_training_admission_and_policy_update",
+  "next_stage": "small30_collection_and_independent_BA_no_training",
   "soft_support_candidate": {
     "status": "40_raw_three_arm_complete_no_clear_TASR_gain",
     "plan": "docs/experiment_management/plans/Pi05_Feedback_Soft_Support_Candidate.md",

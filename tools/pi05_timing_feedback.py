@@ -113,6 +113,7 @@ class TimingFeedbackGate:
     block: int = 5
     enabled: bool = True
     support_mode: str = "hard_radius"
+    max_wait_blocks: int | None = 1
     memory: list = field(default_factory=list)
     episode: int | None = None
     deadline: int | None = None
@@ -128,7 +129,7 @@ class TimingFeedbackGate:
             if cue["episode"] >= self.episode:
                 raise ValueError("current/future episode feedback leaked into query")
             distance = float(np.linalg.norm(normalized - cue["feature"]))
-            if self.support_mode=="soft_mass" or distance <= self.radius:
+            if self.support_mode in ("soft_mass", "continuous") or distance <= self.radius:
                 nearby.append((np.exp(-.5 * (distance / self.radius) ** 2), cue["direction"]))
         direction = 0.
         vote = 0.
@@ -138,16 +139,18 @@ class TimingFeedbackGate:
             # Preserve the minimum total weight guaranteed by the old
             # min_support neighbors inside one Gaussian bandwidth.
             ready=ready and mass>=self.min_support*np.exp(-.5)
+        if self.support_mode=="continuous":
+            ready=mass>0.
         if self.enabled and ready:
             total = sum(w * y for w, y in nearby)
             vote = total / mass
-            if abs(vote) >= self.min_vote:
+            if self.support_mode=="continuous" or abs(vote) >= self.min_vote:
                 direction = total / (self.regularization + mass)
         threshold = float(self.baseline_threshold * np.exp(-self.strength * direction))
         baseline_stop = bool(score > self.baseline_threshold)
         stop = bool(score > threshold)
-        if self.enabled and self.deadline is None and baseline_stop and not stop:
-            self.deadline = int(step) + self.block
+        if self.enabled and self.max_wait_blocks is not None and self.deadline is None and baseline_stop and not stop:
+            self.deadline = int(step) + self.block * self.max_wait_blocks
         deadline_reached = self.deadline is not None and step >= self.deadline
         return {"threshold": threshold, "baseline_stop": baseline_stop,
                 "stop": bool(stop or deadline_reached), "deadline": self.deadline,

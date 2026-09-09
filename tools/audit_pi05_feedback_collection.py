@@ -37,20 +37,22 @@ def audit(root):
             for ep,z_i,y in memory:
                 assert ep<i
                 dist=np.linalg.norm(z-z_i)
-                if cfg.get('support_mode','hard_radius')=='soft_mass' or dist<=radius:
+                if cfg.get('support_mode','hard_radius') in ('soft_mass','continuous') or dist<=radius:
                     neighbors.append((np.exp(-.5*(dist/radius)**2),y))
             direction=0.
             mass=sum(w for w,y in neighbors)
             ready=len(neighbors)>=cfg['minimum_interventions']
             if cfg.get('support_mode','hard_radius')=='soft_mass':
                 ready=ready and mass>=cfg['minimum_interventions']*np.exp(-.5)
+            if cfg.get('support_mode')=='continuous':
+                ready=mass>0.
             if provenance['arm']=='feedback' and ready:
                 weighted=sum(w*y for w,y in neighbors)
-                if abs(weighted/mass)>=cfg['minimum_absolute_vote']:direction=weighted/(cfg['lambda']+mass)
+                if cfg.get('support_mode')=='continuous' or abs(weighted/mass)>=cfg['minimum_absolute_vote']:direction=weighted/(cfg['lambda']+mass)
             threshold=cal['baseline_threshold']*np.exp(-cfg['beta']*direction)
             assert np.isclose(threshold,q['threshold'],rtol=1e-7)
-            if provenance['arm']=='feedback' and deadline is None and q['score']>cal['baseline_threshold'] and q['score']<=threshold:
-                deadline=q['step']+cfg['execution_block']
+            if provenance['arm']=='feedback' and cfg.get('max_wait_blocks',1) is not None and deadline is None and q['score']>cal['baseline_threshold'] and q['score']<=threshold:
+                deadline=q['step']+cfg['execution_block']*cfg.get('max_wait_blocks',1)
             stop=q['score']>threshold or (deadline is not None and q['step']>=deadline)
             assert bool(stop)==q['stop'] and q['deadline']==deadline
             assert len(memory)==q['memory_episodes']
