@@ -15,7 +15,7 @@
   },
   "owner_thread": "01a07faa-682a-7e01-9d5b-eeac5b96864d",
   "objective": "Test the incremental value of expert timing feedback on 2-3 pi0.5 task settings using matched-budget policy updates and independent evaluation; deliver evidence-backed manuscript ablation prose without assuming a positive result.",
-  "current_stage": "chunked_soft_feedback_and_scheduled_hard_control",
+  "current_stage": "three_arm_pilots_complete_autonomous_censoring_probe",
   "render_recovery": {
     "failed_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v1",
     "complete_fixed_prefixes": {
@@ -31,9 +31,9 @@
     "observed_open_fds": 91,
     "feedback_started": true
   },
-  "next_stage": "soft_timing_TASR_then_same_seed_hard40_three_arm_budget",
+  "next_stage": "audit_autonomous_stage_events_then_frozen_candidate_and_training_admission",
   "soft_support_candidate": {
-    "status": "running_fresh_fixed_controls_then_soft_feedback",
+    "status": "40_raw_three_arm_complete_no_clear_TASR_gain",
     "plan": "docs/experiment_management/plans/Pi05_Feedback_Soft_Support_Candidate.md",
     "support_mode": "soft_mass",
     "minimum_total_weight": "minimum_interventions * exp(-0.5)",
@@ -62,6 +62,23 @@
       "state": "waiting_soft_completion",
       "same_fixed_data_reused": true,
       "common_three_arm_budget": true
+    },
+    "results": {
+      "grasp_common_budget": 221,
+      "grasp_compatible_x3": [
+        19,
+        19,
+        19
+      ],
+      "goal_common_budget": 919,
+      "goal_compatible_x3": [
+        305,
+        305,
+        305
+      ],
+      "goal_OOD_delayed_hard": 4,
+      "goal_OOD_delayed_soft": 10,
+      "scope": "Fixed/hard/soft; all changes+5; no post-SFT result"
     }
   },
   "OpenDrawer_mode_repair": {
@@ -293,14 +310,14 @@
     "output_root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1"
   },
   "process": {
-    "controller_pid": 1422325,
+    "controller_pid": 1464038,
     "worker_pids": {
-      "grasp_feedback_chunk": 1429579,
-      "goal_feedback_chunk": 1429478
+      "id_autonomy": 1464544,
+      "ood_autonomy": 1464545
     },
-    "source_commit": "949827ef",
-    "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_soft_support_v2_chunked/controller_state.json",
-    "phase_marker": "TIMING_TASR_PILOTS_COMPLETE.json",
+    "source_commit": "622ef779",
+    "state_path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_goal_autonomy_diagnostic_v1/controller_state.json",
+    "phase_marker": "AUTONOMY_PROBE_COMPLETE.json",
     "whole_pipeline_complete": false
   },
   "plan": "docs/experiment_management/plans/Pi05_Timing_Feedback_Ablation.md",
@@ -523,5 +540,21 @@
     "write_new_hashes"
   ],
   "completion_marker": "PIPELINE_COMPLETE.json",
-  "completion": "At least two task settings have complete audited paired collection, exact-budget SFT, independent final evaluation, full positive/null/negative results, and a directly usable LaTeX ablation paragraph/table. Positive benefit must be demonstrated by evidence to be claimed; no intermediate phase completes the objective."
+  "completion": "At least two task settings have complete audited paired collection, exact-budget SFT, independent final evaluation, full positive/null/negative results, and a directly usable LaTeX ablation paragraph/table. Positive benefit must be demonstrated by evidence to be claimed; no intermediate phase completes the objective.",
+  "autonomy_probe": {
+    "root": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/opendrawer_goal_autonomy_diagnostic_v1",
+    "protocol": "configs/pipelines/opendrawer_goal_autonomous_diagnostic_v1.json",
+    "purpose": "Resolve takeover censoring versus upstream failure, not reserved final SR",
+    "seed_start": 1785000,
+    "episodes_per_split": 20
+  },
+  "reserved_evaluation_protocol": "configs/pipelines/pi05_feedback_reserved_evaluation_v1.json",
+  "reserved_evaluation_used": false,
+  "stackcube_commitment_calibration": {
+    "path": "/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/commitment_candidate_v1/stackcube_opening_ID_calibration.json",
+    "ID_demo_count": 32,
+    "ID_q95": 0,
+    "opening_reference_m": 0.01,
+    "new_collection_started": false
+  }
 }

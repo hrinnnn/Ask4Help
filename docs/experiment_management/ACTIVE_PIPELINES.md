@@ -2,6 +2,8 @@
 
 ## π0.5 Timing Feedback Ablation（2026-09-09）
 
+- **08:35三组完成**：同40seed hard控制和三组共同预算已全部完成。Grasp B221时Fixed/Hard/Soft TASR×3均19/221；Goal B919均305/919。Goal Hard推迟4条、Soft10条，各5动作；没有TASR收益。成功专家成本Goal982→983，失败432→415，不把总成本小降称为成功数据效率提高。报告 `Pi05_Feedback_Three_Arm_40_Results_20260909.md`。
+- 当前是同seed无接管开发复跑：controller1464038，ID/OOD workers1464544/1464545，root `opendrawer_goal_autonomy_diagnostic_v1`，source622ef779。目标为区分被接管截断与前置抓取失败；不是post-SFT或reserved测试。最终测试9,100,000系列种子已冻结未用。StackCube的commitment候选ID参考已算好（32demo/q95=0/floor10mm），尚未新采集。正式SFT仍待准入决定。
 - **Soft40完整结果**：Grasp共同B221，TASR×3=19/221两组相同，新增1条失败报警导致专家成本510→540。Goal10条OOD配对接管推迟5步，但共同B920的TASR×3=304/920→303/920（33.04→32.93%）；成功专家动作982→983，失败段432→415，所以总成本减少不能包装成成功数据效率提升。hard40控制已自动运行，尚待三组同预算报告。
 - 已登记后续同seed无接管开发复跑：Goal-ID/OOD各20，seed1785000–19，原base/eval模式，等待hard40完成后运行。目的区分“被提前接管截断”与“确实无法自主抓起”；不是reserved最终SR。接管前0/20抓起不能直接推断没有自主抓取能力。最终测试已另行冻结9,100,000系列seed，未使用。
 - **07:40恢复已推进**：新root `opendrawer_soft_support_v2_chunked` controller1422325，固定组两stage均补齐40并通过审计，原24条只引用、无覆盖。新16条过程中FD计数稳定91；不把底层原因夸称已完全解释。当前feedback首chunk workers1429579/1429478，最多每进程20新episode，后续从已完成记录恢复精确memory。source949827ef（本地07151958）。
