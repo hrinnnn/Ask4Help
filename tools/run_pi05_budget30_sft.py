@@ -12,7 +12,9 @@ def run(a):
     def save():statepath.write_text(json.dumps(state,indent=2))
     base_env={**os.environ,'PYTHONPATH':str(a.code/'tools')+':'+p['native_source']+':'+p['native_source']+'/RLinf',
               'PYTHONDONTWRITEBYTECODE':'1','JAX_PLATFORMS':'cpu','OMP_NUM_THREADS':'4','MKL_NUM_THREADS':'4','OPENBLAS_NUM_THREADS':'4',
-              'HF_HUB_OFFLINE':'1','HF_DATASETS_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1','TMPDIR':'/tmp/pi05_timing_feedback_ablation_v1/tmp0'}
+              'HF_HUB_OFFLINE':'1','HF_DATASETS_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1',
+              'HF_DATASETS_CACHE':'/dev/shm/pi05_budget30_dataset_cache','TMPDIR':'/tmp/pi05_timing_feedback_ablation_v1/tmp0'}
+    Path(base_env['HF_DATASETS_CACHE']).mkdir(exist_ok=True)
     def command(cmd,label,env=None):
         log=logs/(label+'.log');state['stage']=label
         with log.open('a') as f:q=subprocess.Popen(cmd,env=env or base_env,stdin=subprocess.DEVNULL,stdout=f,stderr=subprocess.STDOUT,start_new_session=True)
@@ -50,7 +52,7 @@ def run(a):
              'FEEDBACK_ID_DATASET':p['ID_dataset'],'FEEDBACK_EXPERT_DATASET':str(root/'data'/arm),
              'FEEDBACK_NORM_PATH':p['norm'],'FEEDBACK_BASE_CHECKPOINT':p['checkpoint_view'],
              'FEEDBACK_TASK_INSTRUCTION':p['instruction'],'FEEDBACK_SFT_STEPS':str(p['training']['steps']),
-             'FEEDBACK_SFT_SEED':str(p['training']['seed']),'HF_DATASETS_CACHE':'/tmp/pi05_timing_feedback_ablation_v1/sft_data_cache',
+             'FEEDBACK_SFT_SEED':str(p['training']['seed']),'HF_DATASETS_CACHE':base_env['HF_DATASETS_CACHE'],
              'VK_ICD_FILENAMES':'/etc/vulkan/icd.d/nvidia_icd.json','TMPDIR':f'/tmp/pi05_budget30_sft_tmp_{gpu}',
              'RAY_TMPDIR':f'/tmp/pi05_budget30_sft_ray_{gpu}'}
         for key in ['TMPDIR','RAY_TMPDIR']:Path(env[key]).mkdir(exist_ok=True)
