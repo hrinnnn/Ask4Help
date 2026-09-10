@@ -3,8 +3,8 @@
   "authorized": true,
   "owner": "01a089e4-7cd0-7a50-afb6-689bb94190da",
   "latest_user_decision": "2026-09-10: directly execute search for a better TAS/TNS; partial robust improvement acceptable, no need perfect fit",
-  "current_stage": "cache_contract_and_fixed_head_probe",
-  "next_stage": "evaluate_probe_scores_and_choose_validated_followup",
+  "current_stage": "independent_CPU_cache_extraction_and_scoring",
+  "next_stage": "audit_independent_scores_then_decide_next_model_probe",
   "output_local": "/Users/zhaozhixuan/Desktop/tsinghua_learning/Research/SEEN_workspace/Ask4Help_agent_workspace/artifacts/tns_model_utility_20260910",
   "candidate_tasks": [
     "X-VLA StackCube Stage2",
@@ -18,12 +18,14 @@
     "Keep negative cohorts and outcomes; never tune to final SR"
   ],
   "placement_preflight": {
-    "selected_server": "local CPU",
-    "selected_reason": "177MB model cache already local; both H20 GPUs busy and no confirmed free5090",
+    "selected_server": "H20 CPU8-11, noCUDA",
+    "selected_reason": "NativeCPU5sample smoke passed18.17s; existing GPU workers are pinned0-3 and4-7; CPU8-11disjoint; exact checkpoint/data/runtime on H20",
     "snapshot_time": "2026-09-10 16:19 CST",
     "h20": "2/2 GPUs at96-98% util,~16.8GB each;existingbudget30SFT",
     "rtx5090": "all8 cards have allocations;data98%full",
-    "expected_local_output_mb": 20
+    "expected_local_output_mb": 20,
+    "persistent_output_root": "/mnt/data/ask4help/results/tns_model_utility_v1",
+    "expected_output_gb": 1
   },
   "short_probe": {
     "steps": 100,
@@ -32,10 +34,13 @@
       31002,
       31003
     ],
-    "scope": "cached final action decoder only; not whole VLA",
+    "scope": "final affine head, nativeX-VLA224BGR contract",
     "source_balance": "ID:new expert1:1",
-    "optimizer": "SGD or Adam declared before score comparison; actual protocol frozen in run manifest",
-    "evaluation": "disjoint-reset OOD probes when available; ID retained split; retrospective comparison with knownSR"
+    "optimizer": "Adam lr1e-4 beta0.9/0.999 eps1e-8",
+    "evaluation": "disjoint-reset OOD probes when available; ID retained split; retrospective comparison with knownSR",
+    "score": "(0.5deltaL_ID+0.25deltaL_nominal+0.25deltaL_recovery)/same_initial_mixture",
+    "candidate_status": "posthoc pilot candidate now frozen before independent cache scores",
+    "independent_probes": "20 nominal OOD resets excluded from all6training selections;14 have successful Recovery data; missing6reported; ID update0..3 vsIDprobe108..127"
   },
   "execution_audit": {
     "required": [
@@ -45,7 +50,37 @@
       "no reset overlap between train and probe",
       "independent arithmetic audit"
     ],
-    "failure_marker": "CONTRACT_MISMATCH.json"
+    "failure_marker": "CONTRACT_MISMATCH.json",
+    "cpu_smoke": "cpu_smoke_retry2 FEATURE_EXTRACTION_COMPLETE 5samples18.17s1tailfinite"
   },
-  "terminal_definition": "Report all executed candidates, at least one reproducible local improvement or explicit null, held-out limitations, independent audit; broader learning claims require new prospective evidence"
+  "terminal_definition": "Report all executed candidates, at least one reproducible local improvement or explicit null, held-out limitations, independent audit; broader learning claims require new prospective evidence",
+  "source_branch": "codex/tns-model-utility-v1",
+  "source_commit": "1ebc0bc4",
+  "output_remote": "/mnt/data/ask4help/results/tns_model_utility_v1",
+  "remote_state": "/mnt/data/ask4help/results/tns_model_utility_v1/pipeline_state.json",
+  "launch_entrypoint": "source/tools/run_tns_cpu_pipeline.py",
+  "completion_marker": "COMPUTE_COMPLETE.json",
+  "failure_marker": "FAILED.json",
+  "followup_rules": [
+    "When COMPUTE_COMPLETE: download independent_scores_v1/results.json, cachecontract/completion and frozen spec; independently audit native reconstruction, masks, seed exclusion and all reported ranks",
+    "Compare four1968timing groups together; compare434gate pair separately; include originalTASR, OOD-only proxy andretention candidate, 20/100step results",
+    "Do not claim prospectiveSR validation: existingSRknown; these are newreset probes of a frozen posthoc formula",
+    "If independent results retain useful improvement, register candidate and report limits; next full-model/otherbackbone experiment requires its own inputs/runtime/resourcepreflight under existing userauthorization",
+    "If result fails, preserve all outputs and diagnose model/probe mismatch before a bounded documented revision; no silentSRtuning"
+  ],
+  "controller_pid": 2098868,
+  "worker_pid": 2098873,
+  "last_progress": {
+    "completed": 241,
+    "total": 1326,
+    "elapsed_seconds": 208.22,
+    "gpu_memory_gb": 0,
+    "cpu_affinity": "8-11"
+  },
+  "watchdog": {
+    "automation_id": "tns",
+    "interval_minutes": 10,
+    "notify_only": "material result,error,user decision",
+    "delete_after": "independent audit and full candidate report"
+  }
 }
