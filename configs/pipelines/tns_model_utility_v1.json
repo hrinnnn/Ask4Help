@@ -1,0 +1,51 @@
+{
+  "pipeline_id": "tns_model_utility_v1",
+  "authorized": true,
+  "owner": "01a089e4-7cd0-7a50-afb6-689bb94190da",
+  "latest_user_decision": "2026-09-10: directly execute search for a better TAS/TNS; partial robust improvement acceptable, no need perfect fit",
+  "current_stage": "cache_contract_and_fixed_head_probe",
+  "next_stage": "evaluate_probe_scores_and_choose_validated_followup",
+  "output_local": "/Users/zhaozhixuan/Desktop/tsinghua_learning/Research/SEEN_workspace/Ask4Help_agent_workspace/artifacts/tns_model_utility_20260910",
+  "candidate_tasks": [
+    "X-VLA StackCube Stage2",
+    "pi0.5 OpenDrawer Grasp OOD"
+  ],
+  "immutable_rules": [
+    "Do not modify old datasets/checkpoints/success predicates",
+    "Use actual real temporal mask and action dimensions",
+    "No GPU use on occupied cards",
+    "Separate cached-head proxy from full-model short training",
+    "Keep negative cohorts and outcomes; never tune to final SR"
+  ],
+  "placement_preflight": {
+    "selected_server": "local CPU",
+    "selected_reason": "177MB model cache already local; both H20 GPUs busy and no confirmed free5090",
+    "snapshot_time": "2026-09-10 16:19 CST",
+    "h20": "2/2 GPUs at96-98% util,~16.8GB each;existingbudget30SFT",
+    "rtx5090": "all8 cards have allocations;data98%full",
+    "expected_local_output_mb": 20
+  },
+  "short_probe": {
+    "steps": 100,
+    "seeds": [
+      31001,
+      31002,
+      31003
+    ],
+    "scope": "cached final action decoder only; not whole VLA",
+    "source_balance": "ID:new expert1:1",
+    "optimizer": "SGD or Adam declared before score comparison; actual protocol frozen in run manifest",
+    "evaluation": "disjoint-reset OOD probes when available; ID retained split; retrospective comparison with knownSR"
+  },
+  "execution_audit": {
+    "required": [
+      "native-cache forward reconstruction",
+      "sample-to-target alignment",
+      "all-tail-mask integrity",
+      "no reset overlap between train and probe",
+      "independent arithmetic audit"
+    ],
+    "failure_marker": "CONTRACT_MISMATCH.json"
+  },
+  "terminal_definition": "Report all executed candidates, at least one reproducible local improvement or explicit null, held-out limitations, independent audit; broader learning claims require new prospective evidence"
+}
