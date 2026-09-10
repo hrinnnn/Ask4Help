@@ -1,10 +1,10 @@
 {
   "pipeline_id": "tns_model_utility_v1",
-  "authorized": true,
+  "authorized": false,
   "owner": "01a089e4-7cd0-7a50-afb6-689bb94190da",
-  "latest_user_decision": "2026-09-10: directly execute search for a better TAS/TNS; partial robust improvement acceptable, no need perfect fit",
-  "current_stage": "independent_CPU_cache_extraction_and_scoring",
-  "next_stage": "audit_independent_scores_then_decide_next_model_probe",
+  "latest_user_decision": "2026-09-10用户明确纠正：SC Stage2四时机实验的协议及旧SR无效，不得用其验证或拟合TAS/TNS。撤回基于52/30/10/4及相关旧四时机结果的指标优越性结论。",
+  "current_stage": "STOPPED_INVALID_EVIDENCE_PER_USER",
+  "next_stage": null,
   "output_local": "/Users/zhaozhixuan/Desktop/tsinghua_learning/Research/SEEN_workspace/Ask4Help_agent_workspace/artifacts/tns_model_utility_20260910",
   "candidate_tasks": [
     "X-VLA StackCube Stage2",
@@ -62,11 +62,7 @@
   "completion_marker": "COMPUTE_COMPLETE.json",
   "failure_marker": "FAILED.json",
   "followup_rules": [
-    "When COMPUTE_COMPLETE: download independent_scores_v1/results.json, cachecontract/completion and frozen spec; independently audit native reconstruction, masks, seed exclusion and all reported ranks",
-    "Compare four1968timing groups together; compare434gate pair separately; include originalTASR, OOD-only proxy andretention candidate, 20/100step results",
-    "Do not claim prospectiveSR validation: existingSRknown; these are newreset probes of a frozen posthoc formula",
-    "If independent results retain useful improvement, register candidate and report limits; next full-model/otherbackbone experiment requires its own inputs/runtime/resourcepreflight under existing userauthorization",
-    "If result fails, preserve all outputs and diagnose model/probe mismatch before a bounded documented revision; no silentSRtuning"
+    "Do not restart this pipeline. Use only user-approved experiment cohorts; no Stage2 timing SR as target."
   ],
   "controller_pid": 2098868,
   "worker_pid": 2098873,
@@ -79,8 +75,6 @@
   },
   "watchdog": {
     "automation_id": "tns",
-    "interval_minutes": 10,
-    "notify_only": "material result,error,user decision",
-    "delete_after": "independent audit and full candidate report"
+    "status": "deleted"
   }
 }

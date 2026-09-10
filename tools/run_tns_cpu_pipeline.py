@@ -4,6 +4,8 @@ from pathlib import Path
 import numpy as np
 
 def main(a):
+ if (a.root/'INVALID_EVIDENCE_USER_CORRECTION.json').exists():
+  raise SystemExit('Stopped by user: historical Stage2 evaluation is invalid; do not resume.')
  a.root.mkdir(parents=True,exist_ok=True);state=a.root/'pipeline_state.json';log=a.root/'controller.log'
  def mark(stage,**extra):
   state.write_text(json.dumps(dict(pipeline='tns_model_utility_v1',stage=stage,pid=os.getpid(),time=time.time(),**extra),indent=2))
