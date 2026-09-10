@@ -8,7 +8,11 @@ import numpy as np
 
 def main(args):
  out=args.output;out.mkdir(parents=True,exist_ok=True);t0=time.time()
- meta=json.loads((args.cache/'samples.json').read_text());d=np.load(args.cache/'head_probe_cache.npz')
+ meta=json.loads((args.cache/'samples.json').read_text())
+ for x in meta:
+  x.setdefault('episode_id',x['path'])
+  if args.independent and x['group'].startswith('query_'):x['group']='expert_'+x['group'][6:]
+ d=np.load(args.cache/'head_probe_cache.npz')
  H=d['head_features'].astype(np.float32);Y=d['targets'].astype(np.float32);M=d['valid_mask'];W=d['head_weight'];b=d['head_bias']
  assert H.shape[:3]==(len(meta),2,10) and Y.shape==(len(meta),10,8)
  lengths=np.array([min(10,s['episode_length']-s['offset']) for s in meta]);assert np.array_equal(M.sum(1),lengths)
@@ -29,7 +33,8 @@ def main(args):
   return (25/(len(idx)*2))*(x.reshape(-1,x.shape[-1]).T@werr.reshape(-1,8))
  methods=['immediate','post_grasp','post_lift','failure_recovery']+(['internal_pca','diffdagger'] if args.include_gates else [])
  seeds=sorted({s['seed'] for s in meta if s['group']=='expert_immediate'})
- assert len(seeds)==8
+ if not args.independent:assert len(seeds)==8
+ folds=[0] if args.independent else [0,1]
  idtrain=np.array([i for i,s in enumerate(meta) if s['group']=='id_calibration'])
  idcheck=np.array([i for i,s in enumerate(meta) if s['group']=='id_check'])
  nparams=base.shape
@@ -43,12 +48,14 @@ def main(args):
  eps=1e-4;fd=(batchloss(eps*direction)-batchloss(-eps*direction))/(2*eps);analytic=float(np.sum(grad*direction));relative_error=abs(fd-analytic)/max(abs(analytic),1e-12)
  assert relative_error<.02,(fd,analytic,relative_error)
  runs=[]
- for fold in [0,1]:
-  trainseeds=set(seeds[fold::2]);testseeds=set(seeds[1-fold::2]);assert trainseeds.isdisjoint(testseeds)
+ for fold in folds:
+  trainseeds=set(seeds) if args.independent else set(seeds[fold::2]);testseeds={x['seed'] for x in meta if x['group'] in ['ood_probe','ood_recovery_probe']} if args.independent else set(seeds[1-fold::2]);assert trainseeds.isdisjoint(testseeds)
   probes={'nominal':np.array([i for i,s in enumerate(meta) if s['group']=='expert_immediate' and s['seed'] in testseeds]),'recovery':np.array([i for i,s in enumerate(meta) if s['group']=='expert_failure_recovery' and s['seed'] in testseeds]),'ID':idcheck}
+  if args.independent:probes={k:np.array([i for i,s in enumerate(meta) if s['group']==g]) for k,g in [('nominal','ood_probe'),('recovery','ood_recovery_probe'),('ID','id_replay_probe')]}
+  assert all(len(v)>0 for v in probes.values())
   l0={k:loss(idx,zero) for k,idx in probes.items()}
   for method in methods:
-   methodseeds=sorted({s['seed'] for s in meta if s['group']=='expert_'+method});mtrain=set(methodseeds[fold::2])
+   methodseeds=sorted({s['seed'] for s in meta if s['group']=='expert_'+method});mtrain=set(methodseeds) if args.independent else set(methodseeds[fold::2])
    train=np.array([i for i,s in enumerate(meta) if s['group']=='expert_'+method and s['seed'] in mtrain]);assert len(train)>0
    assert not mtrain.intersection(testseeds)
    for seed in [31001,31002,31003]:
@@ -65,7 +72,7 @@ def main(args):
       gain={k:l0[k]-after[k] for k in after};norm={k:gain[k]/l0[k] for k in gain}
       checkpoints.append(dict(step=step,before=l0,after=after,gain=gain,relative_gain=norm,TNS=.5*(norm['nominal']+norm['recovery']),TNS_retention=(.5*gain['ID']+.25*gain['nominal']+.25*gain['recovery'])/(.5*l0['ID']+.25*l0['nominal']+.25*l0['recovery']),ID_relative_gain=norm['ID']))
     runs.append(dict(method=method,fold=fold,seed=seed,train_reset_seeds=sorted(mtrain),probe_reset_seeds=sorted(testseeds),expert_anchors=len(train),tail_anchors=int(sum(lengths[train]<10)),checkpoints=checkpoints,delta_norm=float(np.linalg.norm(delta))))
-    (out/'progress.json').write_text(json.dumps(dict(completed=len(runs),total=len(methods)*6,elapsed_seconds=time.time()-t0)))
+    (out/'progress.json').write_text(json.dumps(dict(completed=len(runs),total=len(methods)*len(folds)*3,elapsed_seconds=time.time()-t0)))
     print('RUN',len(runs),method,fold,seed,'TNS',checkpoints[-1]['TNS'],flush=True)
  # Known SR is used only here, after all protocol-fixed updates and scoring.
  SR={'immediate':.52,'post_grasp':.10,'post_lift':.04,'failure_recovery':.30,'internal_pca':.74,'diffdagger':.45}
@@ -78,12 +85,12 @@ def main(args):
  timings=[r for r in summary if r['method'] in ['immediate','post_grasp','post_lift','failure_recovery']]
  corr={k:float(np.corrcoef(rank([r[k] for r in timings]),rank([r['SR'] for r in timings]))[0,1]) for k in ['TNS_mean','TNS_retention_mean','nominal_gain','recovery_gain','ID_gain','original_Q3']}
  byrun=[]
- for fold in [0,1]:
+ for fold in folds:
   for seed in [31001,31002,31003]:
    rr=[r for r in runs if r['fold']==fold and r['seed']==seed and r['method'] in ['immediate','post_grasp','post_lift','failure_recovery']]
    byrun.append(dict(fold=fold,seed=seed,rho=float(np.corrcoef(rank([r['checkpoints'][-1]['TNS'] for r in rr]),rank([SR[r['method']] for r in rr]))[0,1])))
- result=dict(status='CACHED_FINAL_HEAD_PROBE_COMPLETE_NOT_FULL_VLA',protocol=dict(lr=args.lr,optimizer='Adam',beta=[.9,.999],eps=1e-8,steps=100,batch=32,ID_expert_ratio='1:1',train_seeds=[31001,31002,31003],folds=2,MC=2,head_shape=list(base.shape),loss='100 x MSE on real8 dimensions, mean valid targets per anchor, mean MC',score='mean of relative heldout nominal and recovery loss reductions',heldout_aggregation='equal episode weight',fixed_feature_limitation='No trunk/transformer updates; fixed noisy inputs; final affine-head response only'),input=dict(cache=str(args.cache.resolve()),samples=len(meta),tail=int(sum(lengths<10)),unique_original_episodes=len(set(s['episode_id'] for s in meta))),gradient_audit=dict(fd=fd,analytic=analytic,relative_error=relative_error),summary=summary,correlations=corr,per_fold_seed=byrun,runs=runs,limitations=['Only first8 episodes/method; not the complete original matched-budget training datasets.','Two seed folds and3 SGD-sampling repeats are not6 independent training datasets.','OOD probes are held-out resets from the same inspected collection; historicalSR already known.','Nominal/recovery probe mixture is fixed equal, not measured task-criticality or deployment occupancy.','Native cache bf16 versus FP32 affine reconstruction introduces small numerical differences.','ID_check episodes were part of original base training; measures ID retention, not new generalization.','No new closed-loop SR or full-model short-training result.'],elapsed_seconds=time.time()-t0)
+ result=dict(status='CACHED_FINAL_HEAD_PROBE_COMPLETE_NOT_FULL_VLA',protocol=dict(lr=args.lr,optimizer='Adam',beta=[.9,.999],eps=1e-8,steps=100,batch=32,ID_expert_ratio='1:1',train_seeds=[31001,31002,31003],folds=len(folds),independent_probes=args.independent,MC=2,head_shape=list(base.shape),loss='100 x MSE on real8 dimensions, mean valid targets per anchor, mean MC',score='mean of relative heldout nominal and recovery loss reductions',heldout_aggregation='equal episode weight',fixed_feature_limitation='No trunk/transformer updates; fixed noisy inputs; final affine-head response only'),input=dict(cache=str(args.cache.resolve()),samples=len(meta),tail=int(sum(lengths<10)),unique_original_episodes=len(set(s['episode_id'] for s in meta))),gradient_audit=dict(fd=fd,analytic=analytic,relative_error=relative_error),summary=summary,correlations=corr,per_fold_seed=byrun,runs=runs,limitations=['Sampled anchors from full selection; not full-dataset retraining.' if args.independent else 'Only first8 episodes/method; not the complete original matched-budget training datasets.','Two seed folds and3 SGD-sampling repeats are not6 independent training datasets.','OOD probes are held-out resets from the same inspected collection; historicalSR already known.','Nominal/recovery probe mixture is fixed equal, not measured task-criticality or deployment occupancy.','Native cache bf16 versus FP32 affine reconstruction introduces small numerical differences.','ID_check episodes were part of original base training; measures ID retention, not new generalization.','No new closed-loop SR or full-model short-training result.'],elapsed_seconds=time.time()-t0)
  (out/'results.json').write_text(json.dumps(result,ensure_ascii=False,indent=2,allow_nan=False));(out/'CACHED_HEAD_COMPLETE.json').write_text(json.dumps(dict(runs=len(runs),finite=True,summary='results.json')))
  print(json.dumps(dict(summary=summary,correlations=corr,per_fold_seed=byrun,seconds=time.time()-t0),ensure_ascii=False,indent=2))
 if __name__=='__main__':
- p=argparse.ArgumentParser();p.add_argument('--cache',type=Path,default=Path('artifacts/expert_feedback_pca_20260907/free_action_v1'));p.add_argument('--output',type=Path,default=Path('artifacts/tns_model_utility_20260910/head_pilot_v1'));p.add_argument('--lr',type=float,default=1e-4);p.add_argument('--include-gates',action='store_true');main(p.parse_args())
+ p=argparse.ArgumentParser();p.add_argument('--cache',type=Path,default=Path('artifacts/expert_feedback_pca_20260907/free_action_v1'));p.add_argument('--output',type=Path,default=Path('artifacts/tns_model_utility_20260910/head_pilot_v1'));p.add_argument('--lr',type=float,default=1e-4);p.add_argument('--include-gates',action='store_true');p.add_argument('--independent',action='store_true');main(p.parse_args())
