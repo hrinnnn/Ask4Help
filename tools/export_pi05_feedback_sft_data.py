@@ -8,7 +8,8 @@ from pi05_feedback_artifacts import episode_path
 
 def run(args):
     args.output.mkdir(parents=True,exist_ok=False)
-    selection=json.loads((args.paired_root/'pilot_TASR.json').read_text())['results']
+    selection_path=args.selection or args.paired_root/'pilot_TASR.json'
+    selection=json.loads(selection_path.read_text())['results']
     budgets={r['expert_action_budget'] for r in selection.values()};assert len(budgets)==1 and min(budgets)>0
     from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
     import pyarrow.parquet as pq
@@ -48,6 +49,7 @@ def run(args):
                     for feature,key in [('image','main'),('wrist_image','wrist')]:
                         rgb=np.asarray(Image.open(io.BytesIO(row[feature]['bytes'])).convert('RGB'))
                         assert np.array_equal(rgb,d[key][take+j])
+                        if output_index==0 and j==0:Image.fromarray(rgb).save(args.output/f'{arm}_first_{key}.png')
                 episode_map.append({'output_episode':output_index,'source_episode':r['episode'],'seed':r['seed'],
                                     'split':r['split'],'source_trace':str(source),'source_start':take,'anchors':n,
                                     'tail_anchors':min(9,n),'last_anchor_valid_targets':1})
@@ -58,7 +60,7 @@ def run(args):
         histogram={str(k):sum(max(0,r['anchors']-9) if k==10 else int(r['anchors']>=k) for r in episode_map) for k in range(1,11)}
         row={'arm':arm,'dataset':str(destination),'anchors':sum(r['anchors'] for r in episode_map),
              'episodes':len(episode_map),'episode_map':episode_map,'horizon':10,'valid_target_histogram':histogram,
-             'source_collection':str(args.paired_root/arm),'selection_source':str(args.paired_root/'pilot_TASR.json'),
+             'source_collection':str(args.paired_root/arm),'selection_source':str(selection_path),
              'status':'EXPORTED_PILOT_DATA_NOT_SFT_RESULT','padding_rule':'native LeRobot repeats final action; native mask adapter excludes temporal padding during SFT',
              'terminal_observation':'Trace terminal RGB remains in source; every observation with a real expert action is an SFT anchor.'}
         assert sum(histogram.values())==row['anchors']
@@ -68,6 +70,7 @@ def run(args):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--paired-root',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
+    p.add_argument('--selection',type=Path)
     a=p.parse_args()
     try:run(a)
     except Exception as e:

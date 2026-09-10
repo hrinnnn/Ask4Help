@@ -1,5 +1,45 @@
 # Active Pipelines
 
+## 2026-09-10 用户最新授权：挂后台训练最终Stage2两组
+
+- 用户在最终30反馈结果报告后明确授权挂起训练；按上下文执行后台训练，覆盖此前“不训练”的未来动作限制，旧诊断结果不改。主owner不变，Luna继续30分钟只读监测。
+- 已认领`pi05_budget30_sft_v1`：最终budget30的fixed vs sensitive两组，从同一OpenDrawer v9 native5000基座出发，各2500步；先完整后缀匹配专家动作预算，原ID:new专家1:1，原norm，保留全部真实anchor与tail mask。
+- 使用用户已看过的自然ID/OOD组成，不补配额。该明确训练请求针对这两份数据；作为paired ablation，不冒充旧100accepted/80%OOD主实验。
+- H20两卡空闲（仅保护276925），tmp8.7GiB、shm238GiB可用、RAM230GiB可用；5090所有卡有占用且data97%，不分配。模型/原始ID/norm均应保持当前同任务输入。
+- 流程：预算索引→原生导出与mask/batch审计→视觉/两步重载→两组2500步→各100ID100OOD独立评测→报告。长任务由持久controller推进，不在smoke完成后停止。
+
+## 2026-09-10 30反馈预算确认与报告完成
+
+- `pi05_evidence_wait_budget30_v1`两组和100独立passive已完成full审计；主agent另复核标签、分母、无专家动作、fresh seed、记忆始终<=30和逐轨迹配对。固定/修订BA79.43/82.58%，FP2/4（22成功），FN25/13（78失败）；ΔBA95%CI[-4.74,10.00]pp，单流正向点估计而非显著普遍收益。
+- 共同120raw：52双方接管、51双方未接管、17新增接管；52配对中32提前18不变2推迟，30条提前>=10步、最长推迟10步。共同60OOD辅助成功12→22，60ID30→32。收30成功后缀cost5075→3770，但共同120raw cost2593→3770，完整报告两种口径。
+- 结果报告、LaTeX及正负配对视频在主工作区`artifacts/final_feedback_report_20260910/`，正负终帧已检查。此前StackCube、Goal-OOD负结果及76反馈版本保留。当前达到已授权的冻结策略诊断报告交付，未训练。
+- 完成标记`DIAGNOSTIC_COMPLETE.json`；当前无后续训练授权，完成交付后删除空闲heartbeat以节省token，不创建Goal。
+
+## 2026-09-10 用户指定：Luna max监测，主agent决策
+
+- 心跳保持每30分钟，不创建Goal。有界监测子agent `/root/luna_monitor` 使用gpt-5.6-luna/max；每次只读状态、PID/progress/日志/marker，返回简短异常或完成提示。
+- 主agent仍为唯一pipeline owner，负责必要复核、工程修复、科学决策、阶段推进和结果报告。Luna不改阈值/seed、不终止进程、不启动训练、不创建独立长期pipeline。
+- 当前pipeline仍为`pi05_evidence_wait_budget30_v1`，主根与并行修订根不变。自动任务`small30-ba`已改为委派Luna检查，健康时主agent不重复远端轮询。
+
+## 2026-09-10 Stage2正向结果与真正30反馈预算确认
+
+- evidence_wait_v1 Stage2三组及100passive已完成，full审计与独立confusion复核通过。固定/上一版/修订BA75.10/77.89/80.49%，FP1/3/3（23成功），FN35/24/20（77失败）。修订相对固定ΔBA5.39pp，95%reset-seed簇CI[-1.96,11.96]pp，单流结果，非已证明显著普遍收益。
+- 共同142raw的71OOD辅助完成14→22，10改善2变差；ID42→41。收30成功后缀cost4810→4254，但共同raw成本3545→4254，需同时报告。报告和正/负/推迟视频在主工作区`artifacts/evidence_wait_review_20260909/opendrawer_stage2/`。
+- 关键预算限制：30成功后缀用了76条反馈（含失败）。按用户20–30反馈的实际目标，新冻结`configs/pipelines/pi05_evidence_wait_budget30_v1.json`：前30条有效反馈后记忆冻结，其余参数不变；新collection1910000/eval1920000。此为独立预算协议，不能称原76反馈版本复现。
+- 用户已授权持续改进；新root`evidence_wait_budget30_v1`、并行root`evidence_wait_budget30_parallel_v1`，source27a7b980（本地f19e0dd3）；固定/独立评测GPU1，修订GPU0，同一既有资产，原任务完成，不训练。下一阶段发布后启动、首批审计、完整结果报告。
+
+## 2026-09-09 晚间持续推进：双卡并行与增量审计
+
+- 2026-09-09 23:16北京时间确认迁移完成：主controller1759813，GPU1 old worker1760294已133raw/25accepted；GPU0并行修订worker1763511已23raw/3accepted。原collector分块完整保留，新source5af98de7继续原seed和memory，暂无error；不再把旧controller暂停状态当作当前状态。
+
+- 已实际启动：并行修订controller1755267、worker1755290（GPU0），首条轨迹落盘；迁移器1755721等原child1753234完成，旧controller1650915暂停属预期。主根`parallel_migration_state.json`为迁移状态源。跨GPU首条空memory整轨迹动作差0、reset RGB相同，验证通过。
+- 增量审计在原old/chunk0080真实100条数据上与既有full审计逐行结果相同；复用80条，仅检查20条，用时44.8秒。整组末保留full审计。heartbeat已更新到当前并行/迁移流程，不创建Goal。
+
+- 用户授权今晚持续推进、用heartbeat、不要Goal；结果不足继续有依据的新版本，直到可交付ablation报告，仍无训练。
+- 性能修订source5af98de7：增量审计复用已审计prefix，每组结束保留一次full audit；新增only-arm/gpu/cpu/external-sensitive-root执行支持，科学参数不变。
+- 新修订组将独立在GPU0/CPU0-3运行，root`/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/evidence_wait_parallel_sensitive_v1`；主对照/独立passive继续GPU1/CPU4-7，原root不变。
+- 主控制器在当前child结束后迁移，暂停的仅是旧控制器而非collector；`parallel_migration_state.json`记录被保留child及新owner。迁移若中断须先查此state及PID，不重复启动。主控制器会引用并行组完成artifact，不复制/重采同一组。
+
 ## 2026-09-09 最新追加：OpenDrawer Stage2优先，与StackCube修订并行
 
 - 2026-09-09 22:28北京时间：SSH已恢复，OpenDrawer Stage2 controller正常自动推进至old/chunk0040审计（1742739），无error；未因短暂连接中断重启任何进程。

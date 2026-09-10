@@ -11,6 +11,7 @@ import torch.multiprocessing as mp
 from omegaconf import OmegaConf
 from rlinf.config import validate_cfg
 from rlinf.runners.sft_runner import SFTRunner
+from pi05_archived_sft_runner import ArchivedSFTRunner
 from rlinf.scheduler import Cluster
 from rlinf.utils.placement import HybridComponentPlacement
 from pi05_feedback_sft_worker import FeedbackVlaSftWorker
@@ -30,7 +31,8 @@ def main(cfg):
         assert cfg.actor.training_backend in ['fsdp','fsdp2']
         actor=FeedbackVlaSftWorker.create_group(cfg).launch(cluster,name=cfg.actor.group_name,
                                                            placement_strategy=placement.get_strategy('actor'))
-        runner=SFTRunner(cfg=cfg,actor=actor);runner.init_workers();runner.run()
+        runner_class=ArchivedSFTRunner if os.environ.get('FEEDBACK_CHECKPOINT_ARCHIVE') else SFTRunner
+        runner=runner_class(cfg=cfg,actor=actor);runner.init_workers();runner.run()
     finally:
         if ray.is_initialized():ray.shutdown()
 
