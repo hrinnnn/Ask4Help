@@ -1,0 +1,15 @@
+{
+  "evaluation_role":"diagnostic_step2000_probe",
+  "purpose":"User-requested paired20 Stage2 OOD check of both immutable step2000 models while2500-step training continues.",
+  "episodes_per_split":20,
+  "inference_mode":"eval",
+  "execute_horizon":5,
+  "tasks":{"open_drawer_grasp_ood":{"ood_start":9150000,"primary_endpoint":"strict_success"}},
+  "checkpoint_step":2000,
+  "arms":["fixed","feedback"],
+  "seeds":"9150000-9150019, same across both arms; distinct from training/collection and final9121000-9121099",
+  "expert_or_gate_used":false,
+  "resource_plan":"H20 own training GPUs0/1 have about80GiB spare each; colocate one read-only evaluation per own GPU, CPU8-11 and12-15. Do not interrupt training or overwrite its checkpoints.",
+  "output_root":"/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/budget30_sft_v1/step2000_probe20_v1",
+  "interpretation":"Intermediate20-episode diagnostic, not final100-episode SR; does not select a new training stopping point."
+}

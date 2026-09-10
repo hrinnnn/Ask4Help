@@ -2,6 +2,20 @@
 
 ## 2026-09-10 用户最新授权：挂后台训练最终Stage2两组
 
+- 用户追加授权两组2000-step在同20个Stage2 OOD做简要测试，训练继续。已认领诊断`pi05_budget30_step2000_probe_v1.json`，20seed9150000起、strict、eval、无专家/gate，独立于最终9121000测试。两组2000归档均已核实；H20每卡约16.8GiB训练占用、剩余充足，评测共享本任务GPU0/1但使用CPU8-11/12-15。不停止训练、不换最终2500 checkpoint。root为budget30_sft_v1/step2000_probe20_v1。
+
+- 2026-09-10 18:50 Luna核验：fixed2002/2500、loss0.0255；feedback2024/2500、loss0.0277，梯度有限。两组1500和2000检查点均有完整model/DCP三文件及归档marker。控制器正常，尚未进入最终reload/eval；其他Owner的SC无效时机实验停止不影响本OpenDrawer训练。
+
+- 2026-09-10 14:54 Luna独立检查：fixed510/2500（loss0.0581）、feedback515/2500（loss0.0488），loss/grad有限。两组global_step_500均完成持久归档，包含model full_weights、DCP metadata和optimizer distcp，ARCHIVE_COMPLETE声明3files；训练已越过保存点继续，暂无错误或SR结果。
+
+- Luna启动复核：2026-09-10 13:36北京时间，fixed正式8/2500、loss0.422/grad2.86；feedback9/2500、loss0.286/grad2.8，均finite。actors2006171/2004998分别GPU0/GPU1；两组controllers健康，smoke/archive/reload标记完整，正式checkpoint尚未到500。已恢复Luna每30分钟训练→评测的全流程监测，不创建Goal。
+
+- 已实际进入正式训练：controllers fixed1995728 / feedback1995729，formal drivers2002813 /2002603（后续以root下fixed_state.json和feedback_state.json为准）；source747ef55a，root`/mnt/data/ask4help/results/pi05_timing_feedback_ablation_v1/budget30_sft_v1`。
+- 两组smoke各2优化步完成，loss0.337/0.289、grad_norm2.93/2.70有限；checkpoint归档及独立reload+10x8有限forward均PASS，action_projection变化非零。正式均重新从原base开始2500步，不续用smoke权重。
+- 专家预算各1992动作：fixed30完整后缀（12ID18OOD）、feedback28（7ID21OOD）；原ID128/22973anchors。真实tail anchors262/252，全部最后anchor1有效目标，native mask与1:1 batch审计PASS；训练输入图片已人工核对。
+- 初始mask审计因默认HF缓存落在满root盘失败，保留prepare_state_cache_failure.json；改到`/dev/shm/pi05_budget30_dataset_cache`后通过，未重采/改数据。每个closed checkpoint复制并验收持久归档后释放本次scratch副本，避免shm占满；所有持久checkpoint保留。
+- 后续每组自动完成2500→独立reload→100ID种子9120000起与100OOD种子9121000起→独立audit；这些reserved seeds未用于gate调参。完成两组与报告前保持owner，用户已允许训练，旧“不训练”监测提示须替换。
+
 - 用户在最终30反馈结果报告后明确授权挂起训练；按上下文执行后台训练，覆盖此前“不训练”的未来动作限制，旧诊断结果不改。主owner不变，Luna继续30分钟只读监测。
 - 已认领`pi05_budget30_sft_v1`：最终budget30的fixed vs sensitive两组，从同一OpenDrawer v9 native5000基座出发，各2500步；先完整后缀匹配专家动作预算，原ID:new专家1:1，原norm，保留全部真实anchor与tail mask。
 - 使用用户已看过的自然ID/OOD组成，不补配额。该明确训练请求针对这两份数据；作为paired ablation，不冒充旧100accepted/80%OOD主实验。
